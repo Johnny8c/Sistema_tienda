@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Top clientes deudores{% endblock %}
+{% block nav_reportes %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Top clientes deudores</h4>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white d-flex justify-content-between">
+    <span class="fw-semibold">Total cartera pendiente</span>
+    <span class="fs-5 fw-bold text-warning">${{ total_cartera|floatformat:2 }}</span>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <table class="table table-hover align-middle mb-0">
+    <thead>
+      <tr><th>#</th><th>Cliente</th><th>Cédula / RUC</th><th>Teléfono</th><th>Deudas</th><th>Total adeudado</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for item in top %}
+      <tr>
+        <td>
+          {% if forloop.counter == 1 %}<span class="badge bg-warning text-dark">1°</span>
+          {% elif forloop.counter == 2 %}<span class="badge bg-secondary">2°</span>
+          {% elif forloop.counter == 3 %}<span class="badge bg-dark">3°</span>
+          {% else %}{{ forloop.counter }}{% endif %}
+        </td>
+        <td class="fw-semibold">{{ item.cliente__nombre }}</td>
+        <td><code>{{ item.cliente__cedula_ruc }}</code></td>
+        <td>{{ item.cliente__telefono|default:"—" }}</td>
+        <td>{{ item.num_deudas }}</td>
+        <td class="fw-bold text-warning fs-6">${{ item.total_deuda|floatformat:2 }}</td>
+        <td>
+          <a href="{% url 'detalle_cliente' item.cliente__id %}" class="btn btn-sm btn-outline-secondary">Ver ficha</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="text-center text-muted py-4">No hay deudas pendientes.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

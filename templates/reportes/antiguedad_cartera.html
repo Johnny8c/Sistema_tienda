@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load reporte_extras %}
+{% block title %}Antigüedad de cartera{% endblock %}
+{% block nav_reportes %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Antigüedad de cartera</h4>
+  <small class="text-muted">Al {{ hoy|date:"d/m/Y" }}</small>
+</div>
+
+<!-- Resumen por bucket -->
+<div class="row g-3 mb-4">
+  {% for key, color, label in buckets_meta %}
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-{{ color }}">
+      <div class="text-muted small">{{ label }}</div>
+      <div class="fs-3 fw-bold text-{{ color }}">${{ totales|get_item:key|floatformat:2 }}</div>
+      <div class="text-muted small">{{ buckets|get_item:key|length }} deuda{{ buckets|get_item:key|length|pluralize }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Total cartera pendiente</span>
+    <span class="fs-5 fw-bold">${{ total_general|floatformat:2 }}</span>
+  </div>
+</div>
+
+{% for key, color, label in buckets_meta %}
+  {% with lista=buckets|get_item:key %}
+  {% if lista %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white">
+      <span class="badge bg-{{ color }} me-2">{{ label }}</span>
+      <span class="fw-semibold">${{ totales|get_item:key|floatformat:2 }}</span>
+      <span class="text-muted small ms-2">({{ lista|length }} deuda{{ lista|length|pluralize }})</span>
+    </div>
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead><tr><th>#</th><th>Cliente</th><th>Monto original</th><th>Saldo</th><th>Días</th><th>Vence</th><th></th></tr></thead>
+      <tbody>
+        {% for d in lista %}
+        <tr>
+          <td>{{ d.pk }}</td>
+          <td>
+            <a href="{% url 'detalle_cliente' d.cliente.pk %}">{{ d.cliente.nombre }}</a>
+            <div class="text-muted small">{{ d.cliente.cedula_ruc }}</div>
+          </td>
+          <td>${{ d.monto_original|floatformat:2 }}</td>
+          <td class="fw-semibold">${{ d.saldo_pendiente|floatformat:2 }}</td>
+          <td><span class="badge bg-{{ color }}">{{ d.dias_transcurridos }}d</span></td>
+          <td>{{ d.fecha_vencimiento|default:"—" }}</td>
+          <td><a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endwith %}
+{% endfor %}
+{% endblock %}

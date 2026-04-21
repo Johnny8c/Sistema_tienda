@@ -55,6 +55,17 @@
         </a>
         {% endif %}
 
+        {% if user.es_dueno %}
+        <hr class="my-2">
+        <small class="text-muted px-2 mb-1">Administración</small>
+        <a class="nav-link {% block nav_reportes %}{% endblock %}" href="{% url 'reportes' %}">
+          <i class="bi bi-bar-chart-line"></i> Reportes
+        </a>
+        <a class="nav-link {% block nav_cierre %}{% endblock %}" href="{% url 'cierre_caja' %}">
+          <i class="bi bi-safe"></i> Cierre de caja
+        </a>
+        {% endif %}
+
         <hr class="my-2">
         <small class="text-muted px-2 mb-1">Inventario</small>
         <a class="nav-link {% block nav_inventario %}{% endblock %}" href="#">

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}Reportes{% endblock %}
+{% block nav_reportes %}active{% endblock %}
+
+{% block content %}
+<h4 class="fw-bold mb-4"><i class="bi bi-bar-chart-line"></i> Reportes</h4>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <a href="{% url 'reporte_cartera' %}" class="text-decoration-none">
+      <div class="card border-0 shadow-sm h-100 card-hover">
+        <div class="card-body p-4">
+          <div class="fs-1 mb-2">📊</div>
+          <h5 class="fw-bold">Antigüedad de cartera</h5>
+          <p class="text-muted mb-0">Deudas pendientes agrupadas por antigüedad: 0–30, 31–60, 61–90 y 90+ días.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{% url 'reporte_adelantos' %}" class="text-decoration-none">
+      <div class="card border-0 shadow-sm h-100 card-hover">
+        <div class="card-body p-4">
+          <div class="fs-1 mb-2">📅</div>
+          <h5 class="fw-bold">Adelantos por vencer</h5>
+          <p class="text-muted mb-0">Apartados activos ordenados por fecha límite. Vencidos al inicio.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{% url 'reporte_top_deudores' %}" class="text-decoration-none">
+      <div class="card border-0 shadow-sm h-100 card-hover">
+        <div class="card-body p-4">
+          <div class="fs-1 mb-2">👥</div>
+          <h5 class="fw-bold">Top clientes deudores</h5>
+          <p class="text-muted mb-0">Los 20 clientes con mayor deuda pendiente acumulada.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a href="{% url 'cierre_caja' %}" class="text-decoration-none">
+      <div class="card border-0 shadow-sm h-100 card-hover">
+        <div class="card-body p-4">
+          <div class="fs-1 mb-2">🏦</div>
+          <h5 class="fw-bold">Cierre de caja</h5>
+          <p class="text-muted mb-0">Ingresos del día separados en ventas contado, abonos a adelantos y abonos a deudas.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<style>
+  .card-hover { transition: transform .15s, box-shadow .15s; cursor: pointer; }
+  .card-hover:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.1) !important; }
+</style>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% block title %}Cierre de caja — {{ fecha|date:"d/m/Y" }}{% endblock %}
+{% block nav_reportes %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Cierre de caja</h4>
+</div>
+
+<!-- Selector de fecha -->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body py-2">
+    <form method="get" class="d-flex align-items-center gap-2">
+      <label class="form-label mb-0 fw-semibold">Fecha:</label>
+      <input type="date" name="fecha" value="{{ fecha|date:'Y-m-d' }}" class="form-control form-control-sm" style="width:180px">
+      <button class="btn btn-sm btn-dark">Ver</button>
+    </form>
+  </div>
+</div>
+
+<!-- Resumen total del día -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-dark">
+      <div class="text-muted small">Ventas contado</div>
+      <div class="fs-3 fw-bold">${{ total_contado|floatformat:2 }}</div>
+      <div class="text-muted small">{{ ventas_contado|length }} venta{{ ventas_contado|length|pluralize }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-info">
+      <div class="text-muted small">Abonos a adelantos</div>
+      <div class="fs-3 fw-bold text-info">${{ total_abonos_adelanto|floatformat:2 }}</div>
+      <div class="text-muted small">{{ abonos_adelanto|length }} abono{{ abonos_adelanto|length|pluralize }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-warning">
+      <div class="text-muted small">Abonos a deudas</div>
+      <div class="fs-3 fw-bold text-warning">${{ total_abonos_deuda|floatformat:2 }}</div>
+      <div class="text-muted small">{{ abonos_deuda|length }} abono{{ abonos_deuda|length|pluralize }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-success">
+      <div class="text-muted small">TOTAL INGRESOS</div>
+      <div class="fs-3 fw-bold text-success">${{ total_dia|floatformat:2 }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Ventas contado -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+        <span><i class="bi bi-cash"></i> Ventas contado</span>
+        <span class="text-success">${{ total_contado|floatformat:2 }}</span>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Hora</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
+        <tbody>
+          {% for v in ventas_contado %}
+          <tr>
+            <td>{{ v.fecha|date:"H:i" }}</td>
+            <td>{{ v.vendedor.username }}</td>
+            <td class="text-end">${{ v.total|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-center text-muted py-2">Sin ventas al contado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if ventas_por_vendedor %}
+      <div class="card-footer bg-light">
+        <div class="small text-muted fw-semibold mb-1">Por vendedor</div>
+        {% for nombre, total in ventas_por_vendedor.items %}
+        <div class="d-flex justify-content-between small">
+          <span>{{ nombre }}</span><span>${{ total|floatformat:2 }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Abonos -->
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+        <span><i class="bi bi-bookmark-check text-info"></i> Abonos a adelantos</span>
+        <span class="text-info">${{ total_abonos_adelanto|floatformat:2 }}</span>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Hora</th><th>Apartado</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
+        <tbody>
+          {% for p in abonos_adelanto %}
+          <tr>
+            <td>{{ p.fecha|date:"H:i" }}</td>
+            <td><a href="{% url 'detalle_adelanto' p.referencia_id %}">#{{ p.referencia_id }}</a></td>
+            <td>{{ p.vendedor.username }}</td>
+            <td class="text-end">${{ p.monto|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-2">Sin abonos.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
+        <span><i class="bi bi-people text-warning"></i> Abonos a deudas</span>
+        <span class="text-warning">${{ total_abonos_deuda|floatformat:2 }}</span>
+      </div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Hora</th><th>Deuda</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
+        <tbody>
+          {% for p in abonos_deuda %}
+          <tr>
+            <td>{{ p.fecha|date:"H:i" }}</td>
+            <td><a href="{% url 'detalle_deuda' p.referencia_id %}">#{{ p.referencia_id }}</a></td>
+            <td>{{ p.vendedor.username }}</td>
+            <td class="text-end">${{ p.monto|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-2">Sin abonos.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

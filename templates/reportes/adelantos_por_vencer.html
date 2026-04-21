@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}Adelantos por vencer{% endblock %}
+{% block nav_reportes %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Adelantos activos y por vencer</h4>
+  <small class="text-muted">Al {{ hoy|date:"d/m/Y" }}</small>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-danger">
+      <div class="text-muted small">Vencidos</div>
+      <div class="fs-3 fw-bold text-danger">{{ vencidos|length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-warning">
+      <div class="text-muted small">Próximos a vencer</div>
+      <div class="fs-3 fw-bold text-warning">{{ proximos|length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-secondary">
+      <div class="text-muted small">Sin fecha</div>
+      <div class="fs-3 fw-bold text-secondary">{{ sin_fecha|length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-success">
+      <div class="text-muted small">Dinero recibido</div>
+      <div class="fs-3 fw-bold text-success">${{ total_recibido|floatformat:2 }}</div>
+    </div>
+  </div>
+</div>
+
+{% if vencidos %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-danger bg-opacity-10 fw-semibold text-danger">
+    <i class="bi bi-exclamation-triangle"></i> Vencidos ({{ vencidos|length }}) — saldo por cobrar: ${{ total_saldo|floatformat:2 }}
+  </div>
+  <table class="table table-sm table-hover align-middle mb-0">
+    <thead><tr><th>#</th><th>Cliente</th><th>Total</th><th>Saldo</th><th>Vencido el</th><th>Vendedor</th><th></th></tr></thead>
+    <tbody>
+      {% for a in vencidos %}
+      <tr class="table-danger">
+        <td>{{ a.pk }}</td>
+        <td>
+          <a href="{% url 'detalle_cliente' a.cliente.pk %}">{{ a.cliente.nombre }}</a>
+          <div class="text-muted small">{{ a.cliente.telefono|default:"" }}</div>
+        </td>
+        <td>${{ a.total|floatformat:2 }}</td>
+        <td class="fw-semibold">${{ a.saldo_pendiente|floatformat:2 }}</td>
+        <td class="text-danger fw-semibold">{{ a.fecha_limite|date:"d/m/Y" }}</td>
+        <td>{{ a.vendedor.username }}</td>
+        <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-danger">Ver</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if proximos %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-calendar-check text-warning"></i> Próximos a vencer ({{ proximos|length }})
+  </div>
+  <table class="table table-sm table-hover align-middle mb-0">
+    <thead><tr><th>#</th><th>Cliente</th><th>Total</th><th>Saldo</th><th>Fecha límite</th><th>Vendedor</th><th></th></tr></thead>
+    <tbody>
+      {% for a in proximos %}
+      <tr>
+        <td>{{ a.pk }}</td>
+        <td><a href="{% url 'detalle_cliente' a.cliente.pk %}">{{ a.cliente.nombre }}</a></td>
+        <td>${{ a.total|floatformat:2 }}</td>
+        <td class="fw-semibold">${{ a.saldo_pendiente|floatformat:2 }}</td>
+        <td>{{ a.fecha_limite|date:"d/m/Y" }}</td>
+        <td>{{ a.vendedor.username }}</td>
+        <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if sin_fecha %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold text-secondary">
+    <i class="bi bi-calendar-x"></i> Sin fecha límite ({{ sin_fecha|length }})
+  </div>
+  <table class="table table-sm table-hover align-middle mb-0">
+    <thead><tr><th>#</th><th>Cliente</th><th>Total</th><th>Saldo</th><th>Creado</th><th></th></tr></thead>
+    <tbody>
+      {% for a in sin_fecha %}
+      <tr>
+        <td>{{ a.pk }}</td>
+        <td><a href="{% url 'detalle_cliente' a.cliente.pk %}">{{ a.cliente.nombre }}</a></td>
+        <td>${{ a.total|floatformat:2 }}</td>
+        <td class="fw-semibold">${{ a.saldo_pendiente|floatformat:2 }}</td>
+        <td>{{ a.fecha_creacion|date:"d/m/Y" }}</td>
+        <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if not vencidos and not proximos and not sin_fecha %}
+<div class="card border-0 shadow-sm p-4 text-center text-muted">
+  <i class="bi bi-check-circle fs-1 text-success"></i>
+  <p class="mt-2">No hay adelantos activos en este momento.</p>
+</div>
+{% endif %}
+{% endblock %}

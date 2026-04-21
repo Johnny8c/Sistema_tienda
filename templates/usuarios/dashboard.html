@@ -81,6 +81,10 @@
         <a href="{% url 'pos' %}" class="btn btn-dark"><i class="bi bi-cart3"></i> Ir al POS</a>
         <a href="{% url 'lista_adelantos' %}" class="btn btn-outline-secondary"><i class="bi bi-bookmark-check"></i> Ver adelantos</a>
         <a href="{% url 'lista_deudas' %}" class="btn btn-outline-secondary"><i class="bi bi-people"></i> Ver deudores</a>
+        {% if user.es_dueno %}
+        <a href="{% url 'cierre_caja' %}" class="btn btn-outline-secondary"><i class="bi bi-safe"></i> Cierre de caja</a>
+        <a href="{% url 'reportes' %}" class="btn btn-outline-secondary"><i class="bi bi-bar-chart-line"></i> Reportes</a>
+        {% endif %}
       </div>
     </div>
   </div>
