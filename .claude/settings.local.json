@@ -14,7 +14,9 @@
       "Bash(python manage.py makemigrations)",
       "Bash(python manage.py test apps.clientes --verbosity=2)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(python manage.py makemigrations clientes --name=\"add_saldo_a_favor\")",
+      "Bash(python manage.py test apps.deudores apps.clientes --verbosity=2)"
     ]
   }
 }

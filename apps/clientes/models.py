@@ -7,6 +7,7 @@ class Cliente(models.Model):
     telefono = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
     direccion = models.TextField(blank=True)
+    saldo_a_favor = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
