@@ -1,0 +1,7 @@
+Django==5.1.4
+psycopg2-binary==2.9.10
+python-decouple==3.8
+cloudinary==1.42.1
+django-cloudinary-storage==0.3.0
+whitenoise==6.8.2
+gunicorn==23.0.0

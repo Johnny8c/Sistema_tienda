@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip --version)",
+      "Bash(pip install *)",
+      "Bash(django-admin startproject *)",
+      "Bash(python manage.py startapp usuarios apps/usuarios)",
+      "Bash(python manage.py startapp clientes apps/clientes)",
+      "Bash(python manage.py startapp inventario apps/inventario)",
+      "Bash(python manage.py startapp ventas apps/ventas)",
+      "Bash(python manage.py startapp deudores apps/deudores)",
+      "Bash(pip show *)",
+      "Bash(python manage.py check)",
+      "Bash(python manage.py makemigrations)",
+      "Bash(python manage.py test apps.clientes --verbosity=2)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}
