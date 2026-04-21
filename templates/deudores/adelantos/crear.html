@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Nuevo apartado{% endblock %}
+{% block nav_adelantos %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'lista_adelantos' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Nuevo apartado</h4>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:680px">
+  <div class="card-body p-4">
+    <form method="post" id="formAdelanto">
+      {% csrf_token %}
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
+        <select name="cliente_id" class="form-select" required>
+          <option value="">— Seleccionar cliente —</option>
+          {% for c in clientes %}
+          <option value="{{ c.pk }}">{{ c.nombre }} ({{ c.cedula_ruc }})</option>
+          {% endfor %}
+        </select>
+        <div class="form-text"><a href="{% url 'crear_cliente' %}">+ Registrar nuevo cliente</a></div>
+      </div>
+
+      <hr>
+      <label class="form-label fw-semibold">Productos <span class="text-danger">*</span></label>
+      <div id="items-container">
+        <div class="item-fila row g-2 mb-2">
+          <div class="col-md-6">
+            <select name="producto_id" class="form-select form-select-sm producto-sel" required>
+              <option value="">— Producto —</option>
+              {% for p in productos %}
+              <option value="{{ p.pk }}" data-precio="{{ p.precio }}" data-stock="{{ p.stock_disponible }}">
+                {{ p.nombre }} {{ p.talla }} {{ p.color }} — ${{ p.precio }} (stock: {{ p.stock_disponible }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <input type="number" name="cantidad" class="form-control form-control-sm cantidad-inp" min="1" value="1" required>
+          </div>
+          <div class="col-md-3">
+            <input type="text" class="form-control form-control-sm subtotal-disp bg-light" readonly placeholder="Subtotal">
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-sm btn-outline-danger btn-quitar">✕</button>
+          </div>
+        </div>
+      </div>
+      <button type="button" id="btn-agregar" class="btn btn-sm btn-outline-secondary mb-3">
+        <i class="bi bi-plus"></i> Agregar producto
+      </button>
+
+      <div class="alert alert-light border d-flex justify-content-between">
+        <strong>Total del apartado:</strong>
+        <strong id="total-display">$0.00</strong>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Monto inicial (adelanto) <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="monto_inicial" id="monto-inicial" class="form-control"
+                   step="0.01" min="0.01" required>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Fecha límite de retiro</label>
+          <input type="date" name="fecha_limite" class="form-control">
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-dark">Crear apartado</button>
+        <a href="{% url 'lista_adelantos' %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const productos = {{ productos_json|safe }};
+
+function calcularTotal() {
+  let total = 0;
+  document.querySelectorAll('.item-fila').forEach(fila => {
+    const sel = fila.querySelector('.producto-sel');
+    const cant = parseInt(fila.querySelector('.cantidad-inp').value) || 0;
+    const opt = sel.options[sel.selectedIndex];
+    const precio = parseFloat(opt?.dataset?.precio || 0);
+    const subtotal = precio * cant;
+    fila.querySelector('.subtotal-disp').value = subtotal > 0 ? '$' + subtotal.toFixed(2) : '';
+    total += subtotal;
+  });
+  document.getElementById('total-display').textContent = '$' + total.toFixed(2);
+}
+
+function attachFilaEvents(fila) {
+  fila.querySelector('.producto-sel').addEventListener('change', calcularTotal);
+  fila.querySelector('.cantidad-inp').addEventListener('input', calcularTotal);
+  fila.querySelector('.btn-quitar').addEventListener('click', () => {
+    if (document.querySelectorAll('.item-fila').length > 1) {
+      fila.remove(); calcularTotal();
+    }
+  });
+}
+
+document.querySelectorAll('.item-fila').forEach(attachFilaEvents);
+
+document.getElementById('btn-agregar').addEventListener('click', () => {
+  const plantilla = document.querySelector('.item-fila').cloneNode(true);
+  plantilla.querySelector('.producto-sel').value = '';
+  plantilla.querySelector('.cantidad-inp').value = 1;
+  plantilla.querySelector('.subtotal-disp').value = '';
+  document.getElementById('items-container').appendChild(plantilla);
+  attachFilaEvents(plantilla);
+});
+</script>
+{% endblock %}

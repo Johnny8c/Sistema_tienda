@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Clientes{% endblock %}
+{% block nav_clientes %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-person-lines-fill"></i> Clientes</h4>
+  <a href="{% url 'crear_cliente' %}" class="btn btn-dark btn-sm"><i class="bi bi-plus-lg"></i> Nuevo cliente</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body pb-0">
+    <form method="get" class="d-flex gap-2 mb-3">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar por nombre o cédula/RUC…">
+      <button class="btn btn-sm btn-outline-secondary">Buscar</button>
+      {% if q %}<a href="{% url 'lista_clientes' %}" class="btn btn-sm btn-outline-danger">Limpiar</a>{% endif %}
+    </form>
+  </div>
+  <table class="table table-hover align-middle mb-0">
+    <thead>
+      <tr><th>Nombre</th><th>Cédula / RUC</th><th>Teléfono</th><th>Saldo a favor</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for c in clientes %}
+      <tr>
+        <td>{{ c.nombre }}</td>
+        <td><code>{{ c.cedula_ruc }}</code></td>
+        <td>{{ c.telefono|default:"—" }}</td>
+        <td>
+          {% if c.saldo_a_favor > 0 %}
+            <span class="badge bg-success">${{ c.saldo_a_favor|floatformat:2 }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="text-end">
+          <a href="{% url 'detalle_cliente' c.pk %}" class="btn btn-sm btn-outline-secondary">Ver ficha</a>
+          <a href="{% url 'editar_cliente' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="5" class="text-center text-muted py-4">Sin clientes registrados.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

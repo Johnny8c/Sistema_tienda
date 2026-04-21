@@ -79,5 +79,28 @@ def editar_cliente(request, pk):
 @login_required
 @requiere_no_bodeguero
 def detalle_cliente(request, pk):
+    from apps.deudores.models import Adelanto, Deuda, Pago
+    from django.db.models import Sum, Q
+
     cliente = get_object_or_404(Cliente, pk=pk)
-    return render(request, 'clientes/detalle.html', {'cliente': cliente})
+    adelantos = cliente.adelantos.order_by('-fecha_creacion')
+    deudas = cliente.deudas.order_by('-fecha_creacion')
+
+    ids_adelantos = list(adelantos.values_list('id', flat=True))
+    ids_deudas = list(deudas.values_list('id', flat=True))
+    pagos = Pago.objects.filter(
+        Q(tipo=Pago.TIPO_ADELANTO, referencia_id__in=ids_adelantos) |
+        Q(tipo=Pago.TIPO_DEUDA, referencia_id__in=ids_deudas)
+    ).order_by('-fecha')
+
+    ctx = {
+        'cliente': cliente,
+        'adelantos': adelantos,
+        'deudas': deudas,
+        'pagos': pagos,
+        'adelantos_activos': adelantos.filter(estado=Adelanto.ACTIVO).count(),
+        'total_deuda': deudas.filter(estado=Deuda.PENDIENTE).aggregate(
+            t=Sum('saldo_pendiente')
+        )['t'] or 0,
+    }
+    return render(request, 'clientes/detalle.html', ctx)

@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}Ficha de {{ cliente.nombre }}{% endblock %}
+{% block nav_clientes %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'lista_clientes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">{{ cliente.nombre }}</h4>
+  {% if cliente.saldo_a_favor > 0 %}
+    <span class="badge bg-success fs-6">Saldo a favor: ${{ cliente.saldo_a_favor|floatformat:2 }}</span>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-muted mb-3">Datos del cliente</h6>
+        <p class="mb-1"><strong>Cédula/RUC:</strong> <code>{{ cliente.cedula_ruc }}</code></p>
+        <p class="mb-1"><strong>Teléfono:</strong> {{ cliente.telefono|default:"—" }}</p>
+        <p class="mb-1"><strong>Email:</strong> {{ cliente.email|default:"—" }}</p>
+        <p class="mb-0"><strong>Dirección:</strong> {{ cliente.direccion|default:"—" }}</p>
+      </div>
+      <div class="card-footer bg-white">
+        <a href="{% url 'editar_cliente' cliente.pk %}" class="btn btn-sm btn-outline-secondary w-100">Editar datos</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="row g-3">
+      <div class="col-6">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <div class="text-muted small">Adelantos activos</div>
+          <div class="fs-3 fw-bold text-info">{{ adelantos_activos }}</div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="card border-0 shadow-sm text-center p-3">
+          <div class="text-muted small">Deuda pendiente</div>
+          <div class="fs-3 fw-bold text-warning">${{ total_deuda|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="historialTabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-adelantos">Adelantos</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-deudas">Deudas</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-pagos">Pagos</a></li>
+</ul>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="tab-adelantos">
+    <div class="card border-0 shadow-sm">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>#</th><th>Total</th><th>Saldo</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+        <tbody>
+          {% for a in adelantos %}
+          <tr>
+            <td>{{ a.pk }}</td>
+            <td>${{ a.total|floatformat:2 }}</td>
+            <td>${{ a.saldo_pendiente|floatformat:2 }}</td>
+            <td>
+              {% if a.estado == 'activo' %}<span class="badge bg-info">Activo</span>
+              {% elif a.estado == 'completado' %}<span class="badge bg-success">Completado</span>
+              {% else %}<span class="badge bg-secondary">Cancelado</span>{% endif %}
+            </td>
+            <td>{{ a.fecha_creacion|date:"d/m/Y" }}</td>
+            <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-3">Sin adelantos.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-deudas">
+    <div class="card border-0 shadow-sm">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>#</th><th>Original</th><th>Saldo</th><th>Estado</th><th>Vence</th><th></th></tr></thead>
+        <tbody>
+          {% for d in deudas %}
+          <tr>
+            <td>{{ d.pk }}</td>
+            <td>${{ d.monto_original|floatformat:2 }}</td>
+            <td>${{ d.saldo_pendiente|floatformat:2 }}</td>
+            <td>
+              {% if d.estado == 'pendiente' %}<span class="badge bg-warning text-dark">Pendiente</span>
+              {% elif d.estado == 'saldada' %}<span class="badge bg-success">Saldada</span>
+              {% else %}<span class="badge bg-secondary">Condonada</span>{% endif %}
+            </td>
+            <td>{{ d.fecha_vencimiento|default:"—" }}</td>
+            <td><a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-3">Sin deudas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-pagos">
+    <div class="card border-0 shadow-sm">
+      <table class="table table-hover align-middle mb-0">
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Referencia</th><th>Forma de pago</th><th>Monto</th></tr></thead>
+        <tbody>
+          {% for p in pagos %}
+          <tr>
+            <td>{{ p.fecha|date:"d/m/Y H:i" }}</td>
+            <td>{{ p.get_tipo_display }}</td>
+            <td>#{{ p.referencia_id }}</td>
+            <td>{{ p.get_forma_pago_display }}</td>
+            <td>${{ p.monto|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted py-3">Sin pagos.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

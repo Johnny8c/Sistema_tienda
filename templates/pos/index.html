@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+{% block title %}Punto de Venta{% endblock %}
+{% block nav_pos %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0"><i class="bi bi-cart3"></i> Punto de Venta</h4>
+  <span class="text-muted small">{{ request.user.get_full_name|default:request.user.username }}</span>
+</div>
+
+<div class="row g-3">
+  <!-- Panel izquierdo: productos -->
+  <div class="col-md-7">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-body pb-2">
+        <div class="input-group mb-3">
+          <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+          <input type="text" id="buscador-producto" class="form-control" placeholder="Buscar producto por nombre o código…" autofocus>
+        </div>
+        <div id="sugerencias-producto" class="list-group mb-2" style="display:none"></div>
+      </div>
+      <table class="table align-middle mb-0" id="tabla-items">
+        <thead>
+          <tr><th>Producto</th><th>Precio</th><th style="width:80px">Cant.</th><th>Subtotal</th><th></th></tr>
+        </thead>
+        <tbody id="items-tbody">
+          <tr id="fila-vacia"><td colspan="5" class="text-center text-muted py-4">Agrega productos escaneando o buscando arriba.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Panel derecho: cobro -->
+  <div class="col-md-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+
+        <!-- Tipo de venta -->
+        <label class="form-label fw-semibold">Tipo de venta</label>
+        <div class="btn-group w-100 mb-3" id="tipo-venta-group">
+          <input type="radio" class="btn-check" name="tipo_venta" id="tv-contado" value="contado" checked>
+          <label class="btn btn-outline-dark" for="tv-contado">Contado</label>
+
+          <input type="radio" class="btn-check" name="tipo_venta" id="tv-apartado" value="apartado">
+          <label class="btn btn-outline-info" for="tv-apartado"><i class="bi bi-bookmark"></i> Apartar</label>
+
+          <input type="radio" class="btn-check" name="tipo_venta" id="tv-credito" value="credito">
+          <label class="btn btn-outline-warning" for="tv-credito"><i class="bi bi-person-badge"></i> Crédito</label>
+        </div>
+
+        <!-- Sección cliente (aparece en apartado y crédito) -->
+        <div id="seccion-cliente" style="display:none" class="mb-3">
+          <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
+          <select id="sel-cliente" class="form-select form-select-sm">
+            <option value="">— Seleccionar cliente —</option>
+            {% for c in clientes %}
+            <option value="{{ c.pk }}">{{ c.nombre }} ({{ c.cedula_ruc }})</option>
+            {% endfor %}
+          </select>
+          <div class="form-text"><a href="{% url 'crear_cliente' %}" target="_blank">+ Nuevo cliente</a></div>
+        </div>
+
+        <!-- Sección adelanto (solo apartado) -->
+        <div id="seccion-adelanto" style="display:none" class="mb-3">
+          <label class="form-label fw-semibold">Monto inicial del apartado</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" id="monto-inicial-pos" class="form-control" step="0.01" min="0.01" placeholder="0.00">
+          </div>
+          <div class="mb-2 mt-2">
+            <label class="form-label fw-semibold small">Fecha límite de retiro</label>
+            <input type="date" id="fecha-limite-pos" class="form-control form-control-sm">
+          </div>
+        </div>
+
+        <!-- Sección plazo (solo crédito) -->
+        <div id="seccion-credito" style="display:none" class="mb-3">
+          <label class="form-label fw-semibold">Plazo de pago (días)</label>
+          <input type="number" id="plazo-dias" class="form-control form-control-sm" value="30" min="1">
+        </div>
+
+        <!-- Forma de pago (solo contado) -->
+        <div id="seccion-forma-pago" class="mb-3">
+          <label class="form-label fw-semibold">Forma de pago</label>
+          <div class="d-flex gap-2">
+            <div class="form-check"><input class="form-check-input" type="radio" name="forma_pago" id="fp-efectivo" value="efectivo" checked><label class="form-check-label" for="fp-efectivo">Efectivo</label></div>
+            <div class="form-check"><input class="form-check-input" type="radio" name="forma_pago" id="fp-tarjeta" value="tarjeta"><label class="form-check-label" for="fp-tarjeta">Tarjeta</label></div>
+            <div class="form-check"><input class="form-check-input" type="radio" name="forma_pago" id="fp-qr" value="transferencia"><label class="form-check-label" for="fp-qr">QR</label></div>
+          </div>
+          <div class="mt-2" id="campo-recibido">
+            <label class="form-label small">Monto recibido</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" id="monto-recibido" class="form-control" step="0.01" min="0">
+            </div>
+            <div class="mt-1 text-end fw-semibold" id="cambio-display"></div>
+          </div>
+        </div>
+
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="fs-5 fw-bold">TOTAL</span>
+          <span class="fs-4 fw-bold" id="total-pos">$0.00</span>
+        </div>
+
+        <button id="btn-cobrar" class="btn btn-dark w-100 py-2 fs-5" disabled>
+          <i class="bi bi-check-circle"></i> <span id="btn-cobrar-label">COBRAR</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Form oculto que se envía -->
+<form id="form-venta" method="post" action="{% url 'procesar_venta' %}" style="display:none">
+  {% csrf_token %}
+  <input type="hidden" name="tipo_venta" id="hidden-tipo">
+  <input type="hidden" name="cliente_id" id="hidden-cliente">
+  <input type="hidden" name="monto_inicial" id="hidden-monto-inicial">
+  <input type="hidden" name="fecha_limite" id="hidden-fecha-limite">
+  <input type="hidden" name="plazo_dias" id="hidden-plazo">
+  <input type="hidden" name="forma_pago" id="hidden-forma-pago">
+  <input type="hidden" name="items_json" id="hidden-items">
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const productos = {{ productos_json|safe }};
+let itemsCarrito = [];
+
+// --- Buscador de productos ---
+const buscador = document.getElementById('buscador-producto');
+const sugerencias = document.getElementById('sugerencias-producto');
+
+buscador.addEventListener('input', () => {
+  const q = buscador.value.trim().toLowerCase();
+  sugerencias.innerHTML = '';
+  if (!q) { sugerencias.style.display = 'none'; return; }
+  const resultados = productos.filter(p =>
+    p.nombre.toLowerCase().includes(q) || (p.codigo_barras || '').includes(q)
+  ).slice(0, 8);
+  if (!resultados.length) { sugerencias.style.display = 'none'; return; }
+  resultados.forEach(p => {
+    const a = document.createElement('a');
+    a.className = 'list-group-item list-group-item-action d-flex justify-content-between';
+    a.innerHTML = `<span>${p.nombre} <small class="text-muted">${p.talla} ${p.color}</small></span>
+                   <span class="fw-semibold">$${parseFloat(p.precio).toFixed(2)} <small class="text-muted">(${p.stock_disponible})</small></span>`;
+    a.addEventListener('click', () => { agregarItem(p); buscador.value = ''; sugerencias.style.display = 'none'; });
+    sugerencias.appendChild(a);
+  });
+  sugerencias.style.display = 'block';
+});
+
+document.addEventListener('click', e => {
+  if (!sugerencias.contains(e.target) && e.target !== buscador) sugerencias.style.display = 'none';
+});
+
+function agregarItem(p) {
+  const existente = itemsCarrito.find(i => i.id === p.id);
+  if (existente) { existente.cantidad += 1; }
+  else { itemsCarrito.push({id: p.id, nombre: p.nombre, talla: p.talla, color: p.color, precio: parseFloat(p.precio), cantidad: 1, stock: p.stock_disponible}); }
+  renderTabla();
+}
+
+function renderTabla() {
+  const tbody = document.getElementById('items-tbody');
+  if (!itemsCarrito.length) {
+    tbody.innerHTML = '<tr id="fila-vacia"><td colspan="5" class="text-center text-muted py-4">Agrega productos escaneando o buscando arriba.</td></tr>';
+    actualizarTotal(); return;
+  }
+  tbody.innerHTML = itemsCarrito.map((item, i) => `
+    <tr>
+      <td>${item.nombre} <small class="text-muted">${item.talla} ${item.color}</small></td>
+      <td>$${item.precio.toFixed(2)}</td>
+      <td><input type="number" class="form-control form-control-sm" value="${item.cantidad}" min="1" max="${item.stock}"
+           onchange="cambiarCantidad(${i}, this.value)"></td>
+      <td>$${(item.precio * item.cantidad).toFixed(2)}</td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="quitarItem(${i})">✕</button></td>
+    </tr>`).join('');
+  actualizarTotal();
+}
+
+function cambiarCantidad(i, val) {
+  itemsCarrito[i].cantidad = Math.max(1, Math.min(parseInt(val) || 1, itemsCarrito[i].stock));
+  renderTabla();
+}
+
+function quitarItem(i) { itemsCarrito.splice(i, 1); renderTabla(); }
+
+function actualizarTotal() {
+  const total = itemsCarrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  document.getElementById('total-pos').textContent = '$' + total.toFixed(2);
+  document.getElementById('btn-cobrar').disabled = !itemsCarrito.length;
+  calcularCambio();
+}
+
+// --- Tipo de venta ---
+document.querySelectorAll('input[name="tipo_venta"]').forEach(r => r.addEventListener('change', actualizarUI));
+
+function actualizarUI() {
+  const tipo = document.querySelector('input[name="tipo_venta"]:checked').value;
+  document.getElementById('seccion-cliente').style.display = (tipo !== 'contado') ? '' : 'none';
+  document.getElementById('seccion-adelanto').style.display = (tipo === 'apartado') ? '' : 'none';
+  document.getElementById('seccion-credito').style.display = (tipo === 'credito') ? '' : 'none';
+  document.getElementById('seccion-forma-pago').style.display = (tipo === 'contado') ? '' : 'none';
+  const labels = {contado: 'COBRAR', apartado: 'CREAR APARTADO', credito: 'REGISTRAR CRÉDITO'};
+  document.getElementById('btn-cobrar-label').textContent = labels[tipo];
+}
+
+// --- Cambio ---
+document.getElementById('monto-recibido').addEventListener('input', calcularCambio);
+
+function calcularCambio() {
+  const total = itemsCarrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const recibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+  const div = document.getElementById('cambio-display');
+  if (recibido > 0) {
+    const cambio = recibido - total;
+    div.textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)}` : `Faltan: $${Math.abs(cambio).toFixed(2)}`;
+    div.className = cambio >= 0 ? 'mt-1 text-end fw-semibold text-success' : 'mt-1 text-end fw-semibold text-danger';
+  } else { div.textContent = ''; }
+}
+
+// --- Cobrar ---
+document.getElementById('btn-cobrar').addEventListener('click', () => {
+  const tipo = document.querySelector('input[name="tipo_venta"]:checked').value;
+  const clienteId = document.getElementById('sel-cliente').value;
+
+  if (tipo !== 'contado' && !clienteId) {
+    alert('Selecciona un cliente para continuar.'); return;
+  }
+  if (tipo === 'apartado') {
+    const monto = parseFloat(document.getElementById('monto-inicial-pos').value);
+    if (!monto || monto <= 0) { alert('Ingresa el monto del adelanto.'); return; }
+  }
+
+  document.getElementById('hidden-tipo').value = tipo;
+  document.getElementById('hidden-cliente').value = clienteId;
+  document.getElementById('hidden-monto-inicial').value = document.getElementById('monto-inicial-pos').value;
+  document.getElementById('hidden-fecha-limite').value = document.getElementById('fecha-limite-pos').value;
+  document.getElementById('hidden-plazo').value = document.getElementById('plazo-dias').value;
+  document.getElementById('hidden-forma-pago').value = document.querySelector('input[name="forma_pago"]:checked')?.value || 'efectivo';
+  document.getElementById('hidden-items').value = JSON.stringify(itemsCarrito.map(i => ({producto_id: i.id, cantidad: i.cantidad})));
+  document.getElementById('form-venta').submit();
+});
+</script>
+{% endblock %}
