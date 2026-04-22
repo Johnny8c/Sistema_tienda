@@ -277,10 +277,19 @@ def procesar_venta(request):
         else:
             from apps.ventas.models import Venta, ItemVenta
             from apps.inventario.models import Producto as Prod
-            from decimal import Decimal as D
             from django.db import transaction
 
             with transaction.atomic():
+                # Validar stock disponible (descontando reservados) antes de crear nada
+                for i in items:
+                    prod = Prod.objects.select_for_update().get(pk=i['producto_id'])
+                    if prod.stock_disponible < i['cantidad']:
+                        raise StockInsuficienteError(
+                            f'"{prod.nombre}" tiene solo {prod.stock_disponible} unidades disponibles '
+                            f'({prod.stock_reservado} reservadas en apartados). '
+                            f'No se puede vender {i["cantidad"]}.'
+                        )
+
                 total = sum(
                     Prod.objects.get(pk=i['producto_id']).precio * i['cantidad']
                     for i in items
@@ -300,8 +309,7 @@ def procesar_venta(request):
                     prod.stock -= i['cantidad']
                     prod.save(update_fields=['stock'])
 
-            messages.success(request, f'Venta #{venta.pk} registrada por ${total}.')
-            return redirect('pos')
+            return redirect('nota_venta', pk=venta.pk)
 
     except (StockInsuficienteError, SaldoInsuficienteError, ValueError) as e:
         messages.error(request, str(e))

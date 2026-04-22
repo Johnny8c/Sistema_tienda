@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Ajustar stock — {{ producto }}{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'lista_inventario' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Ajustar stock</h4>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:400px">
+  <div class="card-body">
+    <h6 class="fw-semibold">{{ producto }}</h6>
+    <div class="d-flex gap-4 mb-3 text-muted small">
+      <span>Stock actual: <strong>{{ producto.stock }}</strong></span>
+      <span>Reservado: <strong class="text-info">{{ producto.stock_reservado }}</strong></span>
+      <span>Disponible: <strong>{{ producto.stock_disponible }}</strong></span>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Nuevo stock total</label>
+        <input type="number" name="stock" class="form-control" min="{{ producto.stock_reservado }}"
+               value="{{ producto.stock }}" required>
+        <div class="form-text">No puede ser menor al stock reservado ({{ producto.stock_reservado }}).</div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-dark">Guardar</button>
+        <a href="{% url 'lista_inventario' %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

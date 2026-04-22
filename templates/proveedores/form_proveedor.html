@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}{{ accion }} proveedor{% endblock %}
+{% block nav_proveedores %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'lista_proveedores' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">{{ accion }} proveedor</h4>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:520px">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
+        <input type="text" name="nombre" class="form-control" value="{{ proveedor.nombre|default:'' }}" required autofocus>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">RUC</label>
+          <input type="text" name="ruc" class="form-control" value="{{ proveedor.ruc|default:'' }}">
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" value="{{ proveedor.telefono|default:'' }}">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Persona de contacto</label>
+        <input type="text" name="contacto" class="form-control" value="{{ proveedor.contacto|default:'' }}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Email</label>
+        <input type="email" name="email" class="form-control" value="{{ proveedor.email|default:'' }}">
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Dirección</label>
+        <textarea name="direccion" class="form-control" rows="2">{{ proveedor.direccion|default:'' }}</textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-dark">{{ accion }}</button>
+        <a href="{% url 'lista_proveedores' %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

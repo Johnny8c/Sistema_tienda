@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}{{ accion }} producto — Sistema Tienda{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'lista_inventario' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">{{ accion }} producto</h4>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:520px">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
+        <input type="text" name="nombre" class="form-control"
+               value="{{ producto.nombre|default:'' }}" required autofocus>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">Talla</label>
+          <input type="text" name="talla" class="form-control" placeholder="XS, S, M, L, XL, 30, 32…"
+                 value="{{ producto.talla|default:'' }}">
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Color</label>
+          <input type="text" name="color" class="form-control"
+                 value="{{ producto.color|default:'' }}">
+        </div>
+      </div>
+      <div class="row g-2 mb-4">
+        <div class="col">
+          <label class="form-label fw-semibold">Precio <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="precio" class="form-control" step="0.01" min="0"
+                   value="{{ producto.precio|default:'' }}" required>
+          </div>
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Stock inicial</label>
+          <input type="number" name="stock" class="form-control" min="0"
+                 value="{{ producto.stock|default:'0' }}">
+        </div>
+      </div>
+
+      {% if producto.codigo_barras %}
+      <div class="mb-4 p-3 bg-light rounded text-center">
+        <div class="small text-muted mb-1">Código de barras</div>
+        <svg id="bc-preview" style="height:50px"></svg>
+        <div class="small fw-semibold mt-1">{{ producto.codigo_barras }}</div>
+      </div>
+      {% else %}
+      <div class="alert alert-info py-2 small mb-4">
+        <i class="bi bi-info-circle"></i> El código de barras se generará automáticamente al guardar.
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-dark">{{ accion }}</button>
+        <a href="{% url 'lista_inventario' %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if producto.codigo_barras %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+  JsBarcode('#bc-preview', '{{ producto.codigo_barras }}', {
+    format: 'CODE128', width: 2, height: 45, displayValue: false, margin: 2
+  });
+</script>
+{% endif %}
+{% endblock %}

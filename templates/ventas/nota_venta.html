@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Nota de venta #{{ venta.pk }}{% endblock %}
+{% block nav_pos %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'pos' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+    <h5 class="fw-bold mb-0">Venta registrada</h5>
+  </div>
+  <div class="d-flex gap-2">
+    <button onclick="window.print()" class="btn btn-dark">
+      <i class="bi bi-printer"></i> Imprimir
+    </button>
+    <a href="{% url 'pos' %}" class="btn btn-outline-secondary">Nueva venta</a>
+  </div>
+</div>
+
+<!-- Nota de venta imprimible -->
+<div id="nota-imprimible" class="card border-0 shadow-sm mx-auto" style="max-width:400px">
+  <div class="card-body p-4">
+
+    <!-- Encabezado tienda -->
+    <div class="text-center mb-3">
+      <div class="fw-bold fs-5">SISTEMA TIENDA</div>
+      <div class="small text-muted">Gualaceo, Ecuador</div>
+      <hr class="my-2">
+      <div class="fw-semibold">NOTA DE VENTA</div>
+      <div class="small text-muted">N° {{ venta.pk|stringformat:"06d" }}</div>
+    </div>
+
+    <!-- Datos de la venta -->
+    <div class="d-flex justify-content-between small mb-1">
+      <span class="text-muted">Fecha:</span>
+      <span>{{ venta.fecha|date:"d/m/Y H:i" }}</span>
+    </div>
+    <div class="d-flex justify-content-between small mb-1">
+      <span class="text-muted">Vendedor:</span>
+      <span>{{ venta.vendedor.get_full_name|default:venta.vendedor.username }}</span>
+    </div>
+    {% if venta.cliente %}
+    <div class="d-flex justify-content-between small mb-1">
+      <span class="text-muted">Cliente:</span>
+      <span>{{ venta.cliente.nombre }}</span>
+    </div>
+    {% endif %}
+    <hr class="my-2">
+
+    <!-- Detalle de productos -->
+    <table class="table table-sm mb-0" style="font-size:.85rem">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th class="text-center">Cant.</th>
+          <th class="text-end">P.Unit.</th>
+          <th class="text-end">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in venta.items.all %}
+        <tr>
+          <td>
+            {{ item.producto.nombre }}
+            {% if item.producto.talla %}<br><small class="text-muted">{{ item.producto.talla }} · {{ item.producto.color }}</small>{% endif %}
+          </td>
+          <td class="text-center">{{ item.cantidad }}</td>
+          <td class="text-end">${{ item.precio_unitario|floatformat:2 }}</td>
+          <td class="text-end">${{ item.subtotal|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <hr class="my-2">
+    <div class="d-flex justify-content-between fw-bold fs-6">
+      <span>TOTAL</span>
+      <span>${{ venta.total|floatformat:2 }}</span>
+    </div>
+
+    <hr class="my-3">
+    <div class="text-center small text-muted">
+      <p class="mb-1">¡Gracias por su compra!</p>
+      <p class="mb-0" style="font-size:.75rem">Este documento no es un comprobante de pago tributario.</p>
+    </div>
+
+  </div>
+</div>
+
+<style>
+@media print {
+  body * { visibility: hidden; }
+  #nota-imprimible, #nota-imprimible * { visibility: visible; }
+  #nota-imprimible {
+    position: fixed; left: 50%; top: 0;
+    transform: translateX(-50%);
+    width: 80mm;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  .navbar, .sidebar, .btn, .d-flex.justify-content-between.align-items-center { display: none !important; }
+}
+</style>
+{% endblock %}

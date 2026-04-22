@@ -1,6 +1,12 @@
 from django.db import models
 
 
+def _generar_codigo():
+    ultimo = Producto.objects.order_by('-id').first()
+    siguiente = (ultimo.id + 1) if ultimo else 1
+    return f'TDA-{siguiente:06d}'
+
+
 class Producto(models.Model):
     nombre = models.CharField(max_length=200)
     codigo_barras = models.CharField(max_length=100, unique=True, blank=True, null=True)

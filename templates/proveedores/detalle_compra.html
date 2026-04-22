@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Compra #{{ compra.pk }}{% endblock %}
+{% block nav_proveedores %}active{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'lista_compras' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Compra #{{ compra.pk }}</h4>
+  {% if compra.estado == 'pendiente' and user.es_dueno %}
+  <form method="post" action="{% url 'marcar_pagada' compra.pk %}" class="ms-auto">
+    {% csrf_token %}
+    <button class="btn btn-success btn-sm">
+      <i class="bi bi-check-circle"></i> Marcar como pagada
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-1">Proveedor</div>
+        <div class="fw-bold">{{ compra.proveedor }}</div>
+        {% if compra.proveedor.telefono %}<div class="small text-muted">{{ compra.proveedor.telefono }}</div>{% endif %}
+        <hr class="my-2">
+        <div class="d-flex justify-content-between small">
+          <span class="text-muted">Fecha:</span><span>{{ compra.fecha|date:"d/m/Y" }}</span>
+        </div>
+        <div class="d-flex justify-content-between small">
+          <span class="text-muted">Factura N°:</span><span>{{ compra.numero_factura|default:"—" }}</span>
+        </div>
+        <div class="d-flex justify-content-between small">
+          <span class="text-muted">Registrado por:</span><span>{{ compra.registrado_por.get_full_name|default:compra.registrado_por.username }}</span>
+        </div>
+        <div class="d-flex justify-content-between small">
+          <span class="text-muted">Estado:</span>
+          <span>{% if compra.estado == 'pagada' %}<span class="badge bg-success">Pagada</span>{% else %}<span class="badge bg-warning text-dark">Pendiente de pago</span>{% endif %}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100 border-start border-4 border-dark">
+      <div class="card-body text-center d-flex flex-column justify-content-center">
+        <div class="text-muted small">TOTAL COMPRA</div>
+        <div class="display-5 fw-bold">${{ compra.total|floatformat:2 }}</div>
+        {% if compra.notas %}<div class="text-muted small mt-2">{{ compra.notas }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-semibold">Productos recibidos</div>
+  <table class="table table-sm mb-0 align-middle">
+    <thead><tr><th>Producto</th><th class="text-center">Cantidad</th><th class="text-end">P. Unit.</th><th class="text-end">Subtotal</th></tr></thead>
+    <tbody>
+      {% for item in compra.items.all %}
+      <tr>
+        <td>{{ item.producto }}</td>
+        <td class="text-center">{{ item.cantidad }}</td>
+        <td class="text-end">${{ item.precio_unitario|floatformat:2 }}</td>
+        <td class="text-end">${{ item.subtotal|floatformat:2 }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="fw-bold">
+        <td colspan="3" class="text-end">TOTAL</td>
+        <td class="text-end">${{ compra.total|floatformat:2 }}</td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+{% endblock %}

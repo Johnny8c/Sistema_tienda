@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+{% block title %}Consultar precio{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h5 class="fw-bold mb-0"><i class="bi bi-upc-scan"></i> Consultar precio</h5>
+</div>
+
+<!-- Escáner de cámara -->
+<div class="card border-0 shadow-sm mb-3" style="max-width:480px; margin:auto">
+  <div class="card-body">
+    <div id="reader" style="width:100%; border-radius:8px; overflow:hidden"></div>
+    <div class="text-center mt-2">
+      <button id="btn-iniciar" class="btn btn-dark"><i class="bi bi-camera"></i> Activar cámara</button>
+      <button id="btn-detener" class="btn btn-outline-secondary d-none">Detener cámara</button>
+    </div>
+  </div>
+</div>
+
+<!-- Búsqueda manual por código -->
+<div class="card border-0 shadow-sm mb-3" style="max-width:480px; margin:auto">
+  <div class="card-body">
+    <label class="form-label fw-semibold small">O ingresa el código manualmente</label>
+    <div class="input-group">
+      <input type="text" id="codigo-manual" class="form-control" placeholder="TDA-000001">
+      <button class="btn btn-outline-secondary" id="btn-buscar-manual"><i class="bi bi-search"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- Resultado -->
+<div id="resultado" style="display:none; max-width:480px; margin:auto">
+  <div class="card border-0 shadow-sm" id="card-resultado">
+    <div class="card-body text-center py-4">
+      <div class="fs-5 fw-bold mb-1" id="res-nombre"></div>
+      <div class="text-muted small mb-3" id="res-detalle"></div>
+      <div class="display-5 fw-bold text-dark mb-2" id="res-precio"></div>
+      <div class="mb-1" id="res-stock"></div>
+      <div class="text-muted small" id="res-codigo"></div>
+    </div>
+  </div>
+</div>
+
+<div id="no-encontrado" style="display:none; max-width:480px; margin:auto">
+  <div class="alert alert-warning text-center">
+    <i class="bi bi-exclamation-triangle"></i> Producto no encontrado para ese código.
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let scanner = null;
+
+async function buscarCodigo(codigo) {
+  document.getElementById('resultado').style.display = 'none';
+  document.getElementById('no-encontrado').style.display = 'none';
+
+  const resp = await fetch(`{% url 'api_buscar_codigo' %}?codigo=${encodeURIComponent(codigo)}`);
+  const data = await resp.json();
+
+  if (data.encontrado) {
+    document.getElementById('res-nombre').textContent = data.nombre;
+    document.getElementById('res-detalle').textContent = [data.talla, data.color].filter(Boolean).join(' · ');
+    document.getElementById('res-precio').textContent = '$' + parseFloat(data.precio).toFixed(2);
+
+    const stockEl = document.getElementById('res-stock');
+    stockEl.innerHTML = data.stock_disponible > 0
+      ? `<span class="badge bg-success">${data.stock_disponible} disponibles</span>`
+      : `<span class="badge bg-danger">Sin stock</span>`;
+
+    document.getElementById('res-codigo').textContent = data.codigo;
+    document.getElementById('resultado').style.display = '';
+  } else {
+    document.getElementById('no-encontrado').style.display = '';
+  }
+}
+
+document.getElementById('btn-iniciar').addEventListener('click', () => {
+  scanner = new Html5Qrcode('reader');
+  scanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 250, height: 150 } },
+    (decodedText) => {
+      buscarCodigo(decodedText);
+      document.getElementById('codigo-manual').value = decodedText;
+    },
+    () => {}
+  ).then(() => {
+    document.getElementById('btn-iniciar').classList.add('d-none');
+    document.getElementById('btn-detener').classList.remove('d-none');
+  }).catch(() => {
+    alert('No se pudo activar la cámara. Usa la búsqueda manual.');
+  });
+});
+
+document.getElementById('btn-detener').addEventListener('click', () => {
+  if (scanner) {
+    scanner.stop().then(() => {
+      document.getElementById('btn-iniciar').classList.remove('d-none');
+      document.getElementById('btn-detener').classList.add('d-none');
+    });
+  }
+});
+
+document.getElementById('btn-buscar-manual').addEventListener('click', () => {
+  const codigo = document.getElementById('codigo-manual').value.trim();
+  if (codigo) buscarCodigo(codigo);
+});
+
+document.getElementById('codigo-manual').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const codigo = e.target.value.trim();
+    if (codigo) buscarCodigo(codigo);
+  }
+});
+</script>
+{% endblock %}

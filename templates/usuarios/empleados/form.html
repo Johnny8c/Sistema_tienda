@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block title %}{{ accion }} empleado — Sistema Tienda{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-4">
+  <a href="{% url 'lista_empleados' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">{{ accion }} empleado</h4>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:480px">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Usuario <span class="text-danger">*</span></label>
+        {% if empleado %}
+          <input type="text" class="form-control" value="{{ empleado.username }}" disabled>
+        {% else %}
+          <input type="text" name="username" class="form-control"
+                 value="{{ post.username|default:'' }}" required autofocus>
+          <div class="form-text">Sin espacios ni caracteres especiales.</div>
+        {% endif %}
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">Nombre</label>
+          <input type="text" name="first_name" class="form-control"
+                 value="{{ empleado.first_name|default:post.first_name|default:'' }}">
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Apellido</label>
+          <input type="text" name="last_name" class="form-control"
+                 value="{{ empleado.last_name|default:post.last_name|default:'' }}">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Rol <span class="text-danger">*</span></label>
+        <select name="rol" class="form-select">
+          {% for valor, etiqueta in roles %}
+          <option value="{{ valor }}"
+            {% if empleado.rol == valor %}selected
+            {% elif post.rol == valor %}selected{% endif %}>
+            {{ etiqueta }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">
+          {% if empleado %}Nueva contraseña{% else %}Contraseña <span class="text-danger">*</span>{% endif %}
+        </label>
+        <input type="password" name="password" class="form-control"
+               {% if not empleado %}required{% endif %} autocomplete="new-password">
+        {% if empleado %}
+        <div class="form-text">Dejar en blanco para no cambiarla.</div>
+        {% endif %}
+      </div>
+
+      {% if empleado %}
+      <div class="mb-4">
+        <div class="form-check">
+          <input type="checkbox" name="is_active" class="form-check-input" id="activo"
+                 {% if empleado.is_active %}checked{% endif %}>
+          <label class="form-check-label" for="activo">Cuenta activa</label>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-dark">{{ accion }}</button>
+        <a href="{% url 'lista_empleados' %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -55,9 +55,21 @@
         </a>
         {% endif %}
 
+        <hr class="my-2">
+        <small class="text-muted px-2 mb-1">Compras</small>
+        <a class="nav-link {% block nav_proveedores %}{% endblock %}" href="{% url 'lista_proveedores' %}">
+          <i class="bi bi-truck"></i> Proveedores
+        </a>
+        <a class="nav-link {% block nav_compras %}{% endblock %}" href="{% url 'lista_compras' %}">
+          <i class="bi bi-basket"></i> Compras
+        </a>
+
         {% if user.es_dueno %}
         <hr class="my-2">
         <small class="text-muted px-2 mb-1">Administración</small>
+        <a class="nav-link {% block nav_empleados %}{% endblock %}" href="{% url 'lista_empleados' %}">
+          <i class="bi bi-people-fill"></i> Empleados
+        </a>
         <a class="nav-link {% block nav_reportes %}{% endblock %}" href="{% url 'reportes' %}">
           <i class="bi bi-bar-chart-line"></i> Reportes
         </a>
@@ -68,8 +80,11 @@
 
         <hr class="my-2">
         <small class="text-muted px-2 mb-1">Inventario</small>
-        <a class="nav-link {% block nav_inventario %}{% endblock %}" href="#">
+        <a class="nav-link {% block nav_inventario %}{% endblock %}" href="{% url 'lista_inventario' %}">
           <i class="bi bi-box-seam"></i> Inventario
+        </a>
+        <a class="nav-link {% block nav_consultar %}{% endblock %}" href="{% url 'consultar_precio' %}">
+          <i class="bi bi-upc-scan"></i> Consultar precio
         </a>
       </nav>
     </div>
@@ -85,9 +100,6 @@
     </div>
   </div>
 </div>
-
-{% else %}
-  {% block content %}{% endblock %}
 {% endif %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

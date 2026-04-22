@@ -142,11 +142,17 @@ buscador.addEventListener('input', () => {
   ).slice(0, 8);
   if (!resultados.length) { sugerencias.style.display = 'none'; return; }
   resultados.forEach(p => {
+    const sinStock = p.stock_disponible <= 0;
     const a = document.createElement('a');
-    a.className = 'list-group-item list-group-item-action d-flex justify-content-between';
+    a.className = 'list-group-item list-group-item-action d-flex justify-content-between' + (sinStock ? ' disabled text-muted' : '');
+    const stockLabel = sinStock
+      ? '<span class="badge bg-danger ms-1">Sin stock</span>'
+      : `<span class="badge bg-success ms-1">${p.stock_disponible} disp.</span>`;
     a.innerHTML = `<span>${p.nombre} <small class="text-muted">${p.talla} ${p.color}</small></span>
-                   <span class="fw-semibold">$${parseFloat(p.precio).toFixed(2)} <small class="text-muted">(${p.stock_disponible})</small></span>`;
-    a.addEventListener('click', () => { agregarItem(p); buscador.value = ''; sugerencias.style.display = 'none'; });
+                   <span class="fw-semibold">$${parseFloat(p.precio).toFixed(2)} ${stockLabel}</span>`;
+    if (!sinStock) {
+      a.addEventListener('click', () => { agregarItem(p); buscador.value = ''; sugerencias.style.display = 'none'; });
+    }
     sugerencias.appendChild(a);
   });
   sugerencias.style.display = 'block';
@@ -182,7 +188,12 @@ function renderTabla() {
 }
 
 function cambiarCantidad(i, val) {
-  itemsCarrito[i].cantidad = Math.max(1, Math.min(parseInt(val) || 1, itemsCarrito[i].stock));
+  const max = itemsCarrito[i].stock;
+  const nueva = Math.max(1, Math.min(parseInt(val) || 1, max));
+  if (parseInt(val) > max) {
+    alert(`Solo hay ${max} unidades disponibles de "${itemsCarrito[i].nombre}" (el resto está reservado en apartados).`);
+  }
+  itemsCarrito[i].cantidad = nueva;
   renderTabla();
 }
 
