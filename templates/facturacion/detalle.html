@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+{% block title %}Factura {{ factura.numero_factura }}{% endblock %}
+{% block nav_sri %}active{% endblock %}
+{% block page_title %}Factura {{ factura.numero_factura }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_facturas' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">Factura {{ factura.numero_factura }}</h1>
+      <p class="page-header-sub">{{ factura.cliente.nombre }} · {{ factura.fecha_emision|date:"d/m/Y" }}</p>
+    </div>
+    {% if factura.estado == 'autorizada' %}
+      <span class="badge badge-pagada">Autorizada</span>
+    {% elif factura.estado == 'rechazada' %}
+      <span class="badge" style="background:#FEE2E2;color:#991B1B">Rechazada</span>
+    {% elif factura.estado == 'emitida' %}
+      <span class="badge badge-pendiente">Pendiente SRI</span>
+    {% else %}
+      <span class="badge badge-cancelado">{{ factura.get_estado_display }}</span>
+    {% endif %}
+    {% if factura.es_contingencia %}
+      <span class="badge" style="background:#FEF3C7;color:#92400E">Contingencia</span>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if factura.estado == 'borrador' or factura.estado == 'rechazada' %}
+      <form method="post" action="{% url 'reemitir_factura' factura.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary"><i class="bi bi-send me-1"></i>Emitir al SRI</button>
+      </form>
+    {% endif %}
+    {% if factura.estado == 'emitida' %}
+      <form method="post" action="{% url 'verificar_autorizacion' factura.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise me-1"></i>Verificar autorización</button>
+      </form>
+    {% endif %}
+    {% if factura.xml_firmado %}
+      <a href="{% url 'descargar_xml' factura.pk %}" class="btn btn-outline-secondary">
+        <i class="bi bi-filetype-xml me-1"></i>XML
+      </a>
+      <a href="{% url 'descargar_ride' factura.pk %}" class="btn btn-outline-secondary" target="_blank">
+        <i class="bi bi-file-earmark-pdf me-1"></i>RIDE PDF
+      </a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-7">
+    <div class="card">
+      <div class="card-header">Datos del comprobante</div>
+      <div class="card-body">
+        <dl class="row mb-0" style="font-size:13.5px">
+          <dt class="col-sm-4 text-muted">Cliente</dt>
+          <dd class="col-sm-8 fw-semibold">{{ factura.cliente.nombre }}</dd>
+
+          <dt class="col-sm-4 text-muted">Cédula / RUC</dt>
+          <dd class="col-sm-8">{{ factura.cliente.cedula_ruc }}</dd>
+
+          <dt class="col-sm-4 text-muted">Ambiente</dt>
+          <dd class="col-sm-8">{{ factura.ambiente|title }}</dd>
+
+          <dt class="col-sm-4 text-muted">Clave de acceso</dt>
+          <dd class="col-sm-8" style="font-family:monospace;font-size:11px;word-break:break-all">{{ factura.clave_acceso|default:"—" }}</dd>
+
+          {% if factura.sri_numero_autorizacion %}
+          <dt class="col-sm-4 text-muted">Nº Autorización</dt>
+          <dd class="col-sm-8" style="font-family:monospace;font-size:11px;word-break:break-all">{{ factura.sri_numero_autorizacion }}</dd>
+
+          <dt class="col-sm-4 text-muted">Fecha autorización</dt>
+          <dd class="col-sm-8">{{ factura.sri_fecha_autorizacion|date:"d/m/Y H:i:s" }}</dd>
+          {% endif %}
+
+          {% if factura.sri_respuesta %}
+          <dt class="col-sm-4 text-muted">Respuesta SRI</dt>
+          <dd class="col-sm-8" style="font-size:12px;color:#475569">{{ factura.sri_respuesta }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="kpi-card h-100 d-flex flex-column justify-content-center" style="background:#0F172A;border-color:#1E293B !important">
+      <div class="kpi-label" style="color:#94A3B8">Total factura</div>
+      <div class="kpi-value text-money" style="color:#fff;font-size:36px">${{ factura.total|floatformat:2 }}</div>
+      <div class="mt-3" style="font-size:12px;color:#94A3B8">
+        Subtotal IVA: <strong style="color:#fff">${{ factura.subtotal_iva|floatformat:2 }}</strong> ·
+        IVA {{ factura.iva_porcentaje }}%: <strong style="color:#fff">${{ factura.iva_valor|floatformat:2 }}</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">Detalle</div>
+  <div style="overflow-x:auto">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>#</th><th>Descripción</th>
+          <th class="text-center">Cant.</th>
+          <th class="text-end">P. Unit.</th>
+          <th class="text-end">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for it in items %}
+        <tr>
+          <td>{{ it.orden }}</td>
+          <td>{{ it.descripcion }}</td>
+          <td class="text-center">{{ it.cantidad|floatformat:2 }}</td>
+          <td class="text-end text-money">${{ it.precio_unitario|floatformat:2 }}</td>
+          <td class="text-end fw-semibold text-money">${{ it.subtotal|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

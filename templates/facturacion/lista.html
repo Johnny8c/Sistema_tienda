@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Facturas SRI{% endblock %}
+{% block nav_sri %}active{% endblock %}
+{% block page_title %}Facturas SRI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">Facturas electrónicas</h1>
+    <p class="page-header-sub">{{ facturas|length }} factura{{ facturas|length|pluralize }}</p>
+  </div>
+  {% if user.es_dueno %}
+  <a href="{% url 'configuracion_sri' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-gear me-1"></i>Configuración SRI
+  </a>
+  {% endif %}
+</div>
+
+<div class="card mb-3">
+  <div class="card-body" style="padding:14px 16px !important">
+    <form method="get" class="d-flex gap-2 flex-wrap">
+      <div style="position:relative;flex:1;min-width:200px;max-width:340px">
+        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+        <input type="text" name="q" value="{{ q }}" class="form-control" style="padding-left:36px"
+               placeholder="Buscar por cliente…">
+      </div>
+      <select name="estado" class="form-select" style="width:auto">
+        <option value="">Todos los estados</option>
+        {% for v, l in estados %}
+        <option value="{{ v }}" {% if estado_sel == v %}selected{% endif %}>{{ l }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-secondary">Filtrar</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Número</th>
+          <th>Cliente</th>
+          <th>Fecha</th>
+          <th>Estado</th>
+          <th class="text-end">Total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in facturas %}
+        <tr>
+          <td class="fw-semibold">{{ f.numero_factura }}</td>
+          <td>{{ f.cliente.nombre }}</td>
+          <td>{{ f.fecha_emision|date:"d/m/Y" }}</td>
+          <td>
+            {% if f.estado == 'autorizada' %}
+              <span class="badge badge-pagada">Autorizada</span>
+            {% elif f.estado == 'rechazada' %}
+              <span class="badge" style="background:#FEE2E2;color:#991B1B">Rechazada</span>
+            {% elif f.estado == 'emitida' %}
+              <span class="badge badge-pendiente">Pendiente SRI</span>
+            {% elif f.estado == 'borrador' %}
+              <span class="badge badge-cancelado">Borrador</span>
+            {% else %}
+              <span class="badge badge-cancelado">{{ f.get_estado_display }}</span>
+            {% endif %}
+            {% if f.es_contingencia %}
+              <span class="badge" style="background:#FEF3C7;color:#92400E">Contingencia</span>
+            {% endif %}
+          </td>
+          <td class="text-end fw-semibold text-money">${{ f.total|floatformat:2 }}</td>
+          <td class="text-end">
+            <a href="{% url 'detalle_factura' f.pk %}" class="btn btn-sm btn-outline-secondary">
+              Ver
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center py-5" style="color:var(--text-muted)">
+            <i class="bi bi-receipt" style="font-size:32px;display:block;margin-bottom:8px"></i>
+            No hay facturas emitidas todavía.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

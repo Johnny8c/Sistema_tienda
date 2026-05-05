@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Configuración SRI{% endblock %}
+{% block nav_sri %}active{% endblock %}
+{% block page_title %}Facturación SRI{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    {% if user.es_dueno %}
+    <a href="{% url 'config_panel' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    {% endif %}
+    <div>
+      <h1 class="page-header-title">Configuración Facturación Electrónica</h1>
+      <p class="page-header-sub">Datos del emisor, certificado digital y secuenciales</p>
+    </div>
+  </div>
+  <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">
+    <i class="bi bi-receipt me-1"></i>Ver facturas
+  </a>
+</div>
+
+<form method="post" enctype="multipart/form-data" style="max-width:880px">
+  {% csrf_token %}
+
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">Datos del emisor</div>
+        <div class="card-body">
+          <div class="row g-2 mb-3">
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">RUC <span class="text-danger">*</span></label>
+              <input type="text" name="ruc" class="form-control" maxlength="13" required
+                     value="{{ cfg.ruc|default:'' }}">
+            </div>
+            <div class="col-sm-8">
+              <label class="form-label fw-semibold">Razón social <span class="text-danger">*</span></label>
+              <input type="text" name="razon_social" class="form-control" required
+                     value="{{ cfg.razon_social|default:'' }}">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nombre comercial</label>
+            <input type="text" name="nombre_comercial" class="form-control"
+                   value="{{ cfg.nombre_comercial|default:'' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Dirección matriz <span class="text-danger">*</span></label>
+            <input type="text" name="direccion" class="form-control" required
+                   value="{{ cfg.direccion|default:'' }}">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">Teléfono</label>
+              <input type="text" name="telefono" class="form-control"
+                     value="{{ cfg.telefono|default:'' }}">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">Establecimiento</label>
+              <input type="text" name="establecimiento" class="form-control" maxlength="3"
+                     value="{{ cfg.establecimiento|default:'001' }}">
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">Punto de emisión</label>
+              <input type="text" name="punto_emision" class="form-control" maxlength="3"
+                     value="{{ cfg.punto_emision|default:'001' }}">
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">Ambiente</label>
+              <select name="ambiente" class="form-select">
+                <option value="pruebas"    {% if cfg.ambiente == 'pruebas' %}selected{% endif %}>Pruebas</option>
+                <option value="produccion" {% if cfg.ambiente == 'produccion' %}selected{% endif %}>Producción</option>
+              </select>
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label fw-semibold">IVA %</label>
+              <input type="number" name="iva_porcentaje" class="form-control" min="0" max="100"
+                     value="{{ cfg.iva_porcentaje|default:15 }}">
+            </div>
+            <div class="col-sm-4 d-flex align-items-end">
+              <div class="form-check">
+                <input type="checkbox" name="obligado_contabilidad" class="form-check-input" id="obli"
+                       {% if cfg.obligado_contabilidad %}checked{% endif %}>
+                <label class="form-check-label" for="obli">Obligado a llevar contabilidad</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header">Certificado digital (.p12)</div>
+        <div class="card-body">
+          {% if cfg.cert_titular %}
+          <div class="alert alert-info py-2 small">
+            <strong>Cargado:</strong><br>
+            {{ cfg.cert_titular }}<br>
+            <span class="text-muted">Vence: {{ cfg.cert_vencimiento|date:"d/m/Y" }}</span>
+          </div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Archivo .p12</label>
+            <input type="file" name="certificado_p12" class="form-control" accept=".p12,.pfx">
+            <div class="form-text">{% if cfg.cert_configurado %}Solo si quieres reemplazar el actual.{% endif %}</div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold">Contraseña del certificado</label>
+            <input type="password" name="clave_certificado" class="form-control"
+                   placeholder="{% if cfg.cert_configurado %}••••••••{% endif %}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 mt-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2 me-1"></i>Guardar configuración
+      </button>
+    </div>
+  </div>
+</form>
+{% endblock %}
