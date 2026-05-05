@@ -30,3 +30,11 @@ class Usuario(AbstractUser):
 
     def puede_acceder_deudores(self):
         return self.rol in (self.ROL_DUENO, self.ROL_VENDEDOR)
+
+    def puede_gestionar_inventario(self):
+        """Dueño + bodeguero pueden modificar el inventario."""
+        return self.rol in (self.ROL_DUENO, self.ROL_BODEGUERO)
+
+    def puede_registrar_compras(self):
+        """Dueño + bodeguero pueden ver y registrar compras (recibir mercadería)."""
+        return self.rol in (self.ROL_DUENO, self.ROL_BODEGUERO)

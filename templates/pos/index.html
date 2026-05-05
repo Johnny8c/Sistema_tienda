@@ -1,259 +1,579 @@
 {% extends 'base.html' %}
 {% block title %}Punto de Venta{% endblock %}
 {% block nav_pos %}active{% endblock %}
+{% block page_title %}Punto de Venta{% endblock %}
+
+{% block extra_head %}
+<style>
+  .pos-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 20px;
+    align-items: start;
+  }
+  .search-wrap { position: relative; }
+  .search-results {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; border: 1px solid #E2E8F0;
+    border-radius: 10px; z-index: 200;
+    box-shadow: 0 8px 24px rgba(15,23,42,.12);
+    max-height: 320px; overflow-y: auto;
+    display: none;
+  }
+  .search-results.open { display: block; }
+  .search-result-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 16px; cursor: pointer;
+    border-bottom: 1px solid #F1F5F9;
+    transition: background .1s;
+  }
+  .search-result-item:last-child { border-bottom: none; }
+  .search-result-item:hover { background: #F8FAFC; }
+  .search-result-item.disabled { cursor: not-allowed; opacity: .5; }
+
+  .cart-empty {
+    text-align: center; padding: 40px 20px;
+    color: #94A3B8;
+  }
+  .cart-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid #F1F5F9;
+  }
+  .cart-item:last-child { border-bottom: none; }
+  .cart-item-info { flex: 1; min-width: 0; }
+  .cart-qty-btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid #E2E8F0; background: #fff;
+    cursor: pointer; font-size: 15px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .1s; color: #475569;
+  }
+  .cart-qty-btn:hover { background: #F1F5F9; }
+  .cart-qty-input {
+    width: 40px; text-align: center; border: 1px solid #E2E8F0;
+    border-radius: 6px; padding: 3px 0; font-size: 13px; font-weight: 600;
+  }
+  .cart-remove {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: none; background: none; cursor: pointer; color: #CBD5E1;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .1s;
+  }
+  .cart-remove:hover { background: #FEE2E2; color: #EF4444; }
+
+  .sale-type-btn {
+    flex: 1; padding: 10px; border-radius: 8px;
+    border: 1.5px solid #E2E8F0; background: #fff;
+    cursor: pointer; font-size: 13px; font-weight: 500;
+    color: #64748B; transition: all .15s; text-align: center;
+  }
+  .sale-type-btn:hover { border-color: #4F46E5; color: #4F46E5; }
+  .sale-type-btn.selected {
+    border-color: #4F46E5; background: #EEF2FF; color: #4F46E5; font-weight: 600;
+  }
+
+  .total-bar {
+    background: #0F172A; border-radius: 10px;
+    padding: 16px 20px; margin-top: 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .total-bar-label { color: #94A3B8; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .total-bar-value { color: #fff; font-size: 24px; font-weight: 700; }
+
+  .btn-cobrar {
+    width: 100%; padding: 13px; border-radius: 10px;
+    background: #4F46E5; border: none; color: #fff;
+    font-size: 15px; font-weight: 700; font-family: 'Inter', sans-serif;
+    cursor: pointer; transition: all .15s; margin-top: 12px;
+  }
+  .btn-cobrar:hover:not(:disabled) { background: #3730A3; }
+  .btn-cobrar:disabled { opacity: .45; cursor: not-allowed; }
+
+  @media (max-width: 900px) {
+    .pos-layout { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0"><i class="bi bi-cart3"></i> Punto de Venta</h4>
-  <span class="text-muted small">{{ request.user.get_full_name|default:request.user.username }}</span>
-</div>
+<div class="pos-layout">
 
-<div class="row g-3">
-  <!-- Panel izquierdo: productos -->
-  <div class="col-md-7">
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-body pb-2">
-        <div class="input-group mb-3">
-          <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
-          <input type="text" id="buscador-producto" class="form-control" placeholder="Buscar producto por nombre o código…" autofocus>
+  <!-- Panel izquierdo: búsqueda + tabla -->
+  <div>
+    <div class="card mb-3">
+      <div class="card-body" style="padding:16px !important">
+        <div class="search-wrap">
+          <div style="position:relative">
+            <i class="bi bi-upc-scan" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8;font-size:16px"></i>
+            <input type="text" id="buscador-producto"
+                   class="form-control"
+                   style="padding-left:38px; font-size:14px"
+                   placeholder="Buscar producto por nombre o código de barras…"
+                   autofocus autocomplete="off">
+          </div>
+          <div class="search-results" id="sugerencias-producto"></div>
         </div>
-        <div id="sugerencias-producto" class="list-group mb-2" style="display:none"></div>
       </div>
-      <table class="table align-middle mb-0" id="tabla-items">
-        <thead>
-          <tr><th>Producto</th><th>Precio</th><th style="width:80px">Cant.</th><th>Subtotal</th><th></th></tr>
-        </thead>
-        <tbody id="items-tbody">
-          <tr id="fila-vacia"><td colspan="5" class="text-center text-muted py-4">Agrega productos escaneando o buscando arriba.</td></tr>
-        </tbody>
-      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span>Carrito</span>
+        <span id="items-count" class="badge" style="background:#EEF2FF;color:#4F46E5">0 items</span>
+      </div>
+      <div id="cart-body" style="min-height:200px">
+        <div class="cart-empty" id="cart-empty">
+          <i class="bi bi-cart3" style="font-size:32px;display:block;margin-bottom:8px;color:#CBD5E1"></i>
+          Busca y agrega productos arriba
+        </div>
+        <div id="cart-items" style="padding:0 20px"></div>
+      </div>
     </div>
   </div>
 
   <!-- Panel derecho: cobro -->
-  <div class="col-md-5">
-    <div class="card border-0 shadow-sm">
-      <div class="card-body">
+  <div class="card">
+    <div class="card-header">Cobrar</div>
+    <div class="card-body">
 
-        <!-- Tipo de venta -->
-        <label class="form-label fw-semibold">Tipo de venta</label>
-        <div class="btn-group w-100 mb-3" id="tipo-venta-group">
-          <input type="radio" class="btn-check" name="tipo_venta" id="tv-contado" value="contado" checked>
-          <label class="btn btn-outline-dark" for="tv-contado">Contado</label>
-
-          <input type="radio" class="btn-check" name="tipo_venta" id="tv-apartado" value="apartado">
-          <label class="btn btn-outline-info" for="tv-apartado"><i class="bi bi-bookmark"></i> Apartar</label>
-
-          <input type="radio" class="btn-check" name="tipo_venta" id="tv-credito" value="credito">
-          <label class="btn btn-outline-warning" for="tv-credito"><i class="bi bi-person-badge"></i> Crédito</label>
+      <!-- Tipo de venta -->
+      <div class="mb-3">
+        <div class="form-label mb-2">Tipo de venta</div>
+        <div class="d-flex gap-2">
+          <button class="sale-type-btn selected" data-tipo="contado" id="btn-contado">
+            <i class="bi bi-cash-stack d-block mb-1" style="font-size:18px"></i>Contado
+          </button>
+          <button class="sale-type-btn" data-tipo="apartado" id="btn-apartado">
+            <i class="bi bi-bookmark d-block mb-1" style="font-size:18px"></i>Apartar
+          </button>
+          <button class="sale-type-btn" data-tipo="credito" id="btn-credito">
+            <i class="bi bi-person-badge d-block mb-1" style="font-size:18px"></i>Crédito
+          </button>
         </div>
+      </div>
 
-        <!-- Sección cliente (aparece en apartado y crédito) -->
-        <div id="seccion-cliente" style="display:none" class="mb-3">
-          <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
-          <select id="sel-cliente" class="form-select form-select-sm">
-            <option value="">— Seleccionar cliente —</option>
-            {% for c in clientes %}
-            <option value="{{ c.pk }}">{{ c.nombre }} ({{ c.cedula_ruc }})</option>
-            {% endfor %}
-          </select>
-          <div class="form-text"><a href="{% url 'crear_cliente' %}" target="_blank">+ Nuevo cliente</a></div>
+      <!-- Cliente (siempre visible — requerido para apartado/crédito y para emitir factura SRI) -->
+      <div id="seccion-cliente" class="mb-3">
+        <label class="form-label">
+          Cliente <span id="cliente-required" style="color:#94A3B8;font-size:11px">(opcional al contado · requerido para factura SRI)</span>
+        </label>
+        <select id="sel-cliente" class="form-select">
+          <option value="">— Consumidor final —</option>
+          {% for c in clientes %}
+          <option value="{{ c.pk }}">{{ c.nombre }} ({{ c.cedula_ruc }})</option>
+          {% endfor %}
+        </select>
+        <div style="font-size:12px;color:#64748B;margin-top:4px">
+          <a href="#" id="btn-nuevo-cliente" style="color:#4F46E5;text-decoration:none">
+            <i class="bi bi-plus-circle me-1"></i>Nuevo cliente rápido
+          </a>
         </div>
+      </div>
 
-        <!-- Sección adelanto (solo apartado) -->
-        <div id="seccion-adelanto" style="display:none" class="mb-3">
-          <label class="form-label fw-semibold">Monto inicial del apartado</label>
+      <!-- Adelanto (apartado) -->
+      <div id="seccion-adelanto" style="display:none" class="mb-3">
+        <label class="form-label">Monto inicial del apartado <span class="text-danger">*</span></label>
+        <div class="input-group">
+          <span class="input-group-text">$</span>
+          <input type="number" id="monto-inicial-pos" class="form-control" step="0.01" min="0.01" placeholder="0.00">
+        </div>
+        <label class="form-label mt-2">Fecha límite de retiro</label>
+        <input type="date" id="fecha-limite-pos" class="form-control">
+      </div>
+
+      <!-- Plazo (crédito) -->
+      <div id="seccion-credito" style="display:none" class="mb-3">
+        <label class="form-label">Plazo de pago (días)</label>
+        <input type="number" id="plazo-dias" class="form-control" value="30" min="1">
+      </div>
+
+      <!-- Forma de pago (contado) -->
+      <div id="seccion-forma-pago" class="mb-3">
+        <label class="form-label">Forma de pago</label>
+        <div class="d-flex gap-2">
+          {% for valor, label in formas %}
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="radio" name="forma_pago"
+                   id="fp-{{ valor }}" value="{{ valor }}" {% if forloop.first %}checked{% endif %}>
+            <label class="form-check-label" for="fp-{{ valor }}" style="font-size:13px">{{ label }}</label>
+          </div>
+          {% empty %}
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="radio" name="forma_pago" id="fp-efectivo" value="efectivo" checked>
+            <label class="form-check-label" for="fp-efectivo" style="font-size:13px">Efectivo</label>
+          </div>
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="radio" name="forma_pago" id="fp-tarjeta" value="tarjeta">
+            <label class="form-check-label" for="fp-tarjeta" style="font-size:13px">Tarjeta</label>
+          </div>
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="radio" name="forma_pago" id="fp-qr" value="transferencia">
+            <label class="form-check-label" for="fp-qr" style="font-size:13px">QR</label>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mt-2" id="campo-recibido">
+          <label class="form-label" style="font-size:12px">Monto recibido</label>
           <div class="input-group input-group-sm">
             <span class="input-group-text">$</span>
-            <input type="number" id="monto-inicial-pos" class="form-control" step="0.01" min="0.01" placeholder="0.00">
+            <input type="number" id="monto-recibido" class="form-control" step="0.01" min="0" placeholder="0.00">
           </div>
-          <div class="mb-2 mt-2">
-            <label class="form-label fw-semibold small">Fecha límite de retiro</label>
-            <input type="date" id="fecha-limite-pos" class="form-control form-control-sm">
+          <div class="mt-1 text-end fw-semibold" id="cambio-display" style="font-size:13px;min-height:18px"></div>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div class="total-bar">
+        <div>
+          <div class="total-bar-label">Total</div>
+          <div class="total-bar-value" id="total-pos">$0.00</div>
+        </div>
+        <i class="bi bi-receipt" style="font-size:28px;color:#334155"></i>
+      </div>
+
+      <button id="btn-cobrar" class="btn-cobrar" disabled>
+        <i class="bi bi-check-circle me-2"></i><span id="btn-cobrar-label">COBRAR</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<form id="form-venta" method="post" action="{% url 'procesar_venta' %}" style="display:none">
+  {% csrf_token %}
+  <input type="hidden" name="tipo_venta"    id="hidden-tipo">
+  <input type="hidden" name="cliente_id"    id="hidden-cliente">
+  <input type="hidden" name="monto_inicial" id="hidden-monto-inicial">
+  <input type="hidden" name="fecha_limite"  id="hidden-fecha-limite">
+  <input type="hidden" name="plazo_dias"    id="hidden-plazo">
+  <input type="hidden" name="forma_pago"    id="hidden-forma-pago">
+  <input type="hidden" name="items_json"    id="hidden-items">
+</form>
+
+<!-- Modal nuevo cliente rápido -->
+<div class="modal fade" id="modalNuevoCliente" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Nuevo cliente rápido</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="nc-error" class="alert alert-danger" style="display:none;font-size:13px;padding:8px 12px"></div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nombre completo <span class="text-danger">*</span></label>
+          <input type="text" id="nc-nombre" class="form-control" autocomplete="off" autofocus>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Cédula / RUC <span class="text-danger">*</span></label>
+          <input type="text" id="nc-cedula" class="form-control" autocomplete="off"
+                 placeholder="10 dígitos (cédula) o 13 dígitos (RUC)">
+        </div>
+        <div class="row g-2">
+          <div class="col">
+            <label class="form-label fw-semibold">Teléfono</label>
+            <input type="text" id="nc-telefono" class="form-control" autocomplete="off">
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold">Email</label>
+            <input type="email" id="nc-email" class="form-control" autocomplete="off">
           </div>
         </div>
-
-        <!-- Sección plazo (solo crédito) -->
-        <div id="seccion-credito" style="display:none" class="mb-3">
-          <label class="form-label fw-semibold">Plazo de pago (días)</label>
-          <input type="number" id="plazo-dias" class="form-control form-control-sm" value="30" min="1">
-        </div>
-
-        <!-- Forma de pago (solo contado) -->
-        <div id="seccion-forma-pago" class="mb-3">
-          <label class="form-label fw-semibold">Forma de pago</label>
-          <div class="d-flex gap-2">
-            <div class="form-check"><input class="form-check-input" type="radio" name="forma_pago" id="fp-efectivo" value="efectivo" checked><label class="form-check-label" for="fp-efectivo">Efectivo</label></div>
-            <div class="form-check"><input class="form-check-input" type="radio" name="forma_pago" id="fp-tarjeta" value="tarjeta"><label class="form-check-label" for="fp-tarjeta">Tarjeta</label></div>
-            <div class="form-check"><input class="form-check-input" type="radio" name="forma_pago" id="fp-qr" value="transferencia"><label class="form-check-label" for="fp-qr">QR</label></div>
-          </div>
-          <div class="mt-2" id="campo-recibido">
-            <label class="form-label small">Monto recibido</label>
-            <div class="input-group input-group-sm">
-              <span class="input-group-text">$</span>
-              <input type="number" id="monto-recibido" class="form-control" step="0.01" min="0">
-            </div>
-            <div class="mt-1 text-end fw-semibold" id="cambio-display"></div>
-          </div>
-        </div>
-
-        <hr>
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <span class="fs-5 fw-bold">TOTAL</span>
-          <span class="fs-4 fw-bold" id="total-pos">$0.00</span>
-        </div>
-
-        <button id="btn-cobrar" class="btn btn-dark w-100 py-2 fs-5" disabled>
-          <i class="bi bi-check-circle"></i> <span id="btn-cobrar-label">COBRAR</span>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="nc-guardar">
+          <i class="bi bi-check2 me-1"></i>Crear y seleccionar
         </button>
       </div>
     </div>
   </div>
 </div>
-
-<!-- Form oculto que se envía -->
-<form id="form-venta" method="post" action="{% url 'procesar_venta' %}" style="display:none">
-  {% csrf_token %}
-  <input type="hidden" name="tipo_venta" id="hidden-tipo">
-  <input type="hidden" name="cliente_id" id="hidden-cliente">
-  <input type="hidden" name="monto_inicial" id="hidden-monto-inicial">
-  <input type="hidden" name="fecha_limite" id="hidden-fecha-limite">
-  <input type="hidden" name="plazo_dias" id="hidden-plazo">
-  <input type="hidden" name="forma_pago" id="hidden-forma-pago">
-  <input type="hidden" name="items_json" id="hidden-items">
-</form>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 const productos = {{ productos_json|safe }};
-let itemsCarrito = [];
+let carrito = [];
+let tipoActual = 'contado';
 
-// --- Buscador de productos ---
-const buscador = document.getElementById('buscador-producto');
-const sugerencias = document.getElementById('sugerencias-producto');
+/* ─── BÚSQUEDA ────────────────────────────────────── */
+const buscador    = document.getElementById('buscador-producto');
+const resultados  = document.getElementById('sugerencias-producto');
 
 buscador.addEventListener('input', () => {
   const q = buscador.value.trim().toLowerCase();
-  sugerencias.innerHTML = '';
-  if (!q) { sugerencias.style.display = 'none'; return; }
-  const resultados = productos.filter(p =>
-    p.nombre.toLowerCase().includes(q) || (p.codigo_barras || '').includes(q)
+  resultados.innerHTML = '';
+  if (!q) { resultados.classList.remove('open'); return; }
+
+  const hits = productos.filter(p =>
+    p.nombre.toLowerCase().includes(q) || (p.codigo_barras||'').includes(q)
   ).slice(0, 8);
-  if (!resultados.length) { sugerencias.style.display = 'none'; return; }
-  resultados.forEach(p => {
+
+  if (!hits.length) { resultados.classList.remove('open'); return; }
+
+  hits.forEach(p => {
     const sinStock = p.stock_disponible <= 0;
-    const a = document.createElement('a');
-    a.className = 'list-group-item list-group-item-action d-flex justify-content-between' + (sinStock ? ' disabled text-muted' : '');
-    const stockLabel = sinStock
-      ? '<span class="badge bg-danger ms-1">Sin stock</span>'
-      : `<span class="badge bg-success ms-1">${p.stock_disponible} disp.</span>`;
-    a.innerHTML = `<span>${p.nombre} <small class="text-muted">${p.talla} ${p.color}</small></span>
-                   <span class="fw-semibold">$${parseFloat(p.precio).toFixed(2)} ${stockLabel}</span>`;
-    if (!sinStock) {
-      a.addEventListener('click', () => { agregarItem(p); buscador.value = ''; sugerencias.style.display = 'none'; });
-    }
-    sugerencias.appendChild(a);
+    const div = document.createElement('div');
+    div.className = 'search-result-item' + (sinStock ? ' disabled' : '');
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:500;font-size:13.5px">${p.nombre}</div>
+        <div style="font-size:12px;color:#94A3B8">${[p.talla,p.color].filter(Boolean).join(' · ')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:600;font-size:13.5px">$${parseFloat(p.precio).toFixed(2)}</div>
+        <span style="font-size:11px;padding:2px 7px;border-radius:5px;font-weight:500;
+          background:${sinStock?'#FEE2E2':'#DCFCE7'};color:${sinStock?'#991B1B':'#15803D'}">
+          ${sinStock ? 'Sin stock' : p.stock_disponible + ' disp.'}
+        </span>
+      </div>`;
+    if (!sinStock) div.addEventListener('click', () => {
+      agregarItem(p);
+      buscador.value = '';
+      resultados.classList.remove('open');
+    });
+    resultados.appendChild(div);
   });
-  sugerencias.style.display = 'block';
+  resultados.classList.add('open');
 });
 
 document.addEventListener('click', e => {
-  if (!sugerencias.contains(e.target) && e.target !== buscador) sugerencias.style.display = 'none';
+  if (!resultados.contains(e.target) && e.target !== buscador)
+    resultados.classList.remove('open');
 });
 
+/* ─── SCANNER DE CÓDIGOS DE BARRAS ──────────────────
+   El scanner USB es un teclado que "tipea" el código y envía Enter.
+   Al recibir Enter:
+   1) Buscar match EXACTO por codigo_barras → agregar al carrito
+   2) Si hay 1 sola coincidencia por nombre, también agregar
+*/
+buscador.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const q = buscador.value.trim();
+  if (!q) return;
+
+  // 1. Match exacto por código de barras (lo típico al escanear)
+  const exacto = productos.find(p => p.codigo_barras === q);
+  if (exacto) {
+    if (exacto.stock_disponible <= 0) {
+      window.showToast && showToast(`"${exacto.nombre}" sin stock disponible`, 'warning');
+    } else {
+      agregarItem(exacto);
+      window.showToast && showToast(`+ ${exacto.nombre}`, 'success', 1500);
+    }
+    buscador.value = '';
+    resultados.classList.remove('open');
+    return;
+  }
+
+  // 2. Una sola coincidencia por nombre/código → agregar
+  const hits = productos.filter(p =>
+    p.nombre.toLowerCase().includes(q.toLowerCase()) || (p.codigo_barras || '').includes(q)
+  );
+  if (hits.length === 1 && hits[0].stock_disponible > 0) {
+    agregarItem(hits[0]);
+    buscador.value = '';
+    resultados.classList.remove('open');
+    return;
+  }
+
+  // Si no hubo match exacto, mostrar aviso
+  if (!hits.length) {
+    window.showToast && showToast(`No se encontró el código "${q}"`, 'danger');
+    buscador.value = '';
+    resultados.classList.remove('open');
+  }
+});
+
+/* ─── CARRITO ─────────────────────────────────────── */
 function agregarItem(p) {
-  const existente = itemsCarrito.find(i => i.id === p.id);
-  if (existente) { existente.cantidad += 1; }
-  else { itemsCarrito.push({id: p.id, nombre: p.nombre, talla: p.talla, color: p.color, precio: parseFloat(p.precio), cantidad: 1, stock: p.stock_disponible}); }
-  renderTabla();
+  const ex = carrito.find(i => i.id === p.id);
+  if (ex) { ex.cantidad = Math.min(ex.cantidad + 1, p.stock_disponible); }
+  else     { carrito.push({id:p.id, nombre:p.nombre, talla:p.talla, color:p.color,
+                            precio:parseFloat(p.precio), cantidad:1, stock:p.stock_disponible}); }
+  renderCarrito();
 }
 
-function renderTabla() {
-  const tbody = document.getElementById('items-tbody');
-  if (!itemsCarrito.length) {
-    tbody.innerHTML = '<tr id="fila-vacia"><td colspan="5" class="text-center text-muted py-4">Agrega productos escaneando o buscando arriba.</td></tr>';
-    actualizarTotal(); return;
+function renderCarrito() {
+  const empty = document.getElementById('cart-empty');
+  const items = document.getElementById('cart-items');
+  const count = document.getElementById('items-count');
+
+  count.textContent = carrito.length + ' item' + (carrito.length !== 1 ? 's' : '');
+
+  if (!carrito.length) {
+    empty.style.display = '';
+    items.innerHTML = '';
+    actualizarTotal();
+    return;
   }
-  tbody.innerHTML = itemsCarrito.map((item, i) => `
-    <tr>
-      <td>${item.nombre} <small class="text-muted">${item.talla} ${item.color}</small></td>
-      <td>$${item.precio.toFixed(2)}</td>
-      <td><input type="number" class="form-control form-control-sm" value="${item.cantidad}" min="1" max="${item.stock}"
-           onchange="cambiarCantidad(${i}, this.value)"></td>
-      <td>$${(item.precio * item.cantidad).toFixed(2)}</td>
-      <td><button class="btn btn-sm btn-outline-danger" onclick="quitarItem(${i})">✕</button></td>
-    </tr>`).join('');
+  empty.style.display = 'none';
+  items.innerHTML = carrito.map((item, i) => `
+    <div class="cart-item">
+      <div class="cart-item-info">
+        <div style="font-weight:600;font-size:13.5px">${item.nombre}</div>
+        <div style="font-size:12px;color:#94A3B8">${[item.talla,item.color].filter(Boolean).join(' · ')} · $${item.precio.toFixed(2)}</div>
+      </div>
+      <div class="d-flex align-items-center gap-1">
+        <button class="cart-qty-btn" onclick="cambiarCantidad(${i},-1)">−</button>
+        <input class="cart-qty-input" type="number" value="${item.cantidad}" min="1" max="${item.stock}"
+               onchange="setCantidad(${i},this.value)">
+        <button class="cart-qty-btn" onclick="cambiarCantidad(${i},1)">+</button>
+      </div>
+      <div style="font-weight:600;font-size:13.5px;min-width:56px;text-align:right">
+        $${(item.precio*item.cantidad).toFixed(2)}
+      </div>
+      <button class="cart-remove" onclick="quitarItem(${i})">
+        <i class="bi bi-x" style="font-size:16px"></i>
+      </button>
+    </div>`).join('');
   actualizarTotal();
 }
 
-function cambiarCantidad(i, val) {
-  const max = itemsCarrito[i].stock;
-  const nueva = Math.max(1, Math.min(parseInt(val) || 1, max));
-  if (parseInt(val) > max) {
-    alert(`Solo hay ${max} unidades disponibles de "${itemsCarrito[i].nombre}" (el resto está reservado en apartados).`);
-  }
-  itemsCarrito[i].cantidad = nueva;
-  renderTabla();
+function cambiarCantidad(i, delta) {
+  const nueva = carrito[i].cantidad + delta;
+  if (nueva < 1) { quitarItem(i); return; }
+  if (nueva > carrito[i].stock) return;
+  carrito[i].cantidad = nueva;
+  renderCarrito();
 }
-
-function quitarItem(i) { itemsCarrito.splice(i, 1); renderTabla(); }
+function setCantidad(i, val) {
+  const v = Math.max(1, Math.min(parseInt(val)||1, carrito[i].stock));
+  carrito[i].cantidad = v;
+  renderCarrito();
+}
+function quitarItem(i) { carrito.splice(i,1); renderCarrito(); }
 
 function actualizarTotal() {
-  const total = itemsCarrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const total = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
   document.getElementById('total-pos').textContent = '$' + total.toFixed(2);
-  document.getElementById('btn-cobrar').disabled = !itemsCarrito.length;
+  document.getElementById('btn-cobrar').disabled = !carrito.length;
   calcularCambio();
 }
 
-// --- Tipo de venta ---
-document.querySelectorAll('input[name="tipo_venta"]').forEach(r => r.addEventListener('change', actualizarUI));
+/* ─── TIPO VENTA ──────────────────────────────────── */
+document.querySelectorAll('.sale-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sale-type-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    tipoActual = btn.dataset.tipo;
+    actualizarUI();
+  });
+});
 
 function actualizarUI() {
-  const tipo = document.querySelector('input[name="tipo_venta"]:checked').value;
-  document.getElementById('seccion-cliente').style.display = (tipo !== 'contado') ? '' : 'none';
-  document.getElementById('seccion-adelanto').style.display = (tipo === 'apartado') ? '' : 'none';
-  document.getElementById('seccion-credito').style.display = (tipo === 'credito') ? '' : 'none';
-  document.getElementById('seccion-forma-pago').style.display = (tipo === 'contado') ? '' : 'none';
-  const labels = {contado: 'COBRAR', apartado: 'CREAR APARTADO', credito: 'REGISTRAR CRÉDITO'};
-  document.getElementById('btn-cobrar-label').textContent = labels[tipo];
+  // Cliente siempre visible — solo cambia el nivel de exigencia
+  document.getElementById('seccion-adelanto').style.display  = tipoActual === 'apartado' ? '' : 'none';
+  document.getElementById('seccion-credito').style.display   = tipoActual === 'credito'  ? '' : 'none';
+  document.getElementById('seccion-forma-pago').style.display= tipoActual === 'contado'  ? '' : 'none';
+  const labels = {contado:'COBRAR', apartado:'CREAR APARTADO', credito:'REGISTRAR CRÉDITO'};
+  document.getElementById('btn-cobrar-label').textContent = labels[tipoActual];
+
+  // Indicador de "requerido" según tipo de venta
+  const lbl = document.getElementById('cliente-required');
+  if (lbl) {
+    if (tipoActual === 'contado') {
+      lbl.textContent = '(opcional al contado · requerido para factura SRI)';
+      lbl.style.color = '#94A3B8';
+    } else {
+      lbl.textContent = '(obligatorio)';
+      lbl.style.color = '#E11D48';
+    }
+  }
 }
 
-// --- Cambio ---
+/* ─── CAMBIO ──────────────────────────────────────── */
 document.getElementById('monto-recibido').addEventListener('input', calcularCambio);
-
 function calcularCambio() {
-  const total = itemsCarrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
-  const recibido = parseFloat(document.getElementById('monto-recibido').value) || 0;
+  const total = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
+  const recibido = parseFloat(document.getElementById('monto-recibido').value)||0;
   const div = document.getElementById('cambio-display');
   if (recibido > 0) {
     const cambio = recibido - total;
     div.textContent = cambio >= 0 ? `Cambio: $${cambio.toFixed(2)}` : `Faltan: $${Math.abs(cambio).toFixed(2)}`;
-    div.className = cambio >= 0 ? 'mt-1 text-end fw-semibold text-success' : 'mt-1 text-end fw-semibold text-danger';
+    div.style.color = cambio >= 0 ? '#15803D' : '#DC2626';
   } else { div.textContent = ''; }
 }
 
-// --- Cobrar ---
+/* ─── COBRAR ──────────────────────────────────────── */
 document.getElementById('btn-cobrar').addEventListener('click', () => {
-  const tipo = document.querySelector('input[name="tipo_venta"]:checked').value;
   const clienteId = document.getElementById('sel-cliente').value;
-
-  if (tipo !== 'contado' && !clienteId) {
+  if (tipoActual !== 'contado' && !clienteId) {
     alert('Selecciona un cliente para continuar.'); return;
   }
-  if (tipo === 'apartado') {
+  if (tipoActual === 'apartado') {
     const monto = parseFloat(document.getElementById('monto-inicial-pos').value);
     if (!monto || monto <= 0) { alert('Ingresa el monto del adelanto.'); return; }
   }
-
-  document.getElementById('hidden-tipo').value = tipo;
-  document.getElementById('hidden-cliente').value = clienteId;
+  document.getElementById('hidden-tipo').value          = tipoActual;
+  document.getElementById('hidden-cliente').value       = clienteId;
   document.getElementById('hidden-monto-inicial').value = document.getElementById('monto-inicial-pos').value;
-  document.getElementById('hidden-fecha-limite').value = document.getElementById('fecha-limite-pos').value;
-  document.getElementById('hidden-plazo').value = document.getElementById('plazo-dias').value;
-  document.getElementById('hidden-forma-pago').value = document.querySelector('input[name="forma_pago"]:checked')?.value || 'efectivo';
-  document.getElementById('hidden-items').value = JSON.stringify(itemsCarrito.map(i => ({producto_id: i.id, cantidad: i.cantidad})));
+  document.getElementById('hidden-fecha-limite').value  = document.getElementById('fecha-limite-pos').value;
+  document.getElementById('hidden-plazo').value         = document.getElementById('plazo-dias').value;
+  document.getElementById('hidden-forma-pago').value    = document.querySelector('input[name="forma_pago"]:checked')?.value||'efectivo';
+  document.getElementById('hidden-items').value         = JSON.stringify(carrito.map(i=>({producto_id:i.id,cantidad:i.cantidad})));
   document.getElementById('form-venta').submit();
+});
+
+/* ─── NUEVO CLIENTE RÁPIDO (AJAX) ─────────────────── */
+const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+const modalNC = new bootstrap.Modal(document.getElementById('modalNuevoCliente'));
+
+document.getElementById('btn-nuevo-cliente').addEventListener('click', e => {
+  e.preventDefault();
+  // Limpiar campos
+  ['nc-nombre','nc-cedula','nc-telefono','nc-email'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('nc-error').style.display = 'none';
+  modalNC.show();
+});
+
+document.getElementById('nc-guardar').addEventListener('click', async () => {
+  const errBox = document.getElementById('nc-error');
+  errBox.style.display = 'none';
+
+  const data = new FormData();
+  data.append('nombre',     document.getElementById('nc-nombre').value.trim());
+  data.append('cedula_ruc', document.getElementById('nc-cedula').value.trim());
+  data.append('telefono',   document.getElementById('nc-telefono').value.trim());
+  data.append('email',      document.getElementById('nc-email').value.trim());
+  data.append('csrfmiddlewaretoken', csrfToken);
+
+  const btn = document.getElementById('nc-guardar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Guardando…';
+
+  try {
+    const resp = await fetch('{% url "api_crear_cliente" %}', {
+      method: 'POST', body: data, headers: {'X-CSRFToken': csrfToken},
+    });
+    const json = await resp.json();
+    if (!resp.ok || !json.ok) {
+      errBox.textContent = json.error || 'Error al crear cliente.';
+      errBox.style.display = '';
+      return;
+    }
+    // Agregar al select y seleccionarlo
+    const sel = document.getElementById('sel-cliente');
+    const opt = document.createElement('option');
+    opt.value = json.id;
+    opt.textContent = json.label;
+    opt.selected = true;
+    sel.appendChild(opt);
+    sel.value = json.id;
+    modalNC.hide();
+    if (window.showToast) showToast(`Cliente "${json.nombre}" creado y seleccionado`, 'success');
+  } catch (e) {
+    errBox.textContent = 'Error de red: ' + e.message;
+    errBox.style.display = '';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Crear y seleccionar';
+  }
 });
 </script>
 {% endblock %}

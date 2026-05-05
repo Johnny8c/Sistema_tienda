@@ -23,3 +23,8 @@ def requiere_dueno(view_func):
 
 def requiere_no_bodeguero(view_func):
     return requiere_rol('dueno', 'vendedor')(view_func)
+
+
+def requiere_no_vendedor(view_func):
+    """Dueño + bodeguero — para gestión de inventario y compras."""
+    return requiere_rol('dueno', 'bodeguero')(view_func)

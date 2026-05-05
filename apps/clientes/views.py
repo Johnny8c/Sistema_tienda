@@ -1,6 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from apps.usuarios.decorators import requiere_no_bodeguero
 from .models import Cliente
 from .services import validar_cedula_o_ruc
@@ -74,6 +76,36 @@ def editar_cliente(request, pk):
         return redirect('lista_clientes')
 
     return render(request, 'clientes/form.html', {'accion': 'Editar', 'cliente': cliente})
+
+
+@login_required
+@requiere_no_bodeguero
+@require_POST
+def api_crear_cliente(request):
+    """Endpoint AJAX para crear cliente rápido desde el POS."""
+    nombre     = request.POST.get('nombre', '').strip()
+    cedula_ruc = request.POST.get('cedula_ruc', '').strip()
+    telefono   = request.POST.get('telefono', '').strip()
+    email      = request.POST.get('email', '').strip()
+
+    if not nombre or not cedula_ruc:
+        return JsonResponse({'ok': False, 'error': 'Nombre y cédula/RUC son obligatorios.'}, status=400)
+    if not validar_cedula_o_ruc(cedula_ruc):
+        return JsonResponse({'ok': False, 'error': 'Cédula o RUC inválido.'}, status=400)
+    if Cliente.objects.filter(cedula_ruc=cedula_ruc).exists():
+        return JsonResponse({'ok': False, 'error': f'Ya existe un cliente con cédula/RUC {cedula_ruc}.'}, status=400)
+
+    cliente = Cliente.objects.create(
+        nombre=nombre, cedula_ruc=cedula_ruc,
+        telefono=telefono, email=email,
+    )
+    return JsonResponse({
+        'ok':         True,
+        'id':         cliente.pk,
+        'nombre':     cliente.nombre,
+        'cedula_ruc': cliente.cedula_ruc,
+        'label':      f'{cliente.nombre} ({cliente.cedula_ruc})',
+    })
 
 
 @login_required

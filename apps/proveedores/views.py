@@ -4,14 +4,14 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
-from apps.usuarios.decorators import requiere_dueno
+from apps.usuarios.decorators import requiere_dueno, requiere_no_vendedor
 from apps.inventario.models import Producto
 from .models import Proveedor, Compra, ItemCompra
 
 
 # ── Proveedores ───────────────────────────────────────────────────────────────
 
-@login_required
+@requiere_no_vendedor
 def lista_proveedores(request):
     proveedores = Proveedor.objects.filter(activo=True)
     return render(request, 'proveedores/lista.html', {'proveedores': proveedores})
@@ -55,13 +55,13 @@ def editar_proveedor(request, pk):
 
 # ── Compras ───────────────────────────────────────────────────────────────────
 
-@login_required
+@requiere_no_vendedor
 def lista_compras(request):
     compras = Compra.objects.select_related('proveedor', 'registrado_por').all()
     return render(request, 'proveedores/lista_compras.html', {'compras': compras})
 
 
-@requiere_dueno
+@requiere_no_vendedor
 def crear_compra(request):
     proveedores = Proveedor.objects.filter(activo=True)
     productos = Producto.objects.filter(activo=True).order_by('nombre')
@@ -139,7 +139,7 @@ def crear_compra(request):
     })
 
 
-@login_required
+@requiere_no_vendedor
 def detalle_compra(request, pk):
     compra = get_object_or_404(Compra, pk=pk)
     return render(request, 'proveedores/detalle_compra.html', {'compra': compra})
