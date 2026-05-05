@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -10,5 +12,9 @@ urlpatterns = [
     path('deudores/', include('apps.deudores.urls')),
     path('reportes/', include('apps.reportes.urls')),
     path('proveedores/', include('apps.proveedores.urls')),
-    path('ventas/', include('apps.ventas.urls')),
+    path('sri/', include('apps.facturacion.urls')),
+    path('configuracion/', include('apps.configuracion.urls')),
 ]
+
+if settings.DEBUG and hasattr(settings, 'MEDIA_ROOT'):
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

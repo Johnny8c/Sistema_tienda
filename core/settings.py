@@ -25,6 +25,8 @@ LOCAL_APPS = [
     'apps.deudores',
     'apps.reportes',
     'apps.proveedores',
+    'apps.facturacion',
+    'apps.configuracion',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + LOCAL_APPS
@@ -53,6 +55,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.configuracion.context_processors.config_general',
             ],
         },
     },
@@ -88,5 +91,16 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Media / fotos de productos
+_CLOUDINARY_URL = config('CLOUDINARY_URL', default='')
+if _CLOUDINARY_URL:
+    import cloudinary
+    cloudinary.config(cloudinary_url=_CLOUDINARY_URL)
+    INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+else:
+    MEDIA_URL = '/media/'
+    MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
