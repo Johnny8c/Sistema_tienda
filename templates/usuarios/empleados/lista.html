@@ -1,68 +1,87 @@
 {% extends 'base.html' %}
-{% block title %}Empleados — Sistema Tienda{% endblock %}
+{% block title %}Empleados{% endblock %}
+{% block nav_empleados %}active{% endblock %}
+{% block page_title %}Empleados{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0"><i class="bi bi-people-fill"></i> Gestión de empleados</h4>
-  <a href="{% url 'crear_empleado' %}" class="btn btn-dark"><i class="bi bi-plus-lg"></i> Nuevo empleado</a>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'config_panel' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">Gestión de empleados</h1>
+      <p class="page-header-sub">{{ empleados|length }} empleado{{ empleados|length|pluralize }} registrado{{ empleados|length|pluralize }}</p>
+    </div>
+  </div>
+  <a href="{% url 'crear_empleado' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Nuevo empleado
+  </a>
 </div>
 
-<div class="card border-0 shadow-sm">
-  <table class="table table-hover align-middle mb-0">
-    <thead>
-      <tr>
-        <th>Usuario</th>
-        <th>Nombre</th>
-        <th>Rol</th>
-        <th class="text-center">Estado</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for emp in empleados %}
-      <tr class="{% if not emp.is_active %}table-secondary text-muted{% endif %}">
-        <td class="fw-semibold">{{ emp.username }}</td>
-        <td>{{ emp.get_full_name|default:"—" }}</td>
-        <td>
-          {% if emp.rol == 'dueno' %}
-            <span class="badge bg-dark">Dueño</span>
-          {% elif emp.rol == 'vendedor' %}
-            <span class="badge bg-primary">Vendedor</span>
-          {% else %}
-            <span class="badge bg-secondary">Bodeguero</span>
-          {% endif %}
-        </td>
-        <td class="text-center">
-          {% if emp.is_active %}
-            <span class="badge bg-success">Activo</span>
-          {% else %}
-            <span class="badge bg-danger">Inactivo</span>
-          {% endif %}
-        </td>
-        <td class="text-end" style="white-space:nowrap">
-          <a href="{% url 'editar_empleado' emp.pk %}" class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-pencil"></i> Editar
-          </a>
-          <form method="post" action="{% url 'toggle_empleado' emp.pk %}" class="d-inline">
-            {% csrf_token %}
+<div class="card">
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Usuario</th><th>Nombre completo</th><th>Rol</th><th class="text-center">Estado</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for emp in empleados %}
+        <tr {% if not emp.is_active %}style="opacity:.55"{% endif %}>
+          <td class="fw-semibold">{{ emp.username }}</td>
+          <td style="color:#64748B">{{ emp.get_full_name|default:"—" }}</td>
+          <td>
+            {% if emp.rol == 'dueno' %}<span class="badge badge-dueno">Dueño</span>
+            {% elif emp.rol == 'vendedor' %}<span class="badge badge-vendedor">Vendedor</span>
+            {% else %}<span class="badge badge-bodeguero">Bodeguero</span>{% endif %}
+          </td>
+          <td class="text-center">
             {% if emp.is_active %}
-              <button class="btn btn-sm btn-outline-danger"
-                      onclick="return confirm('¿Desactivar acceso de {{ emp.username }}?')">
-                <i class="bi bi-person-x"></i> Desactivar
-              </button>
+              <span class="badge" style="background:#DCFCE7;color:#15803D">Activo</span>
             {% else %}
-              <button class="btn btn-sm btn-outline-success">
-                <i class="bi bi-person-check"></i> Activar
-              </button>
+              <span class="badge" style="background:#FEE2E2;color:#991B1B">Inactivo</span>
             {% endif %}
-          </form>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="5" class="text-center text-muted py-4">No hay otros empleados registrados.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+          </td>
+          <td class="text-end" style="white-space:nowrap">
+            <a href="{% url 'editar_empleado' emp.pk %}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-pencil me-1"></i>Editar
+            </a>
+            <form method="post" action="{% url 'toggle_empleado' emp.pk %}" class="d-inline ms-1"
+                  {% if emp.is_active %}data-confirm="El usuario no podrá iniciar sesión hasta que lo reactives."
+                  data-confirm-title="¿Desactivar a {{ emp.username }}?" data-confirm-variant="warning"{% endif %}>
+              {% csrf_token %}
+              {% if emp.is_active %}
+              <button class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-person-x me-1"></i>Desactivar
+              </button>
+              {% else %}
+              <button class="btn btn-sm" style="border-color:#10B981;color:#10B981">
+                <i class="bi bi-person-check me-1"></i>Activar
+              </button>
+              {% endif %}
+            </form>
+            {% if not emp.is_superuser %}
+            <form method="post" action="{% url 'eliminar_empleado' emp.pk %}" class="d-inline ms-1"
+                  data-confirm="Esta acción es irreversible. Se eliminará permanentemente al empleado."
+                  data-confirm-title="¿Eliminar a {{ emp.username }}?" data-confirm-variant="danger">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-danger btn-icon" title="Eliminar empleado">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center py-5" style="color:#94A3B8">
+            <i class="bi bi-people-fill" style="font-size:32px;display:block;margin-bottom:8px"></i>
+            No hay otros empleados registrados.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
-<div class="mt-2 text-muted small">{{ empleados|length }} empleado{{ empleados|length|pluralize }} registrado{{ empleados|length|pluralize }}</div>
 {% endblock %}

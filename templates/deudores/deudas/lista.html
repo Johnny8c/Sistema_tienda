@@ -1,90 +1,117 @@
 {% extends 'base.html' %}
 {% block title %}Deudores{% endblock %}
 {% block nav_deudas %}active{% endblock %}
+{% block page_title %}Deudores{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0"><i class="bi bi-people"></i> Deudores</h4>
+<div class="page-header">
+  <h1 class="page-header-title">Deudores</h1>
 </div>
 
+<!-- Buckets de antigüedad -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3">
-      <div class="text-muted small">0–30 días</div>
-      <div class="fs-4 fw-bold text-success">${{ bucket_0_30|floatformat:2 }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon emerald"><i class="bi bi-clock"></i></div>
+      <div class="kpi-label">0–30 días</div>
+      <div class="kpi-value text-money" style="color:#15803D">${{ bucket_0_30|floatformat:2 }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3">
-      <div class="text-muted small">31–60 días</div>
-      <div class="fs-4 fw-bold text-warning">${{ bucket_31_60|floatformat:2 }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon amber"><i class="bi bi-clock-history"></i></div>
+      <div class="kpi-label">31–60 días</div>
+      <div class="kpi-value text-money" style="color:#D97706">${{ bucket_31_60|floatformat:2 }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3">
-      <div class="text-muted small">61–90 días</div>
-      <div class="fs-4 fw-bold text-orange" style="color:#fd7e14">${{ bucket_61_90|floatformat:2 }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:#FFF7ED;color:#EA580C"><i class="bi bi-exclamation-circle"></i></div>
+      <div class="kpi-label">61–90 días</div>
+      <div class="kpi-value text-money" style="color:#EA580C">${{ bucket_61_90|floatformat:2 }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3">
-      <div class="text-muted small">90+ días</div>
-      <div class="fs-4 fw-bold text-danger">${{ bucket_90_mas|floatformat:2 }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon rose"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-label">90+ días</div>
+      <div class="kpi-value text-money" style="color:#E11D48">${{ bucket_90_mas|floatformat:2 }}</div>
     </div>
   </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-  <div class="card-body pb-0">
-    <form method="get" class="row g-2 mb-3">
-      <div class="col-md-4">
-        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar cliente o cédula…">
+<div class="card">
+  <div class="card-body" style="padding:14px 16px !important">
+    <form method="get" class="d-flex flex-wrap gap-2">
+      <div style="position:relative;flex:1;min-width:200px;max-width:360px">
+        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8"></i>
+        <input type="text" name="q" value="{{ q }}" class="form-control" style="padding-left:36px"
+               placeholder="Buscar cliente o cédula…">
       </div>
-      <div class="col-md-3">
-        <select name="estado" class="form-select form-select-sm">
-          <option value="pendiente" {% if estado == 'pendiente' %}selected{% endif %}>Pendientes</option>
-          <option value="saldada" {% if estado == 'saldada' %}selected{% endif %}>Saldadas</option>
-          <option value="condonada" {% if estado == 'condonada' %}selected{% endif %}>Condonadas</option>
-          <option value="">Todas</option>
-        </select>
-      </div>
-      <div class="col-auto">
-        <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
-      </div>
+      <select name="estado" class="form-select" style="max-width:180px">
+        <option value="pendiente" {% if estado == 'pendiente' %}selected{% endif %}>Pendientes</option>
+        <option value="saldada"   {% if estado == 'saldada' %}selected{% endif %}>Saldadas</option>
+        <option value="condonada" {% if estado == 'condonada' %}selected{% endif %}>Condonadas</option>
+        <option value="">Todas</option>
+      </select>
+      <button class="btn btn-outline-secondary">Filtrar</button>
     </form>
   </div>
-  <table class="table table-hover align-middle mb-0">
-    <thead>
-      <tr><th>#</th><th>Cliente</th><th>Monto original</th><th>Saldo</th><th>Antigüedad</th><th>Estado</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for d in deudas %}
-      <tr>
-        <td>{{ d.pk }}</td>
-        <td>
-          <a href="{% url 'detalle_cliente' d.cliente.pk %}">{{ d.cliente.nombre }}</a>
-          <div class="text-muted small">{{ d.cliente.cedula_ruc }}</div>
-        </td>
-        <td>${{ d.monto_original|floatformat:2 }}</td>
-        <td class="fw-semibold">${{ d.saldo_pendiente|floatformat:2 }}</td>
-        <td>
-          {% with bucket=d.bucket_antiguedad %}
-          <span class="badge {% if bucket == '0-30' %}bg-success{% elif bucket == '31-60' %}bg-warning text-dark{% elif bucket == '61-90' %}bg-orange{% else %}bg-danger{% endif %}">
-            {{ bucket }} días
-          </span>
-          {% endwith %}
-        </td>
-        <td>
-          {% if d.estado == 'pendiente' %}<span class="badge bg-warning text-dark">Pendiente</span>
-          {% elif d.estado == 'saldada' %}<span class="badge bg-success">Saldada</span>
-          {% else %}<span class="badge bg-secondary">Condonada</span>{% endif %}
-        </td>
-        <td><a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7" class="text-center text-muted py-4">Sin deudas registradas.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Cliente</th>
+          <th class="text-end">Monto original</th>
+          <th class="text-end">Saldo</th>
+          <th>Antigüedad</th>
+          <th>Estado</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in deudas %}
+        <tr>
+          <td data-label="#" style="color:#94A3B8;font-size:12px">#{{ d.pk }}</td>
+          <td data-label="Cliente">
+            <a href="{% url 'detalle_cliente' d.cliente.pk %}" style="font-weight:600;color:#1E293B;text-decoration:none">
+              {{ d.cliente.nombre }}
+            </a>
+            <div style="font-size:12px;color:#94A3B8">{{ d.cliente.cedula_ruc }}</div>
+          </td>
+          <td data-label="Monto original" class="text-end text-money">${{ d.monto_original|floatformat:2 }}</td>
+          <td data-label="Saldo" class="text-end fw-semibold text-money">${{ d.saldo_pendiente|floatformat:2 }}</td>
+          <td data-label="Antigüedad">
+            {% with bucket=d.bucket_antiguedad %}
+            <span class="badge
+              {% if bucket == '0-30' %}bg-success
+              {% elif bucket == '31-60' %}bg-warning text-dark
+              {% elif bucket == '61-90' %}{% else %}bg-danger{% endif %}"
+              {% if bucket == '61-90' %}style="background:#FED7AA;color:#92400E"{% endif %}>
+              {{ bucket }} días
+            </span>
+            {% endwith %}
+          </td>
+          <td data-label="Estado">
+            {% if d.estado == 'pendiente' %}<span class="badge badge-pendiente">Pendiente</span>
+            {% elif d.estado == 'saldada' %}<span class="badge badge-saldada">Saldada</span>
+            {% else %}<span class="badge badge-condonada">Condonada</span>{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary w-100">Ver detalle</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-5" style="color:#94A3B8">
+            <i class="bi bi-people" style="font-size:32px;display:block;margin-bottom:8px"></i>
+            Sin deudas registradas.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

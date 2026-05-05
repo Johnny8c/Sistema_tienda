@@ -2,62 +2,95 @@
 {% load reporte_extras %}
 {% block title %}Antigüedad de cartera{% endblock %}
 {% block nav_reportes %}active{% endblock %}
+{% block page_title %}Antigüedad de cartera{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">Antigüedad de cartera</h4>
-  <small class="text-muted">Al {{ hoy|date:"d/m/Y" }}</small>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'reportes' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">Antigüedad de cartera</h1>
+      <p class="page-header-sub">Al {{ hoy|date:"d/m/Y" }}</p>
+    </div>
+  </div>
 </div>
 
-<!-- Resumen por bucket -->
 <div class="row g-3 mb-4">
   {% for key, color, label in buckets_meta %}
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-{{ color }}">
-      <div class="text-muted small">{{ label }}</div>
-      <div class="fs-3 fw-bold text-{{ color }}">${{ totales|get_item:key|floatformat:2 }}</div>
-      <div class="text-muted small">{{ buckets|get_item:key|length }} deuda{{ buckets|get_item:key|length|pluralize }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon
+        {% if color == 'success' %}emerald
+        {% elif color == 'warning' %}amber
+        {% elif color == 'danger' %}rose
+        {% else %}{% endif %}"
+        {% if color == 'orange' %}style="background:#FFF7ED;color:#EA580C"{% endif %}>
+        <i class="bi bi-clock{% if color == 'danger' %}-history{% endif %}"></i>
+      </div>
+      <div class="kpi-label">{{ label }}</div>
+      <div class="kpi-value text-money">${{ totales|get_item:key|floatformat:2 }}</div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:4px">
+        {{ buckets|get_item:key|length }} deuda{{ buckets|get_item:key|length|pluralize }}
+      </div>
     </div>
   </div>
   {% endfor %}
 </div>
 
-<div class="card border-0 shadow-sm mb-3">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center">
-    <span class="fw-semibold">Total cartera pendiente</span>
-    <span class="fs-5 fw-bold">${{ total_general|floatformat:2 }}</span>
+<div class="kpi-card mb-4" style="display:flex;align-items:center;justify-content:space-between">
+  <div>
+    <div class="kpi-label">Total cartera pendiente</div>
+    <div class="kpi-value text-money">${{ total_general|floatformat:2 }}</div>
   </div>
+  <div class="kpi-icon indigo"><i class="bi bi-bar-chart-line"></i></div>
 </div>
 
 {% for key, color, label in buckets_meta %}
   {% with lista=buckets|get_item:key %}
   {% if lista %}
-  <div class="card border-0 shadow-sm mb-3">
-    <div class="card-header bg-white">
-      <span class="badge bg-{{ color }} me-2">{{ label }}</span>
-      <span class="fw-semibold">${{ totales|get_item:key|floatformat:2 }}</span>
-      <span class="text-muted small ms-2">({{ lista|length }} deuda{{ lista|length|pluralize }})</span>
+  <div class="card mb-3">
+    <div class="card-header">
+      <span class="badge
+        {% if color == 'success' %}bg-success
+        {% elif color == 'warning' %}bg-warning text-dark
+        {% elif color == 'danger' %}bg-danger
+        {% else %}{% endif %} me-2"
+        {% if color == 'orange' %}style="background:#FED7AA;color:#92400E"{% endif %}>
+        {{ label }}
+      </span>
+      <span class="fw-semibold text-money">${{ totales|get_item:key|floatformat:2 }}</span>
+      <span style="color:#94A3B8;font-size:13px;margin-left:6px">({{ lista|length }} deuda{{ lista|length|pluralize }})</span>
     </div>
-    <table class="table table-sm table-hover align-middle mb-0">
-      <thead><tr><th>#</th><th>Cliente</th><th>Monto original</th><th>Saldo</th><th>Días</th><th>Vence</th><th></th></tr></thead>
-      <tbody>
-        {% for d in lista %}
-        <tr>
-          <td>{{ d.pk }}</td>
-          <td>
-            <a href="{% url 'detalle_cliente' d.cliente.pk %}">{{ d.cliente.nombre }}</a>
-            <div class="text-muted small">{{ d.cliente.cedula_ruc }}</div>
-          </td>
-          <td>${{ d.monto_original|floatformat:2 }}</td>
-          <td class="fw-semibold">${{ d.saldo_pendiente|floatformat:2 }}</td>
-          <td><span class="badge bg-{{ color }}">{{ d.dias_transcurridos }}d</span></td>
-          <td>{{ d.fecha_vencimiento|default:"—" }}</td>
-          <td><a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div style="overflow-x:auto">
+      <table class="table table-hover mb-0">
+        <thead><tr><th>#</th><th>Cliente</th><th class="text-end">Monto original</th><th class="text-end">Saldo</th><th>Días</th><th>Vence</th><th></th></tr></thead>
+        <tbody>
+          {% for d in lista %}
+          <tr>
+            <td style="color:#94A3B8;font-size:12px">#{{ d.pk }}</td>
+            <td>
+              <a href="{% url 'detalle_cliente' d.cliente.pk %}" style="font-weight:600;color:#1E293B;text-decoration:none">{{ d.cliente.nombre }}</a>
+              <div style="font-size:12px;color:#94A3B8">{{ d.cliente.cedula_ruc }}</div>
+            </td>
+            <td class="text-end text-money">${{ d.monto_original|floatformat:2 }}</td>
+            <td class="text-end fw-semibold text-money">${{ d.saldo_pendiente|floatformat:2 }}</td>
+            <td>
+              <span class="badge
+                {% if color == 'success' %}bg-success
+                {% elif color == 'warning' %}bg-warning text-dark
+                {% elif color == 'danger' %}bg-danger
+                {% else %}{% endif %}"
+                {% if color == 'orange' %}style="background:#FED7AA;color:#92400E"{% endif %}>
+                {{ d.dias_transcurridos }}d
+              </span>
+            </td>
+            <td style="color:#64748B">{{ d.fecha_vencimiento|default:"—" }}</td>
+            <td><a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
   {% endif %}
   {% endwith %}

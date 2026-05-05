@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  .row-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .row-item:last-child { border-bottom: none; }
+  .row-item-main  { flex: 1; min-width: 0; }
+  .row-item-title { font-weight: 600; font-size: 13.5px; color: var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-item-sub   { font-size: 11.5px; color: var(--text-muted); }
+  .stock-mini { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+  .stock-mini.warn   { background: rgba(217,119,6,.15); color: #D97706; }
+  .stock-mini.danger { background: rgba(225,29,72,.15); color: #E11D48; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    {% if viendo_como_dueno %}
+      <h1 class="page-header-title">Dashboard de {{ empleado.get_full_name|default:empleado.username }}</h1>
+      <p class="page-header-sub">Rol: {{ empleado.get_rol_display }} · Vista del dueño</p>
+    {% else %}
+      <h1 class="page-header-title">Hola, {{ empleado.first_name|default:empleado.username }}</h1>
+      <p class="page-header-sub">Estado del inventario y reposiciones</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    {% if viendo_como_dueno %}
+    <select class="form-select" onchange="if(this.value)location.href=this.value" style="max-width:240px">
+      <option value="{% url 'dashboard' %}">— Mi negocio (vista global) —</option>
+      {% for e in empleados_disponibles %}
+      <option value="?empleado={{ e.pk }}" {% if e.pk == empleado.pk %}selected{% endif %}>
+        {{ e.get_full_name|default:e.username }} ({{ e.get_rol_display }})
+      </option>
+      {% endfor %}
+    </select>
+    {% else %}
+    <a href="{% url 'lista_inventario' %}" class="btn btn-primary">
+      <i class="bi bi-box-seam me-1"></i>Ver inventario
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- KPIs principales -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon emerald"><i class="bi bi-boxes"></i></div>
+      <div class="kpi-label">Unidades en stock</div>
+      <div class="kpi-value">{{ stock_total_unidades }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon indigo"><i class="bi bi-grid-3x3-gap"></i></div>
+      <div class="kpi-label">Variantes activas</div>
+      <div class="kpi-value">{{ total_variantes }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+        de {{ total_catalogo }} producto{{ total_catalogo|pluralize }} en catálogo
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon rose"><i class="bi bi-exclamation-octagon"></i></div>
+      <div class="kpi-label">Sin stock</div>
+      <div class="kpi-value" style="color:#E11D48">{{ sin_stock_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon amber"><i class="bi bi-exclamation-triangle"></i></div>
+      <div class="kpi-label">Stock bajo</div>
+      <div class="kpi-value" style="color:#D97706">{{ stock_bajo_count }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+        ≤ {{ stock_minimo }} unidades
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Valor del inventario -->
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="kpi-card" style="background:#0F172A;border-color:#1E293B !important">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="kpi-label" style="color:#94A3B8">Valor total del inventario</div>
+          <div class="kpi-value text-money" style="color:#fff;font-size:32px">${{ valor_inventario|floatformat:2 }}</div>
+        </div>
+        <a href="{% url 'lista_inventario' %}" class="btn btn-light">
+          <i class="bi bi-arrow-right me-1"></i>Gestionar
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 2 columnas: sin stock + stock crítico -->
+<div class="row g-3 mb-3">
+  <!-- Sin stock — urgente -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-exclamation-octagon-fill text-danger me-2"></i>Reponer URGENTE — Sin stock</span>
+        <span class="badge" style="background:#FEE2E2;color:#991B1B">{{ sin_stock_count }}</span>
+      </div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for v in sin_stock %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ v.catalogo.nombre|default:v.nombre }}</div>
+            <div class="row-item-sub">{{ v.color }} {{ v.talla }} · {{ v.codigo_barras }}</div>
+          </div>
+          <span class="stock-mini danger">0 uds.</span>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:28px;display:block;margin-bottom:6px"></i>
+          Todos los productos tienen stock
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Stock bajo -->
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Stock bajo</span>
+        <span class="badge" style="background:#FEF3C7;color:#92400E">{{ stock_bajo_count }}</span>
+      </div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for v in stock_critico %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ v.catalogo.nombre|default:v.nombre }}</div>
+            <div class="row-item-sub">{{ v.color }} {{ v.talla }} · {{ v.codigo_barras }}</div>
+          </div>
+          <span class="stock-mini {% if v.stock <= 2 %}danger{% else %}warn{% endif %}">
+            {{ v.stock }} uds.
+          </span>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:28px;display:block;margin-bottom:6px"></i>
+          Stock saludable
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Top vendidos (qué reponer primero) -->
+<div class="row g-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-fire text-danger me-2"></i>Productos más vendidos (30 días) — qué reponer primero</div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for p in top_vendidos %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ p.producto__catalogo__nombre|default:"—" }}</div>
+          </div>
+          <div style="font-weight:700;font-size:14px;color:var(--text-1)">
+            {{ p.unidades|floatformat:0 }} uds vendidas
+          </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-bag" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin ventas registradas en 30 días
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

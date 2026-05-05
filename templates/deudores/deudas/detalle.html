@@ -1,91 +1,104 @@
 {% extends 'base.html' %}
 {% block title %}Deuda #{{ deuda.pk }}{% endblock %}
 {% block nav_deudas %}active{% endblock %}
+{% block page_title %}Deuda #{{ deuda.pk }}{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'lista_deudas' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">Deuda #{{ deuda.pk }}</h4>
-  {% if deuda.estado == 'pendiente' %}<span class="badge bg-warning text-dark">Pendiente</span>
-  {% elif deuda.estado == 'saldada' %}<span class="badge bg-success">Saldada</span>
-  {% else %}<span class="badge bg-secondary">Condonada</span>{% endif %}
-  <span class="badge bg-light text-dark border">{{ deuda.bucket_antiguedad }} días</span>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_deudas' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">Deuda #{{ deuda.pk }}</h1>
+      <p class="page-header-sub">Antigüedad: {{ deuda.bucket_antiguedad }} días</p>
+    </div>
+    {% if deuda.estado == 'pendiente' %}<span class="badge badge-pendiente">Pendiente</span>
+    {% elif deuda.estado == 'saldada' %}<span class="badge badge-saldada">Saldada</span>
+    {% else %}<span class="badge badge-condonada">Condonada</span>{% endif %}
+  </div>
+  {% if deuda.estado == 'pendiente' %}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalAbono">
+      <i class="bi bi-cash me-1"></i>Registrar abono
+    </button>
+    <form method="post" action="{% url 'saldar_deuda' deuda.pk %}"
+          data-confirm="¿Marcar la deuda como completamente saldada?"
+          data-confirm-title="Saldar deuda" data-confirm-variant="success">
+      {% csrf_token %}
+      <button class="btn btn-outline-secondary" style="border-color:#10B981;color:#10B981">
+        <i class="bi bi-check-circle me-1"></i>Saldar completo
+      </button>
+    </form>
+    {% if user.es_dueno %}
+    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalCondonar">
+      <i class="bi bi-slash-circle me-1"></i>Condonar
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 <div class="row g-3 mb-4">
+  <!-- Cliente -->
   <div class="col-md-4">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card h-100">
+      <div class="card-header">Cliente</div>
       <div class="card-body">
-        <h6 class="text-muted">Cliente</h6>
-        <p class="fw-semibold mb-1">{{ deuda.cliente.nombre }}</p>
-        <p class="text-muted small mb-1">{{ deuda.cliente.cedula_ruc }}</p>
-        <p class="text-muted small mb-0">{{ deuda.cliente.telefono|default:"Sin teléfono" }}</p>
+        <div class="fw-semibold" style="font-size:15px">{{ deuda.cliente.nombre }}</div>
+        <div style="font-size:12px;color:#94A3B8;margin-top:2px">{{ deuda.cliente.cedula_ruc }}</div>
+        <div style="font-size:13px;color:#64748B;margin-top:6px">{{ deuda.cliente.telefono|default:"Sin teléfono" }}</div>
       </div>
-      <div class="card-footer bg-white">
+      <div class="card-footer">
         <a href="{% url 'detalle_cliente' deuda.cliente.pk %}" class="btn btn-sm btn-outline-secondary w-100">Ver ficha</a>
       </div>
     </div>
   </div>
+
+  <!-- Resumen financiero -->
   <div class="col-md-8">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card h-100">
+      <div class="card-header">Resumen de la deuda</div>
       <div class="card-body">
         <div class="row g-3">
-          <div class="col-6">
-            <div class="text-muted small">Monto original</div>
-            <div class="fs-4 fw-bold">${{ deuda.monto_original|floatformat:2 }}</div>
+          <div class="col-6 col-md-3">
+            <div class="kpi-label">Monto original</div>
+            <div style="font-size:20px;font-weight:700" class="text-money">${{ deuda.monto_original|floatformat:2 }}</div>
           </div>
-          <div class="col-6">
-            <div class="text-muted small">Saldo pendiente</div>
-            <div class="fs-4 fw-bold {% if deuda.saldo_pendiente == 0 %}text-success{% else %}text-warning{% endif %}">
+          <div class="col-6 col-md-3">
+            <div class="kpi-label">Saldo pendiente</div>
+            <div style="font-size:20px;font-weight:700;color:{% if deuda.saldo_pendiente == 0 %}#15803D{% else %}#D97706{% endif %}" class="text-money">
               ${{ deuda.saldo_pendiente|floatformat:2 }}
             </div>
           </div>
-          <div class="col-6">
-            <div class="text-muted small">Creada</div>
-            <div>{{ deuda.fecha_creacion|date:"d/m/Y" }}</div>
+          <div class="col-6 col-md-3">
+            <div class="kpi-label">Creada</div>
+            <div style="font-weight:600;font-size:14px">{{ deuda.fecha_creacion|date:"d/m/Y" }}</div>
           </div>
-          <div class="col-6">
-            <div class="text-muted small">Vence</div>
-            <div>{{ deuda.fecha_vencimiento|default:"Sin plazo" }}</div>
+          <div class="col-6 col-md-3">
+            <div class="kpi-label">Vence</div>
+            <div style="font-weight:600;font-size:14px">{{ deuda.fecha_vencimiento|default:"Sin plazo" }}</div>
           </div>
         </div>
       </div>
-      {% if deuda.estado == 'pendiente' %}
-      <div class="card-footer bg-white d-flex gap-2 flex-wrap">
-        <button class="btn btn-dark btn-sm" data-bs-toggle="modal" data-bs-target="#modalAbono">
-          <i class="bi bi-cash"></i> Registrar abono
-        </button>
-        <form method="post" action="{% url 'saldar_deuda' deuda.pk %}">
-          {% csrf_token %}
-          <button class="btn btn-success btn-sm" onclick="return confirm('¿Marcar la deuda como completamente saldada?')">
-            <i class="bi bi-check-circle"></i> Saldar completo
-          </button>
-        </form>
-        {% if user.es_dueno %}
-        <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#modalCondonar">
-          <i class="bi bi-slash-circle"></i> Condonar
-        </button>
-        {% endif %}
-      </div>
-      {% endif %}
     </div>
   </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-  <div class="card-header bg-white fw-semibold">Historial de pagos</div>
-  <table class="table table-sm mb-0">
-    <thead><tr><th>Fecha</th><th>Forma de pago</th><th>Monto</th><th>Registró</th></tr></thead>
+<div class="card">
+  <div class="card-header">Historial de pagos</div>
+  <table class="table mb-0">
+    <thead>
+      <tr><th>Fecha</th><th>Forma de pago</th><th class="text-end">Monto</th><th>Registró</th></tr>
+    </thead>
     <tbody>
       {% for p in pagos %}
       <tr>
-        <td>{{ p.fecha|date:"d/m/Y H:i" }}</td>
-        <td>{{ p.get_forma_pago_display }}</td>
-        <td>${{ p.monto|floatformat:2 }}</td>
-        <td>{{ p.vendedor.username }}</td>
+        <td style="color:#64748B;font-size:13px">{{ p.fecha|date:"d/m/Y H:i" }}</td>
+        <td style="font-size:13px">{{ p.get_forma_pago_display }}</td>
+        <td class="text-end fw-semibold text-money">${{ p.monto|floatformat:2 }}</td>
+        <td style="font-size:13px;color:#94A3B8">{{ p.vendedor.username }}</td>
       </tr>
       {% empty %}
-      <tr><td colspan="4" class="text-muted text-center py-3">Sin pagos registrados.</td></tr>
+      <tr><td colspan="4" class="text-center py-4" style="color:#94A3B8">Sin pagos registrados.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -97,7 +110,10 @@
     <div class="modal-content">
       <form method="post" action="{% url 'abonar_deuda' deuda.pk %}">
         {% csrf_token %}
-        <div class="modal-header"><h5 class="modal-title">Registrar abono</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header">
+          <h5 class="modal-title">Registrar abono</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Monto <span class="text-danger">*</span></label>
@@ -106,9 +122,11 @@
               <input type="number" name="monto" class="form-control" step="0.01" min="0.01"
                      max="{{ deuda.saldo_pendiente }}" required>
             </div>
-            <div class="form-text">Saldo pendiente: ${{ deuda.saldo_pendiente|floatformat:2 }}</div>
+            <div style="font-size:12px;color:#64748B;margin-top:4px">
+              Saldo pendiente: <strong>${{ deuda.saldo_pendiente|floatformat:2 }}</strong>
+            </div>
           </div>
-          <div class="mb-0">
+          <div>
             <label class="form-label">Forma de pago</label>
             <select name="forma_pago" class="form-select">
               <option value="efectivo">Efectivo</option>
@@ -118,8 +136,8 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-dark btn-sm">Registrar</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm">Registrar abono</button>
         </div>
       </form>
     </div>
@@ -132,16 +150,21 @@
     <div class="modal-content">
       <form method="post" action="{% url 'condonar_deuda' deuda.pk %}">
         {% csrf_token %}
-        <div class="modal-header"><h5 class="modal-title">Condonar deuda</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-header">
+          <h5 class="modal-title">Condonar deuda</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
         <div class="modal-body">
-          <p class="small text-danger">Esta acción cancela la deuda de ${{ deuda.saldo_pendiente|floatformat:2 }} sin cobrarla. No se puede deshacer.</p>
-          <div class="mb-0">
+          <div class="alert alert-danger" style="font-size:13px">
+            Esta acción cancela <strong>${{ deuda.saldo_pendiente|floatformat:2 }}</strong> sin cobrarlos. No se puede deshacer.
+          </div>
+          <div>
             <label class="form-label">Motivo <span class="text-danger">*</span></label>
             <textarea name="motivo" class="form-control" rows="2" required></textarea>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Volver</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Volver</button>
           <button type="submit" class="btn btn-danger btn-sm">Confirmar condonación</button>
         </div>
       </form>

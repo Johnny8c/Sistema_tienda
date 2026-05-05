@@ -1,0 +1,221 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  .chart-bars {
+    display: flex; align-items: flex-end; gap: 6px;
+    height: 120px; padding-top: 8px;
+  }
+  .chart-bar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+  .chart-bar-fill {
+    width: 100%; background: linear-gradient(180deg, var(--primary) 0%, #818CF8 100%);
+    border-radius: 6px 6px 0 0; min-height: 4px; transition: all .3s ease;
+  }
+  .chart-bar-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+  .chart-bar-value { font-size: 10px; color: var(--text-1); font-weight: 600; }
+
+  .row-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .row-item:last-child { border-bottom: none; }
+  .row-item-rank {
+    width: 24px; height: 24px; border-radius: 6px; background: var(--table-head-bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: var(--text-muted); flex-shrink: 0;
+  }
+  .row-item-rank.top-1 { background: rgba(245,158,11,.15); color: #D97706; }
+  .row-item-rank.top-2 { background: rgba(148,163,184,.18); color: #64748B; }
+  .row-item-rank.top-3 { background: rgba(217,119,6,.12); color: #B45309; }
+  .row-item-main  { flex: 1; min-width: 0; }
+  .row-item-title { font-weight: 600; font-size: 13.5px; color: var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-item-sub   { font-size: 11.5px; color: var(--text-muted); }
+  .row-item-value { font-size: 13.5px; font-weight: 700; color: var(--text-1); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    {% if viendo_como_dueno %}
+      <h1 class="page-header-title">Dashboard de {{ empleado.get_full_name|default:empleado.username }}</h1>
+      <p class="page-header-sub">Rol: {{ empleado.get_rol_display }} · Vista del dueño</p>
+    {% else %}
+      <h1 class="page-header-title">Hola, {{ empleado.first_name|default:empleado.username }}</h1>
+      <p class="page-header-sub">Tu resumen de ventas</p>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    {% if viendo_como_dueno %}
+    <select class="form-select" onchange="if(this.value)location.href=this.value" style="max-width:240px">
+      <option value="{% url 'dashboard' %}">— Mi negocio (vista global) —</option>
+      {% for e in empleados_disponibles %}
+      <option value="?empleado={{ e.pk }}" {% if e.pk == empleado.pk %}selected{% endif %}>
+        {{ e.get_full_name|default:e.username }} ({{ e.get_rol_display }})
+      </option>
+      {% endfor %}
+    </select>
+    {% else %}
+    <a href="{% url 'pos' %}" class="btn btn-primary">
+      <i class="bi bi-cart3 me-1"></i>Ir al POS
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- KPIs principales -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon indigo"><i class="bi bi-cash-stack"></i></div>
+      <div class="kpi-label">Mis ventas hoy</div>
+      <div class="kpi-value text-money">${{ total_ventas_hoy|floatformat:2 }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+        {{ tickets_hoy }} ticket{{ tickets_hoy|pluralize }} · ø ${{ ticket_promedio|floatformat:2 }}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon emerald"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="kpi-label">Mes en curso</div>
+      <div class="kpi-value text-money">${{ total_ventas_mes|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon amber"><i class="bi bi-people"></i></div>
+      <div class="kpi-label">Mis deudas activas</div>
+      <div class="kpi-value">{{ cant_deudas }}</div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+        ${{ total_por_cobrar|floatformat:2 }} por cobrar
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon sky"><i class="bi bi-bookmark-check"></i></div>
+      <div class="kpi-label">Mis apartados</div>
+      <div class="kpi-value">{{ adelantos_activos }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Gráfico + Top productos -->
+<div class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-bar-chart-line text-primary me-2"></i>Mis ventas últimos 7 días</div>
+      <div class="card-body">
+        <div class="chart-bars">
+          {% for d in ventas_7d %}
+          <div class="chart-bar" title="${{ d.total|floatformat:2 }}">
+            <div class="chart-bar-value">${{ d.total|floatformat:0 }}</div>
+            <div class="chart-bar-fill" style="height:{{ d.pct }}%"></div>
+            <div class="chart-bar-label">{{ d.dia }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-trophy text-warning me-2"></i>Productos que más vendí</div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for p in top_productos %}
+        <div class="row-item">
+          <div class="row-item-rank {% if forloop.counter == 1 %}top-1{% elif forloop.counter == 2 %}top-2{% elif forloop.counter == 3 %}top-3{% endif %}">
+            {{ forloop.counter }}
+          </div>
+          <div class="row-item-main">
+            <div class="row-item-title">{{ p.producto__catalogo__nombre|default:"—" }}</div>
+            <div class="row-item-sub">{{ p.unidades|floatformat:0 }} unidades</div>
+          </div>
+          <div class="row-item-value text-money">${{ p.ingreso|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-bag" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin ventas en 30 días
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3 columnas: deudas / apartados / últimas ventas -->
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-person-exclamation text-danger me-2"></i>Mis deudores</div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for d in sus_top_deudores %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ d.cliente.nombre }}</div>
+            <div class="row-item-sub">Deuda #{{ d.pk }} · {{ d.bucket_antiguedad }} días</div>
+          </div>
+          <div class="row-item-value text-money" style="color:#E11D48">${{ d.saldo_pendiente|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin deudas pendientes
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-clock-history text-warning me-2"></i>Mis apartados por vencer</div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for a in sus_apartados %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ a.cliente.nombre }}</div>
+            <div class="row-item-sub">Vence {{ a.fecha_limite|date:"d/m/Y" }}</div>
+          </div>
+          <div class="row-item-value text-money">${{ a.saldo_pendiente|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin apartados vencidos
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-receipt text-primary me-2"></i>Mis últimas ventas</div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for v in ultimas_ventas %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ v.cliente.nombre|default:"Consumidor final" }}</div>
+            <div class="row-item-sub">{{ v.fecha|date:"d/m H:i" }}</div>
+          </div>
+          <div class="row-item-value text-money">${{ v.total|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-cart" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin ventas todavía
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Total acumulado al pie -->
+<div class="mt-3 text-center" style="font-size:12px;color:var(--text-muted)">
+  Total acumulado de ventas: <strong style="color:var(--text-1)">${{ total_ventas_total|floatformat:2 }}</strong>
+</div>
+{% endblock %}

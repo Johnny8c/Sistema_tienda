@@ -1,127 +1,167 @@
 {% extends 'base.html' %}
 {% block title %}Ficha de {{ cliente.nombre }}{% endblock %}
 {% block nav_clientes %}active{% endblock %}
+{% block page_title %}Ficha de cliente{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'lista_clientes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">{{ cliente.nombre }}</h4>
-  {% if cliente.saldo_a_favor > 0 %}
-    <span class="badge bg-success fs-6">Saldo a favor: ${{ cliente.saldo_a_favor|floatformat:2 }}</span>
-  {% endif %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_clientes' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">{{ cliente.nombre }}</h1>
+      <p class="page-header-sub">{{ cliente.cedula_ruc }}</p>
+    </div>
+    {% if cliente.saldo_a_favor > 0 %}
+    <span class="badge" style="background:#DCFCE7;color:#15803D;font-size:13px">
+      <i class="bi bi-wallet2 me-1"></i>Saldo a favor: ${{ cliente.saldo_a_favor|floatformat:2 }}
+    </span>
+    {% endif %}
+  </div>
+  <a href="{% url 'editar_cliente' cliente.pk %}" class="btn btn-outline-secondary">
+    <i class="bi bi-pencil me-1"></i>Editar
+  </a>
 </div>
 
 <div class="row g-3 mb-4">
+  <!-- Datos -->
   <div class="col-md-4">
-    <div class="card border-0 shadow-sm h-100">
+    <div class="card h-100">
+      <div class="card-header">Datos del cliente</div>
       <div class="card-body">
-        <h6 class="text-muted mb-3">Datos del cliente</h6>
-        <p class="mb-1"><strong>Cédula/RUC:</strong> <code>{{ cliente.cedula_ruc }}</code></p>
-        <p class="mb-1"><strong>Teléfono:</strong> {{ cliente.telefono|default:"—" }}</p>
-        <p class="mb-1"><strong>Email:</strong> {{ cliente.email|default:"—" }}</p>
-        <p class="mb-0"><strong>Dirección:</strong> {{ cliente.direccion|default:"—" }}</p>
-      </div>
-      <div class="card-footer bg-white">
-        <a href="{% url 'editar_cliente' cliente.pk %}" class="btn btn-sm btn-outline-secondary w-100">Editar datos</a>
+        <dl style="margin:0">
+          <dt style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Cédula / RUC</dt>
+          <dd style="margin-bottom:14px"><code style="background:#F1F5F9;padding:2px 7px;border-radius:5px;font-size:13px">{{ cliente.cedula_ruc }}</code></dd>
+
+          <dt style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Teléfono</dt>
+          <dd style="margin-bottom:14px;font-size:14px">{{ cliente.telefono|default:"—" }}</dd>
+
+          <dt style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Email</dt>
+          <dd style="margin-bottom:14px;font-size:14px">{{ cliente.email|default:"—" }}</dd>
+
+          <dt style="font-size:11px;color:#64748B;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Dirección</dt>
+          <dd style="margin-bottom:0;font-size:14px">{{ cliente.direccion|default:"—" }}</dd>
+        </dl>
       </div>
     </div>
   </div>
+
+  <!-- Métricas -->
   <div class="col-md-8">
-    <div class="row g-3">
+    <div class="row g-3 h-100">
       <div class="col-6">
-        <div class="card border-0 shadow-sm text-center p-3">
-          <div class="text-muted small">Adelantos activos</div>
-          <div class="fs-3 fw-bold text-info">{{ adelantos_activos }}</div>
+        <div class="kpi-card h-100">
+          <div class="kpi-icon sky"><i class="bi bi-bookmark-check"></i></div>
+          <div class="kpi-label">Adelantos activos</div>
+          <div class="kpi-value">{{ adelantos_activos }}</div>
         </div>
       </div>
       <div class="col-6">
-        <div class="card border-0 shadow-sm text-center p-3">
-          <div class="text-muted small">Deuda pendiente</div>
-          <div class="fs-3 fw-bold text-warning">${{ total_deuda|floatformat:2 }}</div>
+        <div class="kpi-card h-100">
+          <div class="kpi-icon amber"><i class="bi bi-exclamation-circle"></i></div>
+          <div class="kpi-label">Deuda pendiente</div>
+          <div class="kpi-value text-money">${{ total_deuda|floatformat:2 }}</div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<ul class="nav nav-tabs mb-3" id="historialTabs">
-  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-adelantos">Adelantos</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-deudas">Deudas</a></li>
-  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-pagos">Pagos</a></li>
-</ul>
-
-<div class="tab-content">
-  <div class="tab-pane fade show active" id="tab-adelantos">
-    <div class="card border-0 shadow-sm">
-      <table class="table table-hover align-middle mb-0">
-        <thead><tr><th>#</th><th>Total</th><th>Saldo</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
-        <tbody>
-          {% for a in adelantos %}
-          <tr>
-            <td>{{ a.pk }}</td>
-            <td>${{ a.total|floatformat:2 }}</td>
-            <td>${{ a.saldo_pendiente|floatformat:2 }}</td>
-            <td>
-              {% if a.estado == 'activo' %}<span class="badge bg-info">Activo</span>
-              {% elif a.estado == 'completado' %}<span class="badge bg-success">Completado</span>
-              {% else %}<span class="badge bg-secondary">Cancelado</span>{% endif %}
-            </td>
-            <td>{{ a.fecha_creacion|date:"d/m/Y" }}</td>
-            <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="6" class="text-center text-muted py-3">Sin adelantos.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+<!-- Historial en tabs -->
+<div class="card">
+  <div class="card-header" style="padding-bottom:0 !important">
+    <ul class="nav nav-tabs" style="border-bottom:none;margin-bottom:-1px">
+      <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#tab-adelantos">
+          <i class="bi bi-bookmark-check me-1"></i>Adelantos
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-deudas">
+          <i class="bi bi-people me-1"></i>Deudas
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab-pagos">
+          <i class="bi bi-cash me-1"></i>Pagos
+        </a>
+      </li>
+    </ul>
   </div>
+  <div class="tab-content">
 
-  <div class="tab-pane fade" id="tab-deudas">
-    <div class="card border-0 shadow-sm">
-      <table class="table table-hover align-middle mb-0">
-        <thead><tr><th>#</th><th>Original</th><th>Saldo</th><th>Estado</th><th>Vence</th><th></th></tr></thead>
-        <tbody>
-          {% for d in deudas %}
-          <tr>
-            <td>{{ d.pk }}</td>
-            <td>${{ d.monto_original|floatformat:2 }}</td>
-            <td>${{ d.saldo_pendiente|floatformat:2 }}</td>
-            <td>
-              {% if d.estado == 'pendiente' %}<span class="badge bg-warning text-dark">Pendiente</span>
-              {% elif d.estado == 'saldada' %}<span class="badge bg-success">Saldada</span>
-              {% else %}<span class="badge bg-secondary">Condonada</span>{% endif %}
-            </td>
-            <td>{{ d.fecha_vencimiento|default:"—" }}</td>
-            <td><a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="6" class="text-center text-muted py-3">Sin deudas.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="tab-pane fade show active" id="tab-adelantos">
+      <div style="overflow-x:auto">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>#</th><th>Total</th><th>Saldo</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+          <tbody>
+            {% for a in adelantos %}
+            <tr>
+              <td style="color:#64748B">#{{ a.pk }}</td>
+              <td class="text-money">${{ a.total|floatformat:2 }}</td>
+              <td class="text-money">${{ a.saldo_pendiente|floatformat:2 }}</td>
+              <td>
+                {% if a.estado == 'activo' %}<span class="badge badge-activo">Activo</span>
+                {% elif a.estado == 'completado' %}<span class="badge badge-completado">Completado</span>
+                {% else %}<span class="badge badge-cancelado">Cancelado</span>{% endif %}
+              </td>
+              <td style="color:#64748B">{{ a.fecha_creacion|date:"d/m/Y" }}</td>
+              <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center py-4" style="color:#94A3B8">Sin adelantos.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
 
-  <div class="tab-pane fade" id="tab-pagos">
-    <div class="card border-0 shadow-sm">
-      <table class="table table-hover align-middle mb-0">
-        <thead><tr><th>Fecha</th><th>Tipo</th><th>Referencia</th><th>Forma de pago</th><th>Monto</th></tr></thead>
-        <tbody>
-          {% for p in pagos %}
-          <tr>
-            <td>{{ p.fecha|date:"d/m/Y H:i" }}</td>
-            <td>{{ p.get_tipo_display }}</td>
-            <td>#{{ p.referencia_id }}</td>
-            <td>{{ p.get_forma_pago_display }}</td>
-            <td>${{ p.monto|floatformat:2 }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="text-center text-muted py-3">Sin pagos.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="tab-pane fade" id="tab-deudas">
+      <div style="overflow-x:auto">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>#</th><th>Original</th><th>Saldo</th><th>Estado</th><th>Vence</th><th></th></tr></thead>
+          <tbody>
+            {% for d in deudas %}
+            <tr>
+              <td style="color:#64748B">#{{ d.pk }}</td>
+              <td class="text-money">${{ d.monto_original|floatformat:2 }}</td>
+              <td class="text-money fw-semibold">${{ d.saldo_pendiente|floatformat:2 }}</td>
+              <td>
+                {% if d.estado == 'pendiente' %}<span class="badge badge-pendiente">Pendiente</span>
+                {% elif d.estado == 'saldada' %}<span class="badge badge-saldada">Saldada</span>
+                {% else %}<span class="badge badge-condonada">Condonada</span>{% endif %}
+              </td>
+              <td style="color:#64748B">{{ d.fecha_vencimiento|default:"—" }}</td>
+              <td><a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center py-4" style="color:#94A3B8">Sin deudas.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
+
+    <div class="tab-pane fade" id="tab-pagos">
+      <div style="overflow-x:auto">
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Referencia</th><th>Forma de pago</th><th>Monto</th></tr></thead>
+          <tbody>
+            {% for p in pagos %}
+            <tr>
+              <td style="color:#64748B">{{ p.fecha|date:"d/m/Y H:i" }}</td>
+              <td>{{ p.get_tipo_display }}</td>
+              <td style="color:#64748B">#{{ p.referencia_id }}</td>
+              <td>{{ p.get_forma_pago_display }}</td>
+              <td class="fw-semibold text-money">${{ p.monto|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center py-4" style="color:#94A3B8">Sin pagos registrados.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 </div>
 {% endblock %}

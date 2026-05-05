@@ -1,90 +1,364 @@
 {% extends 'base.html' %}
-{% block title %}Dashboard — Sistema Tienda{% endblock %}
+{% block title %}Dashboard{% endblock %}
 {% block nav_dashboard %}active{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Mini KPI compactas */
+  .mini-kpi {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    transition: box-shadow .15s;
+  }
+  .mini-kpi:hover { box-shadow: 0 4px 12px rgba(0,0,0,.06); }
+  [data-theme="dark"] .mini-kpi {
+    background: linear-gradient(160deg, #0F1D2F 0%, #0A1520 100%);
+  }
+  .mini-kpi-row {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .mini-kpi-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; flex-shrink: 0;
+  }
+  .mini-kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: .03em; margin-bottom: 2px; }
+  .mini-kpi-value { font-size: 19px; font-weight: 700; color: var(--text-1); line-height: 1.1; }
+  .mini-kpi-sub   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Mini gráfico de barras */
+  .chart-bars {
+    display: flex; align-items: flex-end; gap: 6px;
+    height: 120px; padding-top: 8px;
+  }
+  .chart-bar {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 6px; min-width: 0;
+  }
+  .chart-bar-fill {
+    width: 100%;
+    background: linear-gradient(180deg, var(--primary) 0%, #818CF8 100%);
+    border-radius: 6px 6px 0 0;
+    min-height: 4px;
+    transition: all .3s ease;
+    position: relative;
+  }
+  .chart-bar-fill:hover { background: var(--primary-dark); }
+  .chart-bar-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+  .chart-bar-value { font-size: 10px; color: var(--text-1); font-weight: 600; }
+
+  /* Lista compacta */
+  .row-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .row-item:last-child { border-bottom: none; }
+  .row-item-rank {
+    width: 24px; height: 24px; border-radius: 6px;
+    background: var(--table-head-bg);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    flex-shrink: 0;
+  }
+  .row-item-rank.top-1 { background: rgba(245,158,11,.15); color: #D97706; }
+  .row-item-rank.top-2 { background: rgba(148,163,184,.18); color: #64748B; }
+  .row-item-rank.top-3 { background: rgba(217,119,6,.12); color: #B45309; }
+  .row-item-main { flex: 1; min-width: 0; }
+  .row-item-title { font-weight: 600; font-size: 13.5px; color: var(--text-1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row-item-sub   { font-size: 11.5px; color: var(--text-muted); }
+  .row-item-value { font-size: 13.5px; font-weight: 700; color: var(--text-1); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+  /* Stock chip mini */
+  .stock-mini {
+    font-size: 11px; font-weight: 600; padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .stock-mini.warn { background: rgba(217,119,6,.15); color: #D97706; }
+  .stock-mini.danger { background: rgba(225,29,72,.15); color: #E11D48; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="page-header">
   <div>
-    <h4 class="mb-0 fw-bold">Dashboard</h4>
-    <small class="text-muted">{{ request.user.get_full_name|default:request.user.username }} · Hoy</small>
+    <h1 class="page-header-title">Bienvenido, {{ request.user.first_name|default:request.user.username }}</h1>
+    <p class="page-header-sub">Vista global del negocio</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap align-items-center">
+    {% if empleados_disponibles %}
+    <select class="form-select" onchange="if(this.value)location.href=this.value" style="max-width:240px">
+      <option value="">— Mi negocio (vista global) —</option>
+      {% for e in empleados_disponibles %}
+      <option value="?empleado={{ e.pk }}">
+        {{ e.get_full_name|default:e.username }} ({{ e.get_rol_display }})
+      </option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    {% if not user.es_bodeguero %}
+    <a href="{% url 'pos' %}" class="btn btn-primary">
+      <i class="bi bi-cart3 me-1"></i>Ir al POS
+    </a>
+    {% endif %}
   </div>
 </div>
 
+<!-- ── KPIs PRINCIPALES (4 grandes) ───────────────────────────── -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon indigo"><i class="bi bi-cash-stack"></i></div>
+      <div class="kpi-label">Ventas hoy</div>
+      <div class="kpi-value text-money">${{ total_ventas_hoy|floatformat:2 }}</div>
+      <div class="mini-kpi-sub">{{ tickets_hoy }} ticket{{ tickets_hoy|pluralize }} · ø ${{ ticket_promedio|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon emerald"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="kpi-label">Ventas del mes</div>
+      <div class="kpi-value text-money">${{ total_ventas_mes|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon amber"><i class="bi bi-people"></i></div>
+      <div class="kpi-label">Por cobrar</div>
+      <div class="kpi-value text-money">${{ total_por_cobrar|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon sky"><i class="bi bi-bookmark-check"></i></div>
+      <div class="kpi-label">Adelantos activos</div>
+      <div class="kpi-value">{{ adelantos_activos }}</div>
+      <div class="mini-kpi-sub">${{ total_en_adelantos|floatformat:2 }} cobrados</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MINI KPIs (4 secundarios) ──────────────────────────────── -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-cash-stack"></i> Ventas hoy</div>
-        <div class="fs-4 fw-bold">${{ total_ventas_hoy|floatformat:2 }}</div>
+    <div class="mini-kpi mini-kpi-row">
+      <div class="mini-kpi-icon" style="background:rgba(225,29,72,.12);color:#E11D48"><i class="bi bi-exclamation-octagon"></i></div>
+      <div>
+        <div class="mini-kpi-label">Sin stock</div>
+        <div class="mini-kpi-value">{{ sin_stock_count }}</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm h-100 border-start border-warning border-3">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-people"></i> Por cobrar</div>
-        <div class="fs-4 fw-bold text-warning">${{ total_por_cobrar|floatformat:2 }}</div>
+    <div class="mini-kpi mini-kpi-row">
+      <div class="mini-kpi-icon" style="background:rgba(217,119,6,.12);color:#D97706"><i class="bi bi-exclamation-triangle"></i></div>
+      <div>
+        <div class="mini-kpi-label">Stock bajo</div>
+        <div class="mini-kpi-value">{{ stock_bajo_count }}</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm h-100 border-start border-info border-3">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-bookmark-check"></i> Adelantos activos</div>
-        <div class="fs-4 fw-bold text-info">{{ adelantos_activos }}</div>
+    <div class="mini-kpi mini-kpi-row">
+      <div class="mini-kpi-icon" style="background:rgba(5,150,105,.12);color:#059669"><i class="bi bi-boxes"></i></div>
+      <div>
+        <div class="mini-kpi-label">Valor inventario</div>
+        <div class="mini-kpi-value text-money">${{ valor_inventario|floatformat:0 }}</div>
       </div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm h-100 border-start border-success border-3">
-      <div class="card-body">
-        <div class="text-muted small mb-1"><i class="bi bi-piggy-bank"></i> Dinero en apartados</div>
-        <div class="fs-4 fw-bold text-success">${{ total_en_adelantos|floatformat:2 }}</div>
+    <div class="mini-kpi mini-kpi-row">
+      <div class="mini-kpi-icon" style="background:rgba(2,132,199,.12);color:#0284C7"><i class="bi bi-person-lines-fill"></i></div>
+      <div>
+        <div class="mini-kpi-label">Clientes</div>
+        <div class="mini-kpi-value">{{ total_clientes }}</div>
       </div>
     </div>
   </div>
 </div>
 
 {% if not user.es_bodeguero %}
-<div class="row g-3">
-  <div class="col-md-6">
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white fw-semibold">
-        <i class="bi bi-clock-history text-warning"></i> Apartados vencidos
+<!-- ── GRAFICO + TOP PRODUCTOS ────────────────────────────────── -->
+<div class="row g-3 mb-3">
+
+  <!-- Ventas últimos 7 días -->
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-bar-chart-line text-primary me-2"></i>Ventas últimos 7 días</span>
+        <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary">Ver reportes</a>
       </div>
-      <div class="card-body p-0">
-        {% if adelantos_proximos %}
-        <table class="table table-sm mb-0">
-          <thead><tr><th>Cliente</th><th>Saldo</th><th>Vence</th><th></th></tr></thead>
-          <tbody>
-            {% for a in adelantos_proximos %}
-            <tr>
-              <td>{{ a.cliente.nombre }}</td>
-              <td>${{ a.saldo_pendiente|floatformat:2 }}</td>
-              <td class="text-danger">{{ a.fecha_limite }}</td>
-              <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-        {% else %}
-        <p class="text-muted p-3 mb-0">Sin apartados vencidos.</p>
-        {% endif %}
+      <div class="card-body">
+        <div class="chart-bars">
+          {% for d in ventas_7d %}
+          <div class="chart-bar" title="${{ d.total|floatformat:2 }}">
+            <div class="chart-bar-value">${{ d.total|floatformat:0 }}</div>
+            <div class="chart-bar-fill" style="height:{{ d.pct }}%"></div>
+            <div class="chart-bar-label">{{ d.dia }}</div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="col-md-6">
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white fw-semibold">Accesos rápidos</div>
-      <div class="card-body d-flex flex-column gap-2">
-        <a href="{% url 'pos' %}" class="btn btn-dark"><i class="bi bi-cart3"></i> Ir al POS</a>
-        <a href="{% url 'lista_adelantos' %}" class="btn btn-outline-secondary"><i class="bi bi-bookmark-check"></i> Ver adelantos</a>
-        <a href="{% url 'lista_deudas' %}" class="btn btn-outline-secondary"><i class="bi bi-people"></i> Ver deudores</a>
-        {% if user.es_dueno %}
-        <a href="{% url 'cierre_caja' %}" class="btn btn-outline-secondary"><i class="bi bi-safe"></i> Cierre de caja</a>
-        <a href="{% url 'reportes' %}" class="btn btn-outline-secondary"><i class="bi bi-bar-chart-line"></i> Reportes</a>
-        {% endif %}
+  <!-- Top productos vendidos -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-trophy text-warning me-2"></i>Top productos (30 días)</div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for p in top_productos %}
+        <div class="row-item">
+          <div class="row-item-rank {% if forloop.counter == 1 %}top-1{% elif forloop.counter == 2 %}top-2{% elif forloop.counter == 3 %}top-3{% endif %}">
+            {{ forloop.counter }}
+          </div>
+          <div class="row-item-main">
+            <div class="row-item-title">{{ p.producto__catalogo__nombre|default:"—" }}</div>
+            <div class="row-item-sub">{{ p.unidades|floatformat:0 }} unidades</div>
+          </div>
+          <div class="row-item-value text-money">${{ p.ingreso|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-bag" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin ventas en los últimos 30 días.
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── 3 COLUMNAS: Stock crítico · Top deudores · Últimas ventas ── -->
+<div class="row g-3 mb-3">
+
+  <!-- Stock crítico -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-exclamation-triangle text-warning me-2"></i>Stock bajo</span>
+        <a href="{% url 'lista_inventario' %}" class="btn btn-sm btn-outline-secondary">Ver</a>
+      </div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for v in stock_critico %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ v.catalogo.nombre|default:v.nombre }}</div>
+            <div class="row-item-sub">{{ v.color }} {{ v.talla }}</div>
+          </div>
+          <span class="stock-mini {% if v.stock <= 2 %}danger{% else %}warn{% endif %}">
+            {{ v.stock }} uds.
+          </span>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Stock saludable
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Top deudores -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-person-exclamation text-danger me-2"></i>Top deudores</span>
+        <a href="{% url 'lista_deudas' %}" class="btn btn-sm btn-outline-secondary">Ver</a>
+      </div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for d in top_deudores %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ d.cliente.nombre }}</div>
+            <div class="row-item-sub">Deuda #{{ d.pk }} · {{ d.bucket_antiguedad }} días</div>
+          </div>
+          <div class="row-item-value text-money" style="color:#E11D48">${{ d.saldo_pendiente|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin deudas pendientes
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Últimas ventas -->
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-receipt text-primary me-2"></i>Últimas ventas</span>
+        <a href="{% url 'pos' %}" class="btn btn-sm btn-outline-secondary">POS</a>
+      </div>
+      <div class="card-body" style="padding:0 16px !important">
+        {% for v in ultimas_ventas %}
+        <div class="row-item">
+          <div class="row-item-main">
+            <div class="row-item-title">{{ v.cliente.nombre|default:"Consumidor final" }}</div>
+            <div class="row-item-sub">{{ v.fecha|date:"d/m H:i" }} · {{ v.vendedor.first_name|default:v.vendedor.username }}</div>
+          </div>
+          <div class="row-item-value text-money">${{ v.total|floatformat:2 }}</div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-cart" style="font-size:24px;display:block;margin-bottom:6px"></i>
+          Sin ventas todavía
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── APARTADOS POR VENCER ───────────────────────────────────── -->
+<div class="row g-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-clock-history text-warning me-2"></i>Apartados por vencer</span>
+        <a href="{% url 'lista_adelantos' %}" class="btn btn-sm btn-outline-secondary">Ver todos</a>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th>Saldo pendiente</th>
+              <th>Fecha límite</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in adelantos_proximos %}
+            <tr>
+              <td data-label="Cliente">
+                <div class="fw-semibold">{{ a.cliente.nombre }}</div>
+                <div class="text-muted" style="font-size:12px">{{ a.cliente.cedula_ruc }}</div>
+              </td>
+              <td data-label="Saldo pendiente" class="fw-semibold text-money">${{ a.saldo_pendiente|floatformat:2 }}</td>
+              <td data-label="Fecha límite"><span class="text-danger fw-semibold">{{ a.fecha_limite|date:"d/m/Y" }}</span></td>
+              <td>
+                <a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center py-4" style="color:var(--text-muted)">
+                <i class="bi bi-check-circle-fill text-success me-2"></i>Sin apartados vencidos
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

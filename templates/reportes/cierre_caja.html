@@ -1,83 +1,89 @@
 {% extends 'base.html' %}
 {% block title %}Cierre de caja — {{ fecha|date:"d/m/Y" }}{% endblock %}
 {% block nav_reportes %}active{% endblock %}
+{% block page_title %}Cierre de caja{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">Cierre de caja</h4>
-</div>
-
-<!-- Selector de fecha -->
-<div class="card border-0 shadow-sm mb-4">
-  <div class="card-body py-2">
-    <form method="get" class="d-flex align-items-center gap-2">
-      <label class="form-label mb-0 fw-semibold">Fecha:</label>
-      <input type="date" name="fecha" value="{{ fecha|date:'Y-m-d' }}" class="form-control form-control-sm" style="width:180px">
-      <button class="btn btn-sm btn-dark">Ver</button>
-    </form>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'reportes' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">Cierre de caja</h1>
+      <p class="page-header-sub">{{ fecha|date:"d \d\e F \d\e Y" }}</p>
+    </div>
   </div>
+  <form method="get" class="d-flex align-items-center gap-2">
+    <input type="date" name="fecha" value="{{ fecha|date:'Y-m-d' }}" class="form-control" style="width:180px">
+    <button class="btn btn-outline-secondary">Ver</button>
+  </form>
 </div>
 
-<!-- Resumen total del día -->
+<!-- KPI del día -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-dark">
-      <div class="text-muted small">Ventas contado</div>
-      <div class="fs-3 fw-bold">${{ total_contado|floatformat:2 }}</div>
-      <div class="text-muted small">{{ ventas_contado|length }} venta{{ ventas_contado|length|pluralize }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon indigo"><i class="bi bi-cash-stack"></i></div>
+      <div class="kpi-label">Ventas contado</div>
+      <div class="kpi-value text-money">${{ total_contado|floatformat:2 }}</div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:4px">{{ ventas_contado|length }} venta{{ ventas_contado|length|pluralize }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-info">
-      <div class="text-muted small">Abonos a adelantos</div>
-      <div class="fs-3 fw-bold text-info">${{ total_abonos_adelanto|floatformat:2 }}</div>
-      <div class="text-muted small">{{ abonos_adelanto|length }} abono{{ abonos_adelanto|length|pluralize }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon sky"><i class="bi bi-bookmark-check"></i></div>
+      <div class="kpi-label">Abonos a adelantos</div>
+      <div class="kpi-value text-money">${{ total_abonos_adelanto|floatformat:2 }}</div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:4px">{{ abonos_adelanto|length }} abono{{ abonos_adelanto|length|pluralize }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-warning">
-      <div class="text-muted small">Abonos a deudas</div>
-      <div class="fs-3 fw-bold text-warning">${{ total_abonos_deuda|floatformat:2 }}</div>
-      <div class="text-muted small">{{ abonos_deuda|length }} abono{{ abonos_deuda|length|pluralize }}</div>
+    <div class="kpi-card">
+      <div class="kpi-icon amber"><i class="bi bi-people"></i></div>
+      <div class="kpi-label">Abonos a deudas</div>
+      <div class="kpi-value text-money">${{ total_abonos_deuda|floatformat:2 }}</div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:4px">{{ abonos_deuda|length }} abono{{ abonos_deuda|length|pluralize }}</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card border-0 shadow-sm text-center p-3 border-top border-4 border-success">
-      <div class="text-muted small">TOTAL INGRESOS</div>
-      <div class="fs-3 fw-bold text-success">${{ total_dia|floatformat:2 }}</div>
+    <div class="kpi-card" style="background:#0F172A;border-color:#1E293B !important">
+      <div class="kpi-icon" style="background:rgba(255,255,255,.1);color:#fff"><i class="bi bi-safe2"></i></div>
+      <div class="kpi-label" style="color:#94A3B8">TOTAL INGRESOS</div>
+      <div class="kpi-value text-money" style="color:#fff">${{ total_dia|floatformat:2 }}</div>
     </div>
   </div>
 </div>
 
 <div class="row g-3">
   <!-- Ventas contado -->
-  <div class="col-md-6">
-    <div class="card border-0 shadow-sm h-100">
-      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
-        <span><i class="bi bi-cash"></i> Ventas contado</span>
-        <span class="text-success">${{ total_contado|floatformat:2 }}</span>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cash me-2"></i>Ventas contado</span>
+        <span class="fw-bold text-money">${{ total_contado|floatformat:2 }}</span>
       </div>
-      <table class="table table-sm mb-0">
-        <thead><tr><th>Hora</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
-        <tbody>
-          {% for v in ventas_contado %}
-          <tr>
-            <td>{{ v.fecha|date:"H:i" }}</td>
-            <td>{{ v.vendedor.username }}</td>
-            <td class="text-end">${{ v.total|floatformat:2 }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="3" class="text-center text-muted py-2">Sin ventas al contado.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div style="overflow-x:auto">
+        <table class="table mb-0">
+          <thead><tr><th>Hora</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
+          <tbody>
+            {% for v in ventas_contado %}
+            <tr>
+              <td style="color:#64748B">{{ v.fecha|date:"H:i" }}</td>
+              <td>{{ v.vendedor.username }}</td>
+              <td class="text-end fw-semibold text-money">${{ v.total|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center py-3" style="color:#94A3B8">Sin ventas al contado.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
       {% if ventas_por_vendedor %}
-      <div class="card-footer bg-light">
-        <div class="small text-muted fw-semibold mb-1">Por vendedor</div>
+      <div class="card-footer">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#64748B;margin-bottom:8px">Por vendedor</div>
         {% for nombre, total in ventas_por_vendedor.items %}
-        <div class="d-flex justify-content-between small">
-          <span>{{ nombre }}</span><span>${{ total|floatformat:2 }}</span>
+        <div class="d-flex justify-content-between" style="font-size:13px;margin-bottom:4px">
+          <span>{{ nombre }}</span>
+          <span class="fw-semibold text-money">${{ total|floatformat:2 }}</span>
         </div>
         {% endfor %}
       </div>
@@ -86,49 +92,53 @@
   </div>
 
   <!-- Abonos -->
-  <div class="col-md-6">
-    <div class="card border-0 shadow-sm mb-3">
-      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
-        <span><i class="bi bi-bookmark-check text-info"></i> Abonos a adelantos</span>
-        <span class="text-info">${{ total_abonos_adelanto|floatformat:2 }}</span>
+  <div class="col-lg-6">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-bookmark-check me-2" style="color:#0284C7"></i>Abonos a adelantos</span>
+        <span class="fw-bold text-money" style="color:#0284C7">${{ total_abonos_adelanto|floatformat:2 }}</span>
       </div>
-      <table class="table table-sm mb-0">
-        <thead><tr><th>Hora</th><th>Apartado</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
-        <tbody>
-          {% for p in abonos_adelanto %}
-          <tr>
-            <td>{{ p.fecha|date:"H:i" }}</td>
-            <td><a href="{% url 'detalle_adelanto' p.referencia_id %}">#{{ p.referencia_id }}</a></td>
-            <td>{{ p.vendedor.username }}</td>
-            <td class="text-end">${{ p.monto|floatformat:2 }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="4" class="text-center text-muted py-2">Sin abonos.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div style="overflow-x:auto">
+        <table class="table mb-0">
+          <thead><tr><th>Hora</th><th>Apartado</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
+          <tbody>
+            {% for p in abonos_adelanto %}
+            <tr>
+              <td style="color:#64748B">{{ p.fecha|date:"H:i" }}</td>
+              <td><a href="{% url 'detalle_adelanto' p.referencia_id %}" style="color:#4F46E5">#{{ p.referencia_id }}</a></td>
+              <td style="color:#64748B">{{ p.vendedor.username }}</td>
+              <td class="text-end fw-semibold text-money">${{ p.monto|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center py-3" style="color:#94A3B8">Sin abonos.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <div class="card border-0 shadow-sm">
-      <div class="card-header bg-white fw-semibold d-flex justify-content-between">
-        <span><i class="bi bi-people text-warning"></i> Abonos a deudas</span>
-        <span class="text-warning">${{ total_abonos_deuda|floatformat:2 }}</span>
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people me-2" style="color:#D97706"></i>Abonos a deudas</span>
+        <span class="fw-bold text-money" style="color:#D97706">${{ total_abonos_deuda|floatformat:2 }}</span>
       </div>
-      <table class="table table-sm mb-0">
-        <thead><tr><th>Hora</th><th>Deuda</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
-        <tbody>
-          {% for p in abonos_deuda %}
-          <tr>
-            <td>{{ p.fecha|date:"H:i" }}</td>
-            <td><a href="{% url 'detalle_deuda' p.referencia_id %}">#{{ p.referencia_id }}</a></td>
-            <td>{{ p.vendedor.username }}</td>
-            <td class="text-end">${{ p.monto|floatformat:2 }}</td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="4" class="text-center text-muted py-2">Sin abonos.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <div style="overflow-x:auto">
+        <table class="table mb-0">
+          <thead><tr><th>Hora</th><th>Deuda</th><th>Vendedor</th><th class="text-end">Monto</th></tr></thead>
+          <tbody>
+            {% for p in abonos_deuda %}
+            <tr>
+              <td style="color:#64748B">{{ p.fecha|date:"H:i" }}</td>
+              <td><a href="{% url 'detalle_deuda' p.referencia_id %}" style="color:#4F46E5">#{{ p.referencia_id }}</a></td>
+              <td style="color:#64748B">{{ p.vendedor.username }}</td>
+              <td class="text-end fw-semibold text-money">${{ p.monto|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center py-3" style="color:#94A3B8">Sin abonos.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>

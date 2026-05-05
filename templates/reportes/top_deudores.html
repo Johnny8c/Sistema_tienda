@@ -1,47 +1,61 @@
 {% extends 'base.html' %}
-{% block title %}Top clientes deudores{% endblock %}
+{% block title %}Top deudores{% endblock %}
 {% block nav_reportes %}active{% endblock %}
+{% block page_title %}Top deudores{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">Top clientes deudores</h4>
-</div>
-
-<div class="card border-0 shadow-sm mb-4">
-  <div class="card-header bg-white d-flex justify-content-between">
-    <span class="fw-semibold">Total cartera pendiente</span>
-    <span class="fs-5 fw-bold text-warning">${{ total_cartera|floatformat:2 }}</span>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'reportes' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="page-header-title">Top clientes deudores</h1>
   </div>
 </div>
 
-<div class="card border-0 shadow-sm">
-  <table class="table table-hover align-middle mb-0">
-    <thead>
-      <tr><th>#</th><th>Cliente</th><th>Cédula / RUC</th><th>Teléfono</th><th>Deudas</th><th>Total adeudado</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for item in top %}
-      <tr>
-        <td>
-          {% if forloop.counter == 1 %}<span class="badge bg-warning text-dark">1°</span>
-          {% elif forloop.counter == 2 %}<span class="badge bg-secondary">2°</span>
-          {% elif forloop.counter == 3 %}<span class="badge bg-dark">3°</span>
-          {% else %}{{ forloop.counter }}{% endif %}
-        </td>
-        <td class="fw-semibold">{{ item.cliente__nombre }}</td>
-        <td><code>{{ item.cliente__cedula_ruc }}</code></td>
-        <td>{{ item.cliente__telefono|default:"—" }}</td>
-        <td>{{ item.num_deudas }}</td>
-        <td class="fw-bold text-warning fs-6">${{ item.total_deuda|floatformat:2 }}</td>
-        <td>
-          <a href="{% url 'detalle_cliente' item.cliente__id %}" class="btn btn-sm btn-outline-secondary">Ver ficha</a>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7" class="text-center text-muted py-4">No hay deudas pendientes.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="kpi-card mb-4" style="display:flex;align-items:center;justify-content:space-between">
+  <div>
+    <div class="kpi-label">Total cartera pendiente</div>
+    <div class="kpi-value text-money" style="color:#D97706">${{ total_cartera|floatformat:2 }}</div>
+  </div>
+  <div class="kpi-icon amber"><i class="bi bi-people-fill"></i></div>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr><th>#</th><th>Cliente</th><th>Cédula / RUC</th><th>Teléfono</th><th class="text-center">Deudas</th><th class="text-end">Total adeudado</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for item in top %}
+        <tr>
+          <td>
+            {% if forloop.counter == 1 %}
+              <span class="badge" style="background:#FEF3C7;color:#92400E;font-size:12px">1°</span>
+            {% elif forloop.counter == 2 %}
+              <span class="badge" style="background:#F1F5F9;color:#475569;font-size:12px">2°</span>
+            {% elif forloop.counter == 3 %}
+              <span class="badge" style="background:#FEE2E2;color:#991B1B;font-size:12px">3°</span>
+            {% else %}
+              <span style="color:#94A3B8;font-size:13px">{{ forloop.counter }}</span>
+            {% endif %}
+          </td>
+          <td class="fw-semibold">{{ item.cliente__nombre }}</td>
+          <td><code style="background:#F1F5F9;padding:2px 7px;border-radius:5px;font-size:12px">{{ item.cliente__cedula_ruc }}</code></td>
+          <td style="color:#64748B">{{ item.cliente__telefono|default:"—" }}</td>
+          <td class="text-center">{{ item.num_deudas }}</td>
+          <td class="text-end fw-bold text-money" style="color:#D97706;font-size:15px">${{ item.total_deuda|floatformat:2 }}</td>
+          <td><a href="{% url 'detalle_cliente' item.cliente__id %}" class="btn btn-sm btn-outline-secondary">Ver ficha</a></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-5" style="color:#94A3B8">
+            <i class="bi bi-check-circle-fill text-success" style="font-size:32px;display:block;margin-bottom:8px"></i>
+            No hay deudas pendientes.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

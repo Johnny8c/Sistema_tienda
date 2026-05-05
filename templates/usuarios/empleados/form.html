@@ -1,10 +1,14 @@
 {% extends 'base.html' %}
 {% block title %}{{ accion }} empleado — Sistema Tienda{% endblock %}
+{% block nav_empleados %}active{% endblock %}
+{% block page_title %}{{ accion }} empleado{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'lista_empleados' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">{{ accion }} empleado</h4>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_empleados' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="page-header-title">{{ accion }} empleado</h1>
+  </div>
 </div>
 
 <div class="card border-0 shadow-sm" style="max-width:480px">
@@ -15,10 +19,10 @@
       <div class="mb-3">
         <label class="form-label fw-semibold">Usuario <span class="text-danger">*</span></label>
         {% if empleado %}
-          <input type="text" class="form-control" value="{{ empleado.username }}" disabled>
+          <input type="text" class="form-control" value="{{ f_username }}" disabled>
         {% else %}
           <input type="text" name="username" class="form-control"
-                 value="{{ post.username|default:'' }}" required autofocus>
+                 value="{{ f_username }}" required autofocus>
           <div class="form-text">Sin espacios ni caracteres especiales.</div>
         {% endif %}
       </div>
@@ -26,13 +30,11 @@
       <div class="row g-2 mb-3">
         <div class="col">
           <label class="form-label fw-semibold">Nombre</label>
-          <input type="text" name="first_name" class="form-control"
-                 value="{{ empleado.first_name|default:post.first_name|default:'' }}">
+          <input type="text" name="first_name" class="form-control" value="{{ f_fname }}">
         </div>
         <div class="col">
           <label class="form-label fw-semibold">Apellido</label>
-          <input type="text" name="last_name" class="form-control"
-                 value="{{ empleado.last_name|default:post.last_name|default:'' }}">
+          <input type="text" name="last_name" class="form-control" value="{{ f_lname }}">
         </div>
       </div>
 
@@ -40,9 +42,7 @@
         <label class="form-label fw-semibold">Rol <span class="text-danger">*</span></label>
         <select name="rol" class="form-select">
           {% for valor, etiqueta in roles %}
-          <option value="{{ valor }}"
-            {% if empleado.rol == valor %}selected
-            {% elif post.rol == valor %}selected{% endif %}>
+          <option value="{{ valor }}" {% if f_rol == valor %}selected{% endif %}>
             {{ etiqueta }}
           </option>
           {% endfor %}
@@ -71,7 +71,10 @@
       {% endif %}
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-dark">{{ accion }}</button>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-{% if empleado %}check2{% else %}plus-lg{% endif %} me-1"></i>
+          {% if empleado %}Guardar cambios{% else %}Crear empleado{% endif %}
+        </button>
         <a href="{% url 'lista_empleados' %}" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>

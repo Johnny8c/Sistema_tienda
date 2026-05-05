@@ -1,71 +1,95 @@
 {% extends 'base.html' %}
 {% block title %}Adelantos{% endblock %}
 {% block nav_adelantos %}active{% endblock %}
+{% block page_title %}Adelantos{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0"><i class="bi bi-bookmark-check"></i> Adelantos</h4>
-  <a href="{% url 'crear_adelanto' %}" class="btn btn-dark btn-sm"><i class="bi bi-plus-lg"></i> Nuevo apartado</a>
+<div class="page-header">
+  <h1 class="page-header-title">Adelantos / Apartados</h1>
+  <a href="{% url 'crear_adelanto' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>Nuevo apartado
+  </a>
 </div>
 
-<div class="card border-0 shadow-sm mb-3">
-  <div class="card-body pb-0">
-    <form method="get" class="row g-2 mb-3">
-      <div class="col-md-4">
-        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar cliente o cédula…">
+<div class="card mb-3">
+  <div class="card-body" style="padding:14px 16px !important">
+    <form method="get" class="d-flex flex-wrap gap-2">
+      <div style="position:relative;flex:1;min-width:200px;max-width:360px">
+        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8"></i>
+        <input type="text" name="q" value="{{ q }}" class="form-control" style="padding-left:36px"
+               placeholder="Buscar cliente o cédula…">
       </div>
-      <div class="col-md-3">
-        <select name="estado" class="form-select form-select-sm">
-          <option value="">Todos los estados</option>
-          <option value="activo" {% if estado == 'activo' %}selected{% endif %}>Activo</option>
-          <option value="completado" {% if estado == 'completado' %}selected{% endif %}>Completado</option>
-          <option value="cancelado" {% if estado == 'cancelado' %}selected{% endif %}>Cancelado</option>
-        </select>
-      </div>
-      <div class="col-auto">
-        <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
-        <a href="{% url 'lista_adelantos' %}" class="btn btn-sm btn-outline-danger">Limpiar</a>
-      </div>
+      <select name="estado" class="form-select" style="max-width:180px">
+        <option value="">Todos los estados</option>
+        <option value="activo"     {% if estado == 'activo' %}selected{% endif %}>Activo</option>
+        <option value="completado" {% if estado == 'completado' %}selected{% endif %}>Completado</option>
+        <option value="cancelado"  {% if estado == 'cancelado' %}selected{% endif %}>Cancelado</option>
+      </select>
+      <button class="btn btn-outline-secondary">Filtrar</button>
+      <a href="{% url 'lista_adelantos' %}" class="btn btn-outline-danger"><i class="bi bi-x-lg"></i></a>
     </form>
   </div>
-  <table class="table table-hover align-middle mb-0">
-    <thead>
-      <tr><th>#</th><th>Cliente</th><th>Total</th><th>Saldo pendiente</th><th>Estado</th><th>Fecha límite</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for a in adelantos %}
-      <tr>
-        <td>{{ a.pk }}</td>
-        <td>
-          <a href="{% url 'detalle_cliente' a.cliente.pk %}">{{ a.cliente.nombre }}</a>
-          <div class="text-muted small">{{ a.cliente.cedula_ruc }}</div>
-        </td>
-        <td>${{ a.total|floatformat:2 }}</td>
-        <td>
-          {% if a.saldo_pendiente == 0 %}
-            <span class="text-success fw-semibold">Pagado</span>
-          {% else %}
-            <span class="fw-semibold">${{ a.saldo_pendiente|floatformat:2 }}</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if a.estado == 'activo' %}<span class="badge bg-info">Activo</span>
-          {% elif a.estado == 'completado' %}<span class="badge bg-success">Completado</span>
-          {% else %}<span class="badge bg-secondary">Cancelado</span>{% endif %}
-        </td>
-        <td>
-          {% if a.fecha_limite %}
-            <span class="{% if a.fecha_limite < hoy and a.estado == 'activo' %}text-danger fw-semibold{% endif %}">
-              {{ a.fecha_limite|date:"d/m/Y" }}
-            </span>
-          {% else %}—{% endif %}
-        </td>
-        <td><a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="7" class="text-center text-muted py-4">Sin adelantos registrados.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+</div>
+
+<div class="card">
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Cliente</th>
+          <th class="text-end">Total</th>
+          <th class="text-end">Saldo pendiente</th>
+          <th>Estado</th>
+          <th>Fecha límite</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in adelantos %}
+        <tr>
+          <td data-label="#" style="color:#94A3B8;font-size:12px">#{{ a.pk }}</td>
+          <td data-label="Cliente">
+            <a href="{% url 'detalle_cliente' a.cliente.pk %}" style="font-weight:600;color:#1E293B;text-decoration:none">
+              {{ a.cliente.nombre }}
+            </a>
+            <div style="font-size:12px;color:#94A3B8">{{ a.cliente.cedula_ruc }}</div>
+          </td>
+          <td data-label="Total" class="text-end text-money">${{ a.total|floatformat:2 }}</td>
+          <td data-label="Saldo pendiente" class="text-end">
+            {% if a.saldo_pendiente == 0 %}
+              <span style="color:#15803D;font-weight:600;font-size:13px">Pagado</span>
+            {% else %}
+              <span class="fw-semibold text-money">${{ a.saldo_pendiente|floatformat:2 }}</span>
+            {% endif %}
+          </td>
+          <td data-label="Estado">
+            {% if a.estado == 'activo' %}<span class="badge badge-activo">Activo</span>
+            {% elif a.estado == 'completado' %}<span class="badge badge-completado">Completado</span>
+            {% else %}<span class="badge badge-cancelado">Cancelado</span>{% endif %}
+          </td>
+          <td data-label="Fecha límite">
+            {% if a.fecha_limite %}
+              <span class="{% if a.fecha_limite < hoy and a.estado == 'activo' %}text-danger fw-semibold{% else %}{% endif %}"
+                    style="font-size:13px">
+                {{ a.fecha_limite|date:"d/m/Y" }}
+              </span>
+            {% else %}<span style="color:#CBD5E1">—</span>{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary w-100">Ver detalle</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-5" style="color:#94A3B8">
+            <i class="bi bi-bookmark-check" style="font-size:32px;display:block;margin-bottom:8px"></i>
+            Sin adelantos registrados.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

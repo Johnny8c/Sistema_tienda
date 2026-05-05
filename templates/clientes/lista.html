@@ -1,45 +1,84 @@
 {% extends 'base.html' %}
 {% block title %}Clientes{% endblock %}
 {% block nav_clientes %}active{% endblock %}
+{% block page_title %}Clientes{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0"><i class="bi bi-person-lines-fill"></i> Clientes</h4>
-  <a href="{% url 'crear_cliente' %}" class="btn btn-dark btn-sm"><i class="bi bi-plus-lg"></i> Nuevo cliente</a>
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">Clientes</h1>
+    <p class="page-header-sub">{{ clientes|length }} cliente{{ clientes|length|pluralize }} registrado{{ clientes|length|pluralize }}</p>
+  </div>
+  <a href="{% url 'crear_cliente' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i> Nuevo cliente
+  </a>
 </div>
 
-<div class="card border-0 shadow-sm">
-  <div class="card-body pb-0">
-    <form method="get" class="d-flex gap-2 mb-3">
-      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Buscar por nombre o cédula/RUC…">
-      <button class="btn btn-sm btn-outline-secondary">Buscar</button>
-      {% if q %}<a href="{% url 'lista_clientes' %}" class="btn btn-sm btn-outline-danger">Limpiar</a>{% endif %}
+<div class="card">
+  <div class="card-body" style="padding:16px !important">
+    <form method="get" class="d-flex gap-2">
+      <div style="position:relative;flex:1;max-width:400px">
+        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8"></i>
+        <input type="text" name="q" value="{{ q }}" class="form-control" style="padding-left:36px"
+               placeholder="Buscar por nombre o cédula/RUC…">
+      </div>
+      <button class="btn btn-outline-secondary">Buscar</button>
+      {% if q %}
+      <a href="{% url 'lista_clientes' %}" class="btn btn-outline-danger">
+        <i class="bi bi-x-lg"></i>
+      </a>
+      {% endif %}
     </form>
   </div>
-  <table class="table table-hover align-middle mb-0">
-    <thead>
-      <tr><th>Nombre</th><th>Cédula / RUC</th><th>Teléfono</th><th>Saldo a favor</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for c in clientes %}
-      <tr>
-        <td>{{ c.nombre }}</td>
-        <td><code>{{ c.cedula_ruc }}</code></td>
-        <td>{{ c.telefono|default:"—" }}</td>
-        <td>
-          {% if c.saldo_a_favor > 0 %}
-            <span class="badge bg-success">${{ c.saldo_a_favor|floatformat:2 }}</span>
-          {% else %}—{% endif %}
-        </td>
-        <td class="text-end">
-          <a href="{% url 'detalle_cliente' c.pk %}" class="btn btn-sm btn-outline-secondary">Ver ficha</a>
-          <a href="{% url 'editar_cliente' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="5" class="text-center text-muted py-4">Sin clientes registrados.</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Cédula / RUC</th>
+          <th>Teléfono</th>
+          <th>Saldo a favor</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clientes %}
+        <tr>
+          <td data-label="Nombre">
+            <div class="fw-semibold">{{ c.nombre }}</div>
+          </td>
+          <td data-label="Cédula / RUC">
+            <code style="background:#F1F5F9;padding:2px 7px;border-radius:5px;font-size:12px">{{ c.cedula_ruc }}</code>
+          </td>
+          <td data-label="Teléfono" style="color:#64748B">{{ c.telefono|default:"—" }}</td>
+          <td data-label="Saldo a favor">
+            {% if c.saldo_a_favor > 0 %}
+              <span class="badge" style="background:#DCFCE7;color:#15803D;font-size:12px">
+                ${{ c.saldo_a_favor|floatformat:2 }}
+              </span>
+            {% else %}
+              <span style="color:#CBD5E1">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end" style="white-space:nowrap">
+            <a href="{% url 'detalle_cliente' c.pk %}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-eye me-1"></i>Ver ficha
+            </a>
+            <a href="{% url 'editar_cliente' c.pk %}" class="btn btn-sm btn-outline-secondary btn-icon ms-1">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center py-5" style="color:#94A3B8">
+            <i class="bi bi-person-lines-fill" style="font-size:32px;display:block;margin-bottom:8px"></i>
+            {% if q %}No se encontraron clientes para "{{ q }}".{% else %}No hay clientes registrados.{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

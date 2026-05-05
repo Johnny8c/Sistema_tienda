@@ -1,59 +1,57 @@
 {% extends 'base.html' %}
 {% block title %}Reportes{% endblock %}
 {% block nav_reportes %}active{% endblock %}
+{% block page_title %}Reportes{% endblock %}
 
 {% block content %}
-<h4 class="fw-bold mb-4"><i class="bi bi-bar-chart-line"></i> Reportes</h4>
+<div class="page-header">
+  <h1 class="page-header-title">Reportes</h1>
+</div>
 
 <div class="row g-3">
   <div class="col-md-6">
     <a href="{% url 'reporte_cartera' %}" class="text-decoration-none">
-      <div class="card border-0 shadow-sm h-100 card-hover">
-        <div class="card-body p-4">
-          <div class="fs-1 mb-2">📊</div>
-          <h5 class="fw-bold">Antigüedad de cartera</h5>
-          <p class="text-muted mb-0">Deudas pendientes agrupadas por antigüedad: 0–30, 31–60, 61–90 y 90+ días.</p>
+      <div class="card" style="cursor:pointer;transition:box-shadow .15s,transform .15s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(15,23,42,.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card-body" style="padding:24px !important">
+          <div class="kpi-icon indigo mb-3"><i class="bi bi-bar-chart-line"></i></div>
+          <div style="font-size:16px;font-weight:700;color:#0F172A;margin-bottom:6px">Antigüedad de cartera</div>
+          <div style="font-size:13.5px;color:#64748B">Deudas pendientes agrupadas por antigüedad: 0–30, 31–60, 61–90 y 90+ días.</div>
         </div>
       </div>
     </a>
   </div>
   <div class="col-md-6">
     <a href="{% url 'reporte_adelantos' %}" class="text-decoration-none">
-      <div class="card border-0 shadow-sm h-100 card-hover">
-        <div class="card-body p-4">
-          <div class="fs-1 mb-2">📅</div>
-          <h5 class="fw-bold">Adelantos por vencer</h5>
-          <p class="text-muted mb-0">Apartados activos ordenados por fecha límite. Vencidos al inicio.</p>
+      <div class="card" style="cursor:pointer;transition:box-shadow .15s,transform .15s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(15,23,42,.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card-body" style="padding:24px !important">
+          <div class="kpi-icon sky mb-3"><i class="bi bi-calendar-check"></i></div>
+          <div style="font-size:16px;font-weight:700;color:#0F172A;margin-bottom:6px">Adelantos por vencer</div>
+          <div style="font-size:13.5px;color:#64748B">Apartados activos ordenados por fecha límite. Vencidos al inicio.</div>
         </div>
       </div>
     </a>
   </div>
   <div class="col-md-6">
     <a href="{% url 'reporte_top_deudores' %}" class="text-decoration-none">
-      <div class="card border-0 shadow-sm h-100 card-hover">
-        <div class="card-body p-4">
-          <div class="fs-1 mb-2">👥</div>
-          <h5 class="fw-bold">Top clientes deudores</h5>
-          <p class="text-muted mb-0">Los 20 clientes con mayor deuda pendiente acumulada.</p>
+      <div class="card" style="cursor:pointer;transition:box-shadow .15s,transform .15s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(15,23,42,.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card-body" style="padding:24px !important">
+          <div class="kpi-icon amber mb-3"><i class="bi bi-people-fill"></i></div>
+          <div style="font-size:16px;font-weight:700;color:#0F172A;margin-bottom:6px">Top clientes deudores</div>
+          <div style="font-size:13.5px;color:#64748B">Los 20 clientes con mayor deuda pendiente acumulada.</div>
         </div>
       </div>
     </a>
   </div>
   <div class="col-md-6">
     <a href="{% url 'cierre_caja' %}" class="text-decoration-none">
-      <div class="card border-0 shadow-sm h-100 card-hover">
-        <div class="card-body p-4">
-          <div class="fs-1 mb-2">🏦</div>
-          <h5 class="fw-bold">Cierre de caja</h5>
-          <p class="text-muted mb-0">Ingresos del día separados en ventas contado, abonos a adelantos y abonos a deudas.</p>
+      <div class="card" style="cursor:pointer;transition:box-shadow .15s,transform .15s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 24px rgba(15,23,42,.1)'" onmouseout="this.style.transform='';this.style.boxShadow=''">
+        <div class="card-body" style="padding:24px !important">
+          <div class="kpi-icon emerald mb-3"><i class="bi bi-safe2"></i></div>
+          <div style="font-size:16px;font-weight:700;color:#0F172A;margin-bottom:6px">Cierre de caja</div>
+          <div style="font-size:13.5px;color:#64748B">Ingresos del día: ventas contado, abonos a adelantos y abonos a deudas.</div>
         </div>
       </div>
     </a>
   </div>
 </div>
-
-<style>
-  .card-hover { transition: transform .15s, box-shadow .15s; cursor: pointer; }
-  .card-hover:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.1) !important; }
-</style>
 {% endblock %}

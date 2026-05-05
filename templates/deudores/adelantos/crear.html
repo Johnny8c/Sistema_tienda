@@ -1,80 +1,105 @@
 {% extends 'base.html' %}
 {% block title %}Nuevo apartado{% endblock %}
 {% block nav_adelantos %}active{% endblock %}
+{% block page_title %}Nuevo apartado{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'lista_adelantos' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">Nuevo apartado</h4>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_adelantos' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="page-header-title">Nuevo apartado</h1>
+  </div>
 </div>
 
-<div class="card border-0 shadow-sm" style="max-width:680px">
-  <div class="card-body p-4">
+<div class="card" style="max-width:720px">
+  <div class="card-body">
     <form method="post" id="formAdelanto">
       {% csrf_token %}
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Cliente <span class="text-danger">*</span></label>
+      <div class="mb-4">
+        <label class="form-label">Cliente <span class="text-danger">*</span></label>
         <select name="cliente_id" class="form-select" required>
           <option value="">— Seleccionar cliente —</option>
           {% for c in clientes %}
           <option value="{{ c.pk }}">{{ c.nombre }} ({{ c.cedula_ruc }})</option>
           {% endfor %}
         </select>
-        <div class="form-text"><a href="{% url 'crear_cliente' %}">+ Registrar nuevo cliente</a></div>
-      </div>
-
-      <hr>
-      <label class="form-label fw-semibold">Productos <span class="text-danger">*</span></label>
-      <div id="items-container">
-        <div class="item-fila row g-2 mb-2">
-          <div class="col-md-6">
-            <select name="producto_id" class="form-select form-select-sm producto-sel" required>
-              <option value="">— Producto —</option>
-              {% for p in productos %}
-              <option value="{{ p.pk }}" data-precio="{{ p.precio }}" data-stock="{{ p.stock_disponible }}">
-                {{ p.nombre }} {{ p.talla }} {{ p.color }} — ${{ p.precio }} (stock: {{ p.stock_disponible }})
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <input type="number" name="cantidad" class="form-control form-control-sm cantidad-inp" min="1" value="1" required>
-          </div>
-          <div class="col-md-3">
-            <input type="text" class="form-control form-control-sm subtotal-disp bg-light" readonly placeholder="Subtotal">
-          </div>
-          <div class="col-md-1">
-            <button type="button" class="btn btn-sm btn-outline-danger btn-quitar">✕</button>
-          </div>
+        <div style="font-size:12px;color:#64748B;margin-top:4px">
+          <a href="{% url 'crear_cliente' %}" target="_blank" style="color:#4F46E5">
+            <i class="bi bi-plus-circle me-1"></i>Registrar nuevo cliente
+          </a>
         </div>
       </div>
-      <button type="button" id="btn-agregar" class="btn btn-sm btn-outline-secondary mb-3">
-        <i class="bi bi-plus"></i> Agregar producto
-      </button>
 
-      <div class="alert alert-light border d-flex justify-content-between">
-        <strong>Total del apartado:</strong>
-        <strong id="total-display">$0.00</strong>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Productos a apartar <span class="text-danger">*</span></label>
+
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:16px">
+          <!-- Encabezados -->
+          <div class="row g-2 mb-2" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#94A3B8;font-weight:600">
+            <div class="col-md-6">Producto</div>
+            <div class="col-md-2">Cant.</div>
+            <div class="col-md-3">Subtotal</div>
+            <div class="col-md-1"></div>
+          </div>
+
+          <div id="items-container">
+            <div class="item-fila row g-2 mb-2">
+              <div class="col-md-6">
+                <select name="producto_id" class="form-select producto-sel" required>
+                  <option value="">— Producto —</option>
+                  {% for p in productos %}
+                  <option value="{{ p.pk }}" data-precio="{{ p.precio }}" data-stock="{{ p.stock_disponible }}">
+                    {{ p.nombre }} {{ p.talla }} {{ p.color }} — ${{ p.precio }} (stock: {{ p.stock_disponible }})
+                  </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2">
+                <input type="number" name="cantidad" class="form-control cantidad-inp" min="1" value="1" required>
+              </div>
+              <div class="col-md-3">
+                <input type="text" class="form-control subtotal-disp" style="background:#fff;color:#64748B" readonly placeholder="Subtotal">
+              </div>
+              <div class="col-md-1 d-flex align-items-center">
+                <button type="button" class="btn btn-icon btn-outline-danger btn-quitar">
+                  <i class="bi bi-x"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" id="btn-agregar" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="bi bi-plus me-1"></i>Agregar producto
+          </button>
+        </div>
+      </div>
+
+      <!-- Total -->
+      <div style="background:#EEF2FF;border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+        <span style="font-weight:600;color:#3730A3">Total del apartado</span>
+        <span id="total-display" style="font-size:20px;font-weight:700;color:#3730A3">$0.00</span>
       </div>
 
       <div class="row g-3 mb-4">
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Monto inicial (adelanto) <span class="text-danger">*</span></label>
+          <label class="form-label">Monto inicial (adelanto) <span class="text-danger">*</span></label>
           <div class="input-group">
             <span class="input-group-text">$</span>
             <input type="number" name="monto_inicial" id="monto-inicial" class="form-control"
-                   step="0.01" min="0.01" required>
+                   step="0.01" min="0.01" required placeholder="0.00">
           </div>
         </div>
         <div class="col-md-6">
-          <label class="form-label fw-semibold">Fecha límite de retiro</label>
+          <label class="form-label">Fecha límite de retiro</label>
           <input type="date" name="fecha_limite" class="form-control">
         </div>
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-dark">Crear apartado</button>
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-bookmark-check me-1"></i>Crear apartado
+        </button>
         <a href="{% url 'lista_adelantos' %}" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>
@@ -89,10 +114,10 @@ const productos = {{ productos_json|safe }};
 function calcularTotal() {
   let total = 0;
   document.querySelectorAll('.item-fila').forEach(fila => {
-    const sel = fila.querySelector('.producto-sel');
+    const sel  = fila.querySelector('.producto-sel');
     const cant = parseInt(fila.querySelector('.cantidad-inp').value) || 0;
-    const opt = sel.options[sel.selectedIndex];
-    const precio = parseFloat(opt?.dataset?.precio || 0);
+    const opt  = sel.options[sel.selectedIndex];
+    const precio   = parseFloat(opt?.dataset?.precio || 0);
     const subtotal = precio * cant;
     fila.querySelector('.subtotal-disp').value = subtotal > 0 ? '$' + subtotal.toFixed(2) : '';
     total += subtotal;
@@ -104,9 +129,7 @@ function attachFilaEvents(fila) {
   fila.querySelector('.producto-sel').addEventListener('change', calcularTotal);
   fila.querySelector('.cantidad-inp').addEventListener('input', calcularTotal);
   fila.querySelector('.btn-quitar').addEventListener('click', () => {
-    if (document.querySelectorAll('.item-fila').length > 1) {
-      fila.remove(); calcularTotal();
-    }
+    if (document.querySelectorAll('.item-fila').length > 1) { fila.remove(); calcularTotal(); }
   });
 }
 
