@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Configuración{% endblock %}
+{% block nav_config %}active{% endblock %}
+{% block page_title %}Configuración{% endblock %}
+
+{% block extra_head %}
+<style>
+  .config-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    text-decoration: none;
+    color: inherit;
+    transition: all .2s;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+  }
+  .config-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+    color: inherit;
+  }
+  [data-theme="dark"] .config-card:hover {
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    border-color: rgba(255,255,255,.15);
+  }
+  .config-card-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .config-card-title { font-weight: 700; font-size: 15px; color: var(--text-1); }
+  .config-card-desc  { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+  .config-card-cta   { margin-top: auto; font-size: 13px; font-weight: 600; color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-header-title">Configuración del sistema</h1>
+    <p class="page-header-sub">Administra tu negocio, perfil y preferencias</p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- Datos del negocio -->
+  <div class="col-md-6 col-lg-4">
+    <a href="{% url 'config_datos_negocio' %}" class="config-card">
+      <div class="config-card-icon" style="background:#EEF2FF;color:#4F46E5">
+        <i class="bi bi-shop"></i>
+      </div>
+      <div class="config-card-title">Datos del negocio</div>
+      <div class="config-card-desc">Nombre comercial, logo, dirección, contacto y mensaje en notas de venta.</div>
+      <div class="config-card-cta">Configurar →</div>
+    </a>
+  </div>
+
+  <!-- Configuración SRI -->
+  <div class="col-md-6 col-lg-4">
+    <a href="{% url 'configuracion_sri' %}" class="config-card">
+      <div class="config-card-icon" style="background:#DBEAFE;color:#1D4ED8">
+        <i class="bi bi-receipt"></i>
+      </div>
+      <div class="config-card-title">Facturación electrónica SRI</div>
+      <div class="config-card-desc">RUC, razón social, certificado digital (.p12), ambiente y secuenciales.</div>
+      <div class="config-card-cta">Configurar →</div>
+    </a>
+  </div>
+
+  <!-- Preferencias -->
+  <div class="col-md-6 col-lg-4">
+    <a href="{% url 'config_preferencias' %}" class="config-card">
+      <div class="config-card-icon" style="background:#FFFBEB;color:#D97706">
+        <i class="bi bi-sliders"></i>
+      </div>
+      <div class="config-card-title">Preferencias del sistema</div>
+      <div class="config-card-desc">Stock mínimo de alerta y días de anticipación para vencimientos.</div>
+      <div class="config-card-cta">Configurar →</div>
+    </a>
+  </div>
+
+  <!-- Empleados -->
+  <div class="col-md-6 col-lg-4">
+    <a href="{% url 'lista_empleados' %}" class="config-card">
+      <div class="config-card-icon" style="background:#ECFDF5;color:#059669">
+        <i class="bi bi-people-fill"></i>
+      </div>
+      <div class="config-card-title">Gestión de empleados</div>
+      <div class="config-card-desc">Crear, editar, activar o eliminar usuarios y asignarles roles.</div>
+      <div class="config-card-cta">Administrar →</div>
+    </a>
+  </div>
+
+  <!-- Mi cuenta -->
+  <div class="col-md-6 col-lg-4">
+    <a href="{% url 'config_mi_cuenta' %}" class="config-card">
+      <div class="config-card-icon" style="background:#FFF1F2;color:#E11D48">
+        <i class="bi bi-person-circle"></i>
+      </div>
+      <div class="config-card-title">Mi cuenta</div>
+      <div class="config-card-desc">Actualiza tu perfil personal y cambia tu contraseña.</div>
+      <div class="config-card-cta">Configurar →</div>
+    </a>
+  </div>
+
+  <!-- Reportes (atajo) -->
+  <div class="col-md-6 col-lg-4">
+    <a href="{% url 'reportes' %}" class="config-card">
+      <div class="config-card-icon" style="background:#E0F2FE;color:#0284C7">
+        <i class="bi bi-bar-chart-line"></i>
+      </div>
+      <div class="config-card-title">Reportes y cierre</div>
+      <div class="config-card-desc">Cierre de caja, top deudores, antigüedad de cartera y adelantos por vencer.</div>
+      <div class="config-card-cta">Ver reportes →</div>
+    </a>
+  </div>
+</div>
+{% endblock %}

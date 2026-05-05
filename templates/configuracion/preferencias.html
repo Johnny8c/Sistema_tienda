@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Preferencias{% endblock %}
+{% block nav_config %}active{% endblock %}
+{% block page_title %}Preferencias{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'config_panel' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="page-header-title">Preferencias del sistema</h1>
+  </div>
+</div>
+
+<form method="post" style="max-width:540px">
+  {% csrf_token %}
+  <div class="card">
+    <div class="card-header">Alertas operativas</div>
+    <div class="card-body">
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Stock mínimo de alerta</label>
+        <input type="number" name="stock_minimo_alerta" class="form-control" min="0"
+               value="{{ cfg.stock_minimo_alerta }}">
+        <div class="form-text">
+          Cuando el stock disponible de una variante baje de este número, se mostrará como
+          <span class="badge" style="background:#FEF3C7;color:#92400E">stock bajo</span>.
+        </div>
+      </div>
+
+      <div class="mb-0">
+        <label class="form-label fw-semibold">Días de anticipación para vencimientos</label>
+        <input type="number" name="dias_alerta_vencimiento" class="form-control" min="0"
+               value="{{ cfg.dias_alerta_vencimiento }}">
+        <div class="form-text">
+          Días antes del vencimiento en que aparecerán las deudas y adelantos en
+          el reporte "Por vencer".
+        </div>
+      </div>
+
+    </div>
+    <div class="card-footer d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check2 me-1"></i>Guardar preferencias
+      </button>
+      <a href="{% url 'config_panel' %}" class="btn btn-outline-secondary">Cancelar</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

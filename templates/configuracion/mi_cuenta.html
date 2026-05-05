@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Mi cuenta{% endblock %}
+{% block nav_config %}active{% endblock %}
+{% block page_title %}Mi cuenta{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    {% if user.es_dueno %}
+    <a href="{% url 'config_panel' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    {% endif %}
+    <h1 class="page-header-title">Mi cuenta</h1>
+  </div>
+</div>
+
+<div class="row g-3" style="max-width:780px">
+
+  <!-- Perfil -->
+  <div class="col-md-6">
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="perfil">
+      <div class="card h-100">
+        <div class="card-header">Perfil</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Usuario</label>
+            <input type="text" class="form-control" value="{{ user.username }}" disabled>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col">
+              <label class="form-label fw-semibold">Nombre</label>
+              <input type="text" name="first_name" class="form-control"
+                     value="{{ user.first_name }}">
+            </div>
+            <div class="col">
+              <label class="form-label fw-semibold">Apellido</label>
+              <input type="text" name="last_name" class="form-control"
+                     value="{{ user.last_name }}">
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Rol</label>
+            <input type="text" class="form-control" value="{{ user.get_rol_display }}" disabled>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>Actualizar perfil
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Cambiar contraseña -->
+  <div class="col-md-6">
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="accion" value="password">
+      <div class="card h-100">
+        <div class="card-header">Cambiar contraseña</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Contraseña actual <span class="text-danger">*</span></label>
+            <input type="password" name="password_actual" class="form-control" required autocomplete="current-password">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nueva contraseña <span class="text-danger">*</span></label>
+            <input type="password" name="password_nueva" class="form-control" required minlength="6" autocomplete="new-password">
+            <div class="form-text">Mínimo 6 caracteres.</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Confirmar nueva contraseña <span class="text-danger">*</span></label>
+            <input type="password" name="password_confirma" class="form-control" required minlength="6" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="card-footer">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-key me-1"></i>Cambiar contraseña
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
