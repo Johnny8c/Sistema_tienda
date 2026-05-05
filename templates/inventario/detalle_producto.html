@@ -1,0 +1,222 @@
+{% extends 'base.html' %}
+{% block title %}{{ catalogo.nombre }} — Inventario{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+{% block page_title %}{{ catalogo.nombre }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_inventario' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">{{ catalogo.nombre }}</h1>
+      <p class="page-header-sub">{{ catalogo.get_categoria_display }}</p>
+    </div>
+  </div>
+  {% if user.puede_gestionar_inventario %}
+  <div class="d-flex gap-2">
+    <a href="{% url 'agregar_variante' catalogo.pk %}" class="btn btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Agregar variante
+    </a>
+    <a href="{% url 'editar_producto' catalogo.pk %}" class="btn btn-outline-secondary">
+      <i class="bi bi-pencil me-1"></i>Editar producto
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Resumen del producto -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card h-100 d-flex align-items-center justify-content-center" style="min-height:200px">
+      {% if catalogo.foto %}
+        <img src="{{ catalogo.foto.url }}" alt="{{ catalogo.nombre }}"
+             style="width:100%;height:220px;object-fit:cover;border-radius:12px">
+      {% else %}
+        <div class="text-center" style="color:var(--border);padding:40px">
+          <i class="bi bi-image" style="font-size:56px;display:block;margin-bottom:8px"></i>
+          <div class="small" style="color:var(--text-muted)">Sin foto</div>
+          {% if user.puede_gestionar_inventario %}
+          <a href="{% url 'editar_producto' catalogo.pk %}" class="btn btn-sm btn-outline-secondary mt-2">
+            <i class="bi bi-camera me-1"></i>Agregar foto
+          </a>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-md-9">
+    <div class="row g-3 h-100">
+      <div class="col-sm-4">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon emerald"><i class="bi bi-boxes"></i></div>
+          <div class="kpi-label">Stock disponible total</div>
+          <div class="kpi-value">{{ catalogo.stock_total_disponible }}</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon indigo"><i class="bi bi-collection"></i></div>
+          <div class="kpi-label">Variantes activas</div>
+          <div class="kpi-value">{{ variantes|length }}</div>
+        </div>
+      </div>
+      <div class="col-sm-4">
+        <div class="kpi-card h-100">
+          <div class="kpi-icon amber"><i class="bi bi-tag"></i></div>
+          <div class="kpi-label">Precio base</div>
+          <div class="kpi-value" style="font-size:22px">${{ catalogo.precio_base|floatformat:2 }}</div>
+        </div>
+      </div>
+      {% if catalogo.descripcion %}
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body" style="font-size:13.5px;color:var(--text-2)">
+            {{ catalogo.descripcion }}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Tabla de variantes -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span>Variantes</span>
+    {% if user.puede_gestionar_inventario %}
+    <a href="{% url 'agregar_variante' catalogo.pk %}" class="btn btn-sm btn-primary">
+      <i class="bi bi-plus-lg me-1"></i>Nueva variante
+    </a>
+    {% endif %}
+  </div>
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Color</th>
+          <th>Talla</th>
+          <th>Código</th>
+          <th class="text-end">Precio</th>
+          <th class="text-center">Stock</th>
+          <th class="text-center">Reservado</th>
+          <th class="text-center">Disponible</th>
+          {% if user.puede_gestionar_inventario %}<th></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in variantes %}
+        <tr>
+          <td>
+            {% if v.color %}
+            <span class="d-flex align-items-center gap-2">
+              <span style="width:14px;height:14px;border-radius:50%;background:{{ v.color|lower }};border:1px solid var(--border);flex-shrink:0"></span>
+              {{ v.color }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ v.talla|default:"—" }}</td>
+          <td>
+            {% if v.codigo_barras %}
+            <div class="d-flex align-items-center gap-2">
+              <svg class="barcode" data-code="{{ v.codigo_barras }}" style="height:28px"></svg>
+              {% if not user.es_vendedor %}
+              <button class="btn btn-sm btn-outline-secondary btn-icon imprimir-etiqueta"
+                      data-nombre="{{ catalogo.nombre }}" data-talla="{{ v.talla }}"
+                      data-color="{{ v.color }}" data-precio="{{ v.precio }}"
+                      data-codigo="{{ v.codigo_barras }}" title="Imprimir etiqueta">
+                <i class="bi bi-printer"></i>
+              </button>
+              {% endif %}
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px">{{ v.codigo_barras }}</div>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-end fw-semibold text-money">${{ v.precio|floatformat:2 }}</td>
+          <td class="text-center">{{ v.stock }}</td>
+          <td class="text-center" style="color:#0284C7">{{ v.stock_reservado }}</td>
+          <td class="text-center">
+            <span class="badge {% if v.stock_disponible == 0 %}bg-danger{% elif v.stock_disponible <= 3 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+              {{ v.stock_disponible }}
+            </span>
+          </td>
+          {% if user.puede_gestionar_inventario %}
+          <td class="text-end" style="white-space:nowrap">
+            <a href="{% url 'ajustar_stock' v.pk %}" class="btn btn-sm btn-outline-secondary btn-icon" title="Ajustar stock">
+              <i class="bi bi-pencil-square"></i>
+            </a>
+            <a href="{% url 'editar_variante' v.pk %}" class="btn btn-sm btn-outline-secondary btn-icon ms-1" title="Editar variante">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {% if user.es_dueno %}
+            <form method="post" action="{% url 'desactivar_variante' v.pk %}" class="d-inline ms-1"
+                  data-confirm="Esta variante quedará oculta del inventario y del POS."
+                  data-confirm-title="¿Desactivar variante?" data-confirm-variant="danger">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-danger btn-icon" title="Desactivar">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="text-center py-4" style="color:var(--text-muted)">
+            No hay variantes activas.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if user.es_dueno %}
+<div class="mt-3 text-end">
+  <form method="post" action="{% url 'desactivar_producto' catalogo.pk %}"
+        data-confirm="Se desactivará el producto y todas sus variantes. Podrás reactivarlo después si lo necesitas."
+        data-confirm-title="¿Desactivar producto?" data-confirm-variant="danger">
+    {% csrf_token %}
+    <button class="btn btn-outline-danger btn-sm">
+      <i class="bi bi-trash me-1"></i>Desactivar producto completo
+    </button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+  document.querySelectorAll('svg.barcode').forEach(el => {
+    JsBarcode(el, el.dataset.code, {format:'CODE128', displayValue:false, margin:2, width:1.4, height:24});
+  });
+  document.querySelectorAll('.imprimir-etiqueta').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const {nombre, talla, color, precio, codigo} = this.dataset;
+      const v = window.open('', '_blank', 'width=320,height=220');
+      v.document.write(`<!DOCTYPE html><html><head><style>
+        body{font-family:Arial,sans-serif;text-align:center;margin:10px}
+        .n{font-size:13px;font-weight:bold;margin-bottom:2px}
+        .d{font-size:11px;color:#555;margin-bottom:4px}
+        .p{font-size:18px;font-weight:bold;margin:4px 0}
+        svg{display:block;margin:0 auto}
+        .c{font-size:10px;margin-top:2px}
+      </style>
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+      </head><body>
+        <div class="n">${nombre}</div>
+        <div class="d">${talla} · ${color}</div>
+        <div class="p">$${parseFloat(precio).toFixed(2)}</div>
+        <svg id="bc"></svg>
+        <div class="c">${codigo}</div>
+        <script>JsBarcode('#bc','${codigo}',{format:'CODE128',width:1.8,height:40,displayValue:false,margin:2});
+        window.onload=function(){window.print();window.close()};<\/script>
+      </body></html>`);
+      v.document.close();
+    });
+  });
+</script>
+{% endblock %}

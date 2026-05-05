@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load l10n %}
+{% block title %}{{ accion }} variante — {{ catalogo.nombre }}{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+{% block page_title %}{{ catalogo.nombre }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'detalle_producto' catalogo.pk %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">{{ accion }} variante</h1>
+      <p class="page-header-sub">{{ catalogo.nombre }}</p>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm" style="max-width:480px">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <div class="row g-2 mb-3">
+        <div class="col">
+          <label class="form-label fw-semibold">Color</label>
+          <input type="text" name="color" class="form-control" placeholder="Ej: Azul, Rojo, Negro…"
+                 value="{{ variante.color|default:f.color|default:'' }}" autofocus>
+        </div>
+        <div class="col">
+          <label class="form-label fw-semibold">Talla</label>
+          <input type="text" name="talla" class="form-control" placeholder="XS, S, M, L, 30, 32…"
+                 value="{{ variante.talla|default:f.talla|default:'' }}">
+        </div>
+      </div>
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Precio</label>
+        <div class="input-group">
+          <span class="input-group-text">$</span>
+          <input type="number" name="precio" class="form-control" step="0.01" min="0" required
+                 value="{{ variante.precio|unlocalize|default:f.precio|default:catalogo.precio_base|unlocalize }}">
+        </div>
+        <div class="form-text">Por defecto usa el precio base del producto.</div>
+      </div>
+      {% if not variante %}
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Stock inicial</label>
+        <input type="number" name="stock" class="form-control" min="0"
+               value="{{ f.stock|default:'0' }}">
+      </div>
+      {% endif %}
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-{% if variante %}check2{% else %}plus-lg{% endif %} me-1"></i>
+          {% if variante %}Guardar cambios{% else %}Agregar variante{% endif %}
+        </button>
+        <a href="{% url 'detalle_producto' catalogo.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,78 +1,161 @@
 {% extends 'base.html' %}
+{% load l10n %}
 {% block title %}{{ accion }} producto — Sistema Tienda{% endblock %}
 {% block nav_inventario %}active{% endblock %}
+{% block page_title %}{{ accion }} producto{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'lista_inventario' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">{{ accion }} producto</h4>
-</div>
-
-<div class="card border-0 shadow-sm" style="max-width:520px">
-  <div class="card-body">
-    <form method="post">
-      {% csrf_token %}
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
-        <input type="text" name="nombre" class="form-control"
-               value="{{ producto.nombre|default:'' }}" required autofocus>
-      </div>
-      <div class="row g-2 mb-3">
-        <div class="col">
-          <label class="form-label fw-semibold">Talla</label>
-          <input type="text" name="talla" class="form-control" placeholder="XS, S, M, L, XL, 30, 32…"
-                 value="{{ producto.talla|default:'' }}">
-        </div>
-        <div class="col">
-          <label class="form-label fw-semibold">Color</label>
-          <input type="text" name="color" class="form-control"
-                 value="{{ producto.color|default:'' }}">
-        </div>
-      </div>
-      <div class="row g-2 mb-4">
-        <div class="col">
-          <label class="form-label fw-semibold">Precio <span class="text-danger">*</span></label>
-          <div class="input-group">
-            <span class="input-group-text">$</span>
-            <input type="number" name="precio" class="form-control" step="0.01" min="0"
-                   value="{{ producto.precio|default:'' }}" required>
-          </div>
-        </div>
-        <div class="col">
-          <label class="form-label fw-semibold">Stock inicial</label>
-          <input type="number" name="stock" class="form-control" min="0"
-                 value="{{ producto.stock|default:'0' }}">
-        </div>
-      </div>
-
-      {% if producto.codigo_barras %}
-      <div class="mb-4 p-3 bg-light rounded text-center">
-        <div class="small text-muted mb-1">Código de barras</div>
-        <svg id="bc-preview" style="height:50px"></svg>
-        <div class="small fw-semibold mt-1">{{ producto.codigo_barras }}</div>
-      </div>
-      {% else %}
-      <div class="alert alert-info py-2 small mb-4">
-        <i class="bi bi-info-circle"></i> El código de barras se generará automáticamente al guardar.
-      </div>
-      {% endif %}
-
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-dark">{{ accion }}</button>
-        <a href="{% url 'lista_inventario' %}" class="btn btn-outline-secondary">Cancelar</a>
-      </div>
-    </form>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_inventario' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="page-header-title">{{ accion }} producto</h1>
   </div>
 </div>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="row g-3" style="max-width:780px">
+
+    <!-- Info principal -->
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">Información del producto</div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
+            <input type="text" name="nombre" class="form-control" required autofocus
+                   value="{{ catalogo.nombre|default:f.nombre|default:'' }}">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col">
+              <label class="form-label fw-semibold">Categoría</label>
+              <select name="categoria" class="form-select">
+                {% for val, label in categorias %}
+                <option value="{{ val }}"
+                  {% if catalogo.categoria == val %}selected
+                  {% elif f.categoria == val %}selected{% endif %}>
+                  {{ label }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col">
+              <label class="form-label fw-semibold">Precio base <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" name="precio_base" class="form-control" step="0.01" min="0" required
+                       value="{{ catalogo.precio_base|unlocalize|default:f.precio_base|default:'' }}">
+              </div>
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Descripción</label>
+            <textarea name="descripcion" class="form-control" rows="3"
+                      placeholder="Detalles del producto, materiales, etc.">{{ catalogo.descripcion|default:'' }}</textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Foto -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header">Foto del producto</div>
+        <div class="card-body d-flex flex-column align-items-center justify-content-center text-center gap-3">
+          <div id="foto-preview"
+               style="width:100%;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--table-head-bg);display:flex;align-items:center;justify-content:center">
+            {% if catalogo.foto %}
+              <img src="{{ catalogo.foto.url }}" id="preview-img" alt="Foto actual"
+                   style="width:100%;height:100%;object-fit:cover">
+            {% else %}
+              <i class="bi bi-image" id="preview-icon" style="font-size:40px;color:var(--border)"></i>
+              <img id="preview-img" style="display:none;width:100%;height:100%;object-fit:cover" alt="">
+            {% endif %}
+          </div>
+          <label class="btn btn-outline-secondary btn-sm w-100" style="cursor:pointer">
+            <i class="bi bi-camera me-1"></i>
+            {% if catalogo.foto %}Cambiar foto{% else %}Subir foto{% endif %}
+            <input type="file" name="foto" accept="image/*" id="foto-input" class="d-none">
+          </label>
+          <div class="form-text">JPG, PNG o WEBP. Máx. 5 MB.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primera variante (solo al crear) -->
+    {% if not catalogo %}
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">Primera variante <span class="text-muted fw-normal small">(podrás agregar más después)</span></div>
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-sm-3">
+              <label class="form-label fw-semibold">Color</label>
+              <input type="text" name="color" class="form-control" placeholder="Ej: Azul, Rojo…"
+                     value="{{ f.color|default:'' }}">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label fw-semibold">Talla</label>
+              <input type="text" name="talla" class="form-control" placeholder="S, M, L, 32…"
+                     value="{{ f.talla|default:'' }}">
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label fw-semibold">Precio variante</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" name="precio" class="form-control" step="0.01" min="0"
+                       id="precio-variante" value="{{ f.precio|default:'' }}"
+                       placeholder="Igual al base">
+              </div>
+            </div>
+            <div class="col-sm-3">
+              <label class="form-label fw-semibold">Stock inicial</label>
+              <input type="number" name="stock" class="form-control" min="0"
+                     value="{{ f.stock|default:'0' }}">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="col-12">
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-{% if catalogo %}check2{% else %}plus-lg{% endif %} me-1"></i>
+          {% if catalogo %}Guardar cambios{% else %}Crear producto{% endif %}
+        </button>
+        <a href="{% url 'lista_inventario' %}" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </div>
+  </div>
+</form>
 {% endblock %}
 
 {% block extra_js %}
-{% if producto.codigo_barras %}
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <script>
-  JsBarcode('#bc-preview', '{{ producto.codigo_barras }}', {
-    format: 'CODE128', width: 2, height: 45, displayValue: false, margin: 2
+  // Preview de foto
+  document.getElementById('foto-input').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.getElementById('preview-img');
+      const icon = document.getElementById('preview-icon');
+      img.src = e.target.result;
+      img.style.display = 'block';
+      if (icon) icon.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
   });
+
+  // Precio variante = precio base por defecto
+  const precioBase = document.querySelector('[name="precio_base"]');
+  const precioVar  = document.getElementById('precio-variante');
+  if (precioBase && precioVar) {
+    precioBase.addEventListener('input', () => {
+      if (!precioVar.value) precioVar.placeholder = precioBase.value;
+    });
+  }
 </script>
-{% endif %}
 {% endblock %}
