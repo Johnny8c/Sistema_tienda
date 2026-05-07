@@ -3,86 +3,557 @@
 {% block nav_config %}active{% endblock %}
 {% block page_title %}Mi cuenta{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* HERO de perfil */
+  .perfil-hero {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 18px;
+    padding: 28px 24px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .perfil-hero::before {
+    content: '';
+    position: absolute; top: -60px; right: -40px;
+    width: 220px; height: 220px;
+    background: rgba(255,255,255,.08);
+    border-radius: 50%;
+  }
+  .perfil-hero::after {
+    content: '';
+    position: absolute; bottom: -80px; right: 80px;
+    width: 160px; height: 160px;
+    background: rgba(255,255,255,.05);
+    border-radius: 50%;
+  }
+  .perfil-hero-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+
+  .perfil-avatar {
+    width: 84px; height: 84px;
+    background: rgba(255,255,255,.2);
+    border: 3px solid rgba(255,255,255,.4);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    font-weight: 800;
+    flex-shrink: 0;
+    backdrop-filter: blur(10px);
+  }
+
+  .perfil-info { flex: 1; min-width: 220px; }
+  .perfil-nombre { font-size: 26px; font-weight: 800; line-height: 1.1; margin-bottom: 4px; }
+  .perfil-username {
+    font-family: monospace;
+    background: rgba(255,255,255,.15);
+    padding: 3px 10px; border-radius: 6px;
+    font-size: 12px;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  .perfil-rol-badge {
+    background: #fff;
+    color: var(--primary);
+    padding: 3px 10px; border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    display: inline-block;
+  }
+  .perfil-meta {
+    font-size: 12.5px;
+    margin-top: 8px;
+    opacity: .9;
+  }
+  .perfil-meta i { margin-right: 4px; opacity: .8; }
+
+  .perfil-stats-mini {
+    display: flex;
+    gap: 16px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .perfil-stat {
+    text-align: center;
+    background: rgba(255,255,255,.12);
+    border-radius: 12px;
+    padding: 12px 18px;
+    min-width: 110px;
+    backdrop-filter: blur(10px);
+  }
+  .perfil-stat-label {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    opacity: .85;
+    margin-bottom: 4px;
+  }
+  .perfil-stat-value {
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .perfil-stat-sub {
+    font-size: 10.5px;
+    opacity: .8;
+    margin-top: 2px;
+  }
+
+  /* Sections */
+  .mc-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .mc-card-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .mc-card-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .mc-card-title { font-weight: 700; font-size: 15px; color: var(--text-1); }
+  .mc-card-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+  .mc-card-body { padding: 20px; flex: 1; display: flex; flex-direction: column; }
+  .mc-card-footer {
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--table-head-bg);
+  }
+
+  .form-label-clean {
+    font-weight: 600; font-size: 13px;
+    color: var(--text-1);
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .form-label-clean i { color: var(--text-muted); font-size: 13px; }
+
+  .input-disabled {
+    background: var(--table-head-bg) !important;
+    color: var(--text-muted) !important;
+    cursor: not-allowed;
+  }
+
+  /* Toggle password visibility */
+  .pw-wrap { position: relative; }
+  .pw-toggle {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: transparent; border: none;
+    color: var(--text-muted);
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .pw-toggle:hover { color: var(--primary); }
+
+  /* Strength meter */
+  .pw-strength {
+    margin-top: 6px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .pw-strength-bar {
+    height: 100%;
+    width: 0%;
+    transition: width .25s, background .25s;
+  }
+  .pw-strength-label { font-size: 11.5px; margin-top: 4px; color: var(--text-muted); }
+
+  /* Requisitos checklist */
+  .pw-reqs {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--table-head-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .pw-req {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 2px 0;
+    transition: color .15s;
+  }
+  .pw-req i {
+    width: 16px; font-size: 13px;
+    transition: color .15s;
+  }
+  .pw-req.ok { color: #15803D; }
+  .pw-req.ok i { color: #10B981; }
+  [data-theme="dark"] .pw-req.ok { color: #34D399; }
+
+  /* Tips */
+  .tip-item {
+    display: flex; gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .tip-item:last-child { border-bottom: none; }
+  .tip-item-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(16,185,129,.12);
+    color: #059669;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 13px;
+  }
+  .tip-item-text { color: var(--text-2); line-height: 1.45; }
+  .tip-item-text b { color: var(--text-1); }
+
+  /* Role badges */
+  .badge-rol { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; }
+  .badge-dueno     { background: rgba(124,58,237,.12); color: #7C3AED; }
+  .badge-vendedor  { background: rgba(37,99,235,.12);  color: #2563EB; }
+  .badge-bodeguero { background: rgba(245,158,11,.12); color: #B45309; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="d-flex align-items-center gap-3">
     {% if user.es_dueno %}
     <a href="{% url 'config_panel' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
     {% endif %}
-    <h1 class="page-header-title">Mi cuenta</h1>
+    <div>
+      <h1 class="page-header-title">Mi cuenta</h1>
+      <p class="page-header-sub">Tu perfil personal y configuración de seguridad</p>
+    </div>
   </div>
 </div>
 
-<div class="row g-3" style="max-width:780px">
+<!-- HERO -->
+<div class="perfil-hero">
+  <div class="perfil-hero-content">
+    <div class="perfil-avatar">
+      {% if user.first_name %}{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}
+      {% else %}{{ user.username|slice:":2"|upper }}{% endif %}
+    </div>
+    <div class="perfil-info">
+      <div class="perfil-nombre">
+        {{ user.get_full_name|default:user.username }}
+      </div>
+      <div>
+        <span class="perfil-username">@{{ user.username }}</span>
+        <span class="perfil-rol-badge">{{ user.get_rol_display }}</span>
+      </div>
+      <div class="perfil-meta">
+        <i class="bi bi-calendar-check"></i>Cuenta creada el {{ user.date_joined|date:"d/m/Y" }}
+        {% if user.last_login %}
+          · <i class="bi bi-clock-history"></i>Última conexión: {{ user.last_login|date:"d/m/Y H:i" }}
+        {% endif %}
+      </div>
+    </div>
 
-  <!-- Perfil -->
-  <div class="col-md-6">
-    <form method="post">
+    <!-- Stats mini según rol -->
+    <div class="perfil-stats-mini">
+      {% if user.es_dueno or user.es_vendedor %}
+      <div class="perfil-stat">
+        <div class="perfil-stat-label">Ventas</div>
+        <div class="perfil-stat-value">{{ stats.ventas_count }}</div>
+        <div class="perfil-stat-sub">${{ stats.ventas_total|floatformat:0 }}</div>
+      </div>
+      {% endif %}
+      {% if user.es_dueno or user.es_bodeguero %}
+      <div class="perfil-stat">
+        <div class="perfil-stat-label">Compras</div>
+        <div class="perfil-stat-value">{{ stats.compras_count }}</div>
+        <div class="perfil-stat-sub">${{ stats.compras_total|floatformat:0 }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+
+  <!-- PERFIL -->
+  <div class="col-lg-6">
+    <form method="post" style="height:100%">
       {% csrf_token %}
       <input type="hidden" name="accion" value="perfil">
-      <div class="card h-100">
-        <div class="card-header">Perfil</div>
-        <div class="card-body">
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Usuario</label>
-            <input type="text" class="form-control" value="{{ user.username }}" disabled>
+      <div class="mc-card">
+        <div class="mc-card-head">
+          <div class="mc-card-icon" style="background:var(--primary-light);color:var(--primary)">
+            <i class="bi bi-person-circle"></i>
           </div>
-          <div class="row g-2 mb-3">
-            <div class="col">
-              <label class="form-label fw-semibold">Nombre</label>
-              <input type="text" name="first_name" class="form-control"
-                     value="{{ user.first_name }}">
-            </div>
-            <div class="col">
-              <label class="form-label fw-semibold">Apellido</label>
-              <input type="text" name="last_name" class="form-control"
-                     value="{{ user.last_name }}">
-            </div>
-          </div>
-          <div class="mb-0">
-            <label class="form-label fw-semibold">Rol</label>
-            <input type="text" class="form-control" value="{{ user.get_rol_display }}" disabled>
+          <div>
+            <div class="mc-card-title">Perfil personal</div>
+            <div class="mc-card-sub">Tu nombre y datos visibles</div>
           </div>
         </div>
-        <div class="card-footer">
+        <div class="mc-card-body">
+          <div class="mb-3">
+            <label class="form-label-clean">
+              <i class="bi bi-at"></i>Usuario
+            </label>
+            <input type="text" class="form-control input-disabled" value="{{ user.username }}" disabled>
+            <div class="form-text" style="font-size:11.5px;color:var(--text-muted);margin-top:4px">
+              <i class="bi bi-lock me-1"></i>El nombre de usuario no se puede modificar.
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label-clean">
+                <i class="bi bi-person"></i>Nombre
+              </label>
+              <input type="text" name="first_name" class="form-control"
+                     value="{{ user.first_name }}" placeholder="Ej. María">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label-clean">
+                <i class="bi bi-person-fill"></i>Apellido
+              </label>
+              <input type="text" name="last_name" class="form-control"
+                     value="{{ user.last_name }}" placeholder="Ej. González">
+            </div>
+          </div>
+
+          <div class="mb-0">
+            <label class="form-label-clean">
+              <i class="bi bi-shield-fill"></i>Rol asignado
+            </label>
+            <div style="padding:9px 12px;background:var(--table-head-bg);border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between">
+              <span class="badge-rol badge-{{ user.rol }}">{{ user.get_rol_display }}</span>
+              <span style="font-size:11.5px;color:var(--text-muted)">
+                <i class="bi bi-info-circle me-1"></i>Solo el dueño puede cambiar roles
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="mc-card-footer">
           <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check2 me-1"></i>Actualizar perfil
+            <i class="bi bi-check2 me-1"></i>Guardar cambios
           </button>
         </div>
       </div>
     </form>
   </div>
 
-  <!-- Cambiar contraseña -->
-  <div class="col-md-6">
-    <form method="post">
+  <!-- CONTRASEÑA -->
+  <div class="col-lg-6">
+    <form method="post" style="height:100%">
       {% csrf_token %}
       <input type="hidden" name="accion" value="password">
-      <div class="card h-100">
-        <div class="card-header">Cambiar contraseña</div>
-        <div class="card-body">
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Contraseña actual <span class="text-danger">*</span></label>
-            <input type="password" name="password_actual" class="form-control" required autocomplete="current-password">
+      <div class="mc-card">
+        <div class="mc-card-head">
+          <div class="mc-card-icon" style="background:rgba(220,38,38,.12);color:#DC2626">
+            <i class="bi bi-shield-lock-fill"></i>
           </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Nueva contraseña <span class="text-danger">*</span></label>
-            <input type="password" name="password_nueva" class="form-control" required minlength="6" autocomplete="new-password">
-            <div class="form-text">Mínimo 6 caracteres.</div>
-          </div>
-          <div class="mb-0">
-            <label class="form-label fw-semibold">Confirmar nueva contraseña <span class="text-danger">*</span></label>
-            <input type="password" name="password_confirma" class="form-control" required minlength="6" autocomplete="new-password">
+          <div>
+            <div class="mc-card-title">Cambiar contraseña</div>
+            <div class="mc-card-sub">Actualiza tu clave de acceso</div>
           </div>
         </div>
-        <div class="card-footer">
+        <div class="mc-card-body">
+          <div class="mb-3">
+            <label class="form-label-clean">
+              <i class="bi bi-key"></i>Contraseña actual <span class="text-danger">*</span>
+            </label>
+            <div class="pw-wrap">
+              <input type="password" name="password_actual" id="pw-actual" class="form-control" required
+                     autocomplete="current-password" style="padding-right:48px">
+              <button type="button" class="pw-toggle" data-target="pw-actual" tabindex="-1">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label-clean">
+              <i class="bi bi-key-fill"></i>Nueva contraseña <span class="text-danger">*</span>
+            </label>
+            <div class="pw-wrap">
+              <input type="password" name="password_nueva" id="pw-nueva" class="form-control" required
+                     minlength="8" autocomplete="new-password" style="padding-right:48px">
+              <button type="button" class="pw-toggle" data-target="pw-nueva" tabindex="-1">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+            <div class="pw-strength"><div class="pw-strength-bar" id="pw-bar"></div></div>
+            <div class="pw-strength-label" id="pw-label">Ingresa una contraseña</div>
+            <div class="pw-reqs" id="pw-reqs">
+              <div class="pw-req" data-req="length"><i class="bi bi-circle"></i>Al menos <b>8 caracteres</b></div>
+              <div class="pw-req" data-req="upper"><i class="bi bi-circle"></i>Una <b>letra mayúscula</b> (A-Z)</div>
+              <div class="pw-req" data-req="lower"><i class="bi bi-circle"></i>Una <b>letra minúscula</b> (a-z)</div>
+              <div class="pw-req" data-req="number"><i class="bi bi-circle"></i>Un <b>número</b> (0-9)</div>
+              <div class="pw-req" data-req="notnumeric"><i class="bi bi-circle"></i>No solo números</div>
+              <div class="pw-req" data-req="notuser"><i class="bi bi-circle"></i>Distinta a tu nombre de usuario</div>
+            </div>
+          </div>
+
+          <div class="mb-0">
+            <label class="form-label-clean">
+              <i class="bi bi-check2-circle"></i>Confirmar nueva contraseña <span class="text-danger">*</span>
+            </label>
+            <div class="pw-wrap">
+              <input type="password" name="password_confirma" id="pw-confirma" class="form-control" required
+                     minlength="6" autocomplete="new-password" style="padding-right:48px">
+              <button type="button" class="pw-toggle" data-target="pw-confirma" tabindex="-1">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+            <div id="pw-match" class="pw-strength-label"></div>
+          </div>
+        </div>
+        <div class="mc-card-footer">
           <button type="submit" class="btn btn-primary">
-            <i class="bi bi-key me-1"></i>Cambiar contraseña
+            <i class="bi bi-shield-check me-1"></i>Cambiar contraseña
           </button>
         </div>
       </div>
     </form>
+  </div>
+
+  <!-- TIPS DE SEGURIDAD -->
+  <div class="col-12">
+    <div class="mc-card">
+      <div class="mc-card-head">
+        <div class="mc-card-icon" style="background:rgba(16,185,129,.12);color:#059669">
+          <i class="bi bi-shield-check"></i>
+        </div>
+        <div>
+          <div class="mc-card-title">Buenas prácticas de seguridad</div>
+          <div class="mc-card-sub">Protege tu cuenta y la información del negocio</div>
+        </div>
+      </div>
+      <div class="mc-card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="tip-item" style="border:none;padding-top:0">
+              <div class="tip-item-icon"><i class="bi bi-key"></i></div>
+              <div class="tip-item-text">
+                <b>Usa contraseñas fuertes:</b> al menos 8 caracteres con mayúsculas, números y símbolos.
+              </div>
+            </div>
+            <div class="tip-item">
+              <div class="tip-item-icon"><i class="bi bi-people-slash"></i></div>
+              <div class="tip-item-text">
+                <b>No compartas tu contraseña</b> con otros vendedores. Cada empleado debe tener su propio usuario.
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="tip-item" style="border:none;padding-top:0">
+              <div class="tip-item-icon"><i class="bi bi-arrow-repeat"></i></div>
+              <div class="tip-item-text">
+                <b>Cambia tu contraseña periódicamente</b>, especialmente si crees que alguien más la conoce.
+              </div>
+            </div>
+            <div class="tip-item">
+              <div class="tip-item-icon"><i class="bi bi-box-arrow-right"></i></div>
+              <div class="tip-item-text">
+                <b>Cierra sesión</b> al terminar tu turno o si vas a dejar el equipo desatendido.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// === Toggle visibilidad de password ===
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const id = btn.dataset.target;
+    const inp = document.getElementById(id);
+    const isPass = inp.type === 'password';
+    inp.type = isPass ? 'text' : 'password';
+    btn.querySelector('i').className = isPass ? 'bi bi-eye-slash' : 'bi bi-eye';
+  });
+});
+
+// === Indicador de fuerza + checklist ===
+const pwNueva = document.getElementById('pw-nueva');
+const pwBar   = document.getElementById('pw-bar');
+const pwLabel = document.getElementById('pw-label');
+const pwConfirma = document.getElementById('pw-confirma');
+const pwMatch = document.getElementById('pw-match');
+const USERNAME = "{{ user.username|escapejs }}".toLowerCase();
+
+function check(s) {
+  return {
+    length:     s.length >= 8,
+    upper:      /[A-Z]/.test(s),
+    lower:      /[a-z]/.test(s),
+    number:     /[0-9]/.test(s),
+    notnumeric: s.length > 0 && !/^[0-9]+$/.test(s),
+    notuser:    s.length > 0 && s.toLowerCase() !== USERNAME && !s.toLowerCase().includes(USERNAME),
+  };
+}
+
+function setReqIcon(el, ok) {
+  el.classList.toggle('ok', ok);
+  el.querySelector('i').className = ok ? 'bi bi-check-circle-fill' : 'bi bi-circle';
+}
+
+function updateStrength() {
+  const s = pwNueva.value;
+  const c = check(s);
+
+  // Actualizar checklist
+  document.querySelectorAll('.pw-req').forEach(el => {
+    setReqIcon(el, c[el.dataset.req]);
+  });
+
+  // Score 0..6
+  const cumplidos = Object.values(c).filter(Boolean).length;
+  if (!s) {
+    pwBar.style.width = '0%';
+    pwLabel.textContent = 'Ingresa una contraseña';
+    pwLabel.style.color = '';
+    return;
+  }
+  const widths = ['10%','25%','40%','55%','70%','85%','100%'];
+  const colors = ['#DC2626','#DC2626','#F59E0B','#F59E0B','#10B981','#10B981','#15803D'];
+  const labels = ['Muy débil','Débil','Insuficiente','Aceptable','Buena','Fuerte','Excelente'];
+  pwBar.style.width = widths[cumplidos];
+  pwBar.style.background = colors[cumplidos];
+  pwLabel.textContent = labels[cumplidos];
+  pwLabel.style.color = colors[cumplidos];
+}
+
+function updateMatch() {
+  const a = pwNueva.value, b = pwConfirma.value;
+  if (!b) { pwMatch.textContent = ''; return; }
+  if (a === b) {
+    pwMatch.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Las contraseñas coinciden';
+    pwMatch.style.color = '#10B981';
+  } else {
+    pwMatch.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i>Las contraseñas no coinciden';
+    pwMatch.style.color = '#DC2626';
+  }
+}
+
+pwNueva.addEventListener('input', () => { updateStrength(); updateMatch(); });
+pwConfirma.addEventListener('input', updateMatch);
+</script>
 {% endblock %}

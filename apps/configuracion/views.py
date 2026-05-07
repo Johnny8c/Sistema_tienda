@@ -18,6 +18,7 @@ def panel(request):
 @login_required
 @requiere_dueno
 def datos_negocio(request):
+    import re
     cfg = ConfiguracionGeneral.get_singleton()
 
     if request.method == 'POST':
@@ -28,6 +29,14 @@ def datos_negocio(request):
         cfg.email              = request.POST.get('email', '').strip()
         cfg.sitio_web          = request.POST.get('sitio_web', '').strip()
         cfg.mensaje_nota_venta = request.POST.get('mensaje_nota_venta', '').strip()
+
+        color = (request.POST.get('color_primario', '') or '').strip().upper()
+        if re.match(r'^#[0-9A-F]{6}$', color):
+            cfg.color_primario = color
+
+        if request.POST.get('quitar_logo') == '1' and cfg.logo:
+            cfg.logo.delete(save=False)
+            cfg.logo = None
         if request.FILES.get('logo'):
             cfg.logo = request.FILES['logo']
         cfg.save()
@@ -46,6 +55,19 @@ def preferencias(request):
         try:
             cfg.stock_minimo_alerta = max(0, int(request.POST.get('stock_minimo_alerta', 5)))
             cfg.dias_alerta_vencimiento = max(0, int(request.POST.get('dias_alerta_vencimiento', 7)))
+
+            # Booleanos (checkbox -> presente/ausente en POST)
+            cfg.permitir_vender_sin_stock = request.POST.get('permitir_vender_sin_stock') == 'on'
+            cfg.cliente_obligatorio_venta = request.POST.get('cliente_obligatorio_venta') == 'on'
+            cfg.sonido_escaneo            = request.POST.get('sonido_escaneo') == 'on'
+            cfg.imprimir_auto_nota        = request.POST.get('imprimir_auto_nota') == 'on'
+            cfg.mostrar_logo_en_nota      = request.POST.get('mostrar_logo_en_nota') == 'on'
+            cfg.mostrar_vendedor_en_nota  = request.POST.get('mostrar_vendedor_en_nota') == 'on'
+
+            modo = request.POST.get('precio_fuera_rango_modo', 'advertir')
+            if modo in dict(ConfiguracionGeneral.PRECIO_RANGO_OPCIONES):
+                cfg.precio_fuera_rango_modo = modo
+
             cfg.save()
             messages.success(request, 'Preferencias guardadas.')
         except ValueError:
@@ -58,6 +80,7 @@ def preferencias(request):
 @login_required
 def mi_cuenta(request):
     """Editar perfil propio + cambiar contraseña. Disponible para todos los roles."""
+    from django.db.models import Sum, Count
     user = request.user
 
     if request.method == 'POST':
@@ -70,22 +93,55 @@ def mi_cuenta(request):
             messages.success(request, 'Perfil actualizado.')
 
         elif accion == 'password':
+            from django.contrib.auth.password_validation import validate_password
+            from django.core.exceptions import ValidationError as DjangoValidationError
+
             actual = request.POST.get('password_actual', '')
             nueva  = request.POST.get('password_nueva', '')
             confirma = request.POST.get('password_confirma', '')
 
             if not user.check_password(actual):
                 messages.error(request, 'La contraseña actual es incorrecta.')
-            elif len(nueva) < 6:
-                messages.error(request, 'La nueva contraseña debe tener al menos 6 caracteres.')
             elif nueva != confirma:
                 messages.error(request, 'Las contraseñas no coinciden.')
+            elif nueva == actual:
+                messages.error(request, 'La nueva contraseña no puede ser igual a la actual.')
             else:
-                user.set_password(nueva)
-                user.save()
-                update_session_auth_hash(request, user)
-                messages.success(request, 'Contraseña actualizada correctamente.')
+                try:
+                    validate_password(nueva, user=user)
+                except DjangoValidationError as e:
+                    for err in e.messages:
+                        messages.error(request, err)
+                else:
+                    user.set_password(nueva)
+                    user.save()
+                    update_session_auth_hash(request, user)
+                    messages.success(request, 'Contraseña actualizada correctamente.')
 
         return redirect('config_mi_cuenta')
 
-    return render(request, 'configuracion/mi_cuenta.html', {})
+    # Estadísticas de actividad según rol
+    stats = {}
+    try:
+        from apps.ventas.models import Venta
+        agg_ventas = Venta.objects.filter(vendedor=user).aggregate(
+            cnt=Count('id'), total=Sum('total')
+        )
+        stats['ventas_count'] = agg_ventas['cnt'] or 0
+        stats['ventas_total'] = agg_ventas['total'] or 0
+    except Exception:
+        stats['ventas_count'] = 0
+        stats['ventas_total'] = 0
+
+    try:
+        from apps.proveedores.models import Compra
+        agg_compras = Compra.objects.filter(registrado_por=user).aggregate(
+            cnt=Count('id'), total=Sum('total')
+        )
+        stats['compras_count'] = agg_compras['cnt'] or 0
+        stats['compras_total'] = agg_compras['total'] or 0
+    except Exception:
+        stats['compras_count'] = 0
+        stats['compras_total'] = 0
+
+    return render(request, 'configuracion/mi_cuenta.html', {'stats': stats})

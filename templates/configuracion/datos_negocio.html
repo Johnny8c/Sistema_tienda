@@ -3,126 +3,565 @@
 {% block nav_config %}active{% endblock %}
 {% block page_title %}Datos del negocio{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Layout y secciones */
+  .dn-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .dn-section-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .dn-section-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .dn-section-title { font-weight: 700; font-size: 15px; color: var(--text-1); }
+  .dn-section-sub   { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+  .dn-section-body  { padding: 20px; }
+
+  /* Form labels más limpios */
+  .form-label-clean {
+    font-weight: 600; font-size: 13px;
+    color: var(--text-1);
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .form-label-clean i { color: var(--text-muted); font-size: 13px; }
+  .form-text-clean { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+
+  /* === LOGO === */
+  .logo-card {
+    text-align: center;
+  }
+  .logo-preview-wrap {
+    width: 100%; aspect-ratio: 1;
+    background: var(--table-head-bg);
+    border-radius: 14px;
+    border: 2px dashed var(--border);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 14px;
+    position: relative;
+    transition: border-color .15s;
+  }
+  .logo-preview-wrap.has-logo { border-style: solid; }
+  .logo-preview-wrap:hover { border-color: var(--primary); }
+  .logo-preview-wrap img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    padding: 18px;
+  }
+  .logo-empty { color: var(--border); font-size: 56px; }
+
+  /* === COLOR PICKER === */
+  .color-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .color-swatch {
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 12px;
+    cursor: pointer;
+    border: 3px solid var(--card-bg);
+    box-shadow: 0 0 0 1px var(--border);
+    transition: transform .15s, box-shadow .15s;
+    position: relative;
+  }
+  .color-swatch:hover {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 2px var(--border), 0 6px 14px rgba(0,0,0,.12);
+  }
+  .color-swatch.selected {
+    box-shadow: 0 0 0 3px var(--card-bg), 0 0 0 5px currentColor;
+    transform: scale(1.05);
+  }
+  .color-swatch.selected::after {
+    content: '\f26a';
+    font-family: 'bootstrap-icons';
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: 22px;
+    text-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
+
+  .color-custom {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    background: var(--table-head-bg);
+    border-radius: 10px;
+  }
+  .color-custom input[type="color"] {
+    width: 56px; height: 40px;
+    border: none; border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    padding: 0;
+  }
+  .color-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  .color-custom input[type="color"]::-webkit-color-swatch {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .color-custom input[type="text"] {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    background: var(--card-bg);
+    color: var(--text-1);
+    font-family: monospace;
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+  .color-custom input[type="text"]:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
+  }
+
+  /* Preview en vivo */
+  .color-preview {
+    margin-top: 14px;
+    border-radius: 12px;
+    background: var(--table-head-bg);
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .color-preview-label {
+    grid-column: 1 / -1;
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .05em;
+    padding: 10px 14px 0;
+  }
+
+  /* Mini sidebar mockup */
+  .preview-sidebar {
+    background: var(--preview-sidebar);
+    color: rgba(255,255,255,.65);
+    padding: 14px 10px;
+    display: flex; flex-direction: column; gap: 4px;
+    min-height: 140px;
+  }
+  .preview-sidebar-brand {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; margin-bottom: 8px;
+    color: #fff; font-weight: 700; font-size: 12px;
+  }
+  .preview-sidebar-brand-icon {
+    width: 22px; height: 22px;
+    background: var(--preview-color);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; color: #fff;
+    box-shadow: 0 0 12px rgba(var(--preview-rgb),.45);
+  }
+  .preview-sidebar-link {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 6px;
+    font-size: 11.5px;
+  }
+  .preview-sidebar-link.active {
+    background: var(--preview-color);
+    color: #fff; font-weight: 600;
+  }
+
+  .preview-content {
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    background: var(--card-bg);
+  }
+  .preview-content-row {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  }
+  .preview-btn {
+    background: var(--preview-color);
+    color: #fff; border: none;
+    padding: 7px 14px; border-radius: 8px;
+    font-weight: 600; font-size: 12.5px;
+  }
+  .preview-link {
+    color: var(--preview-color);
+    font-weight: 600; font-size: 12.5px;
+    text-decoration: none;
+  }
+  .preview-badge {
+    background: rgba(var(--preview-rgb),.12);
+    color: var(--preview-color);
+    padding: 3px 9px; border-radius: 12px;
+    font-size: 11px; font-weight: 700;
+  }
+  .preview-input {
+    width: 100%;
+    border: 1.5px solid var(--preview-color);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text-1);
+    box-shadow: 0 0 0 3px rgba(var(--preview-rgb),.12);
+  }
+  @media (max-width: 540px) {
+    .color-preview { grid-template-columns: 1fr; }
+  }
+
+  /* Sticky footer guardar */
+  .save-bar {
+    position: sticky; bottom: 0;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border);
+    padding: 14px 20px;
+    margin: 0 -20px -20px;
+    display: flex; justify-content: flex-end; gap: 10px;
+    margin-top: 24px;
+    z-index: 10;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="d-flex align-items-center gap-3">
     <a href="{% url 'config_panel' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
-    <h1 class="page-header-title">Datos del negocio</h1>
+    <div>
+      <h1 class="page-header-title">Datos del negocio</h1>
+      <p class="page-header-sub">Personaliza la identidad y apariencia de tu sistema</p>
+    </div>
   </div>
 </div>
 
-<form method="post" enctype="multipart/form-data" style="max-width:780px">
+<form method="post" enctype="multipart/form-data" id="form-datos-negocio">
   {% csrf_token %}
-  <div class="row g-3">
 
-    <div class="col-md-8">
-      <div class="card">
-        <div class="card-header">Información comercial</div>
-        <div class="card-body">
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Nombre del negocio <span class="text-danger">*</span></label>
-            <input type="text" name="nombre_negocio" class="form-control" required
-                   value="{{ cfg.nombre_negocio }}">
-            <div class="form-text">Aparece en el sidebar, login, pestaña del navegador y nota de venta.</div>
+  <div class="row g-3">
+    <!-- Columna principal -->
+    <div class="col-lg-8">
+
+      <!-- IDENTIDAD -->
+      <div class="dn-section">
+        <div class="dn-section-head">
+          <div class="dn-section-icon" style="background:var(--primary-light);color:var(--primary)">
+            <i class="bi bi-shop"></i>
           </div>
+          <div>
+            <div class="dn-section-title">Identidad comercial</div>
+            <div class="dn-section-sub">Nombre, slogan y datos visibles del negocio</div>
+          </div>
+        </div>
+        <div class="dn-section-body">
           <div class="mb-3">
-            <label class="form-label fw-semibold">Slogan</label>
+            <label class="form-label-clean">
+              <i class="bi bi-building"></i>Nombre del negocio <span class="text-danger">*</span>
+            </label>
+            <input type="text" name="nombre_negocio" class="form-control" required
+                   value="{{ cfg.nombre_negocio }}" placeholder="Ej. Tienda María">
+            <div class="form-text-clean">Aparece en sidebar, login, pestaña del navegador y nota de venta.</div>
+          </div>
+
+          <div class="mb-0">
+            <label class="form-label-clean">
+              <i class="bi bi-quote"></i>Slogan
+            </label>
             <input type="text" name="slogan" class="form-control"
                    placeholder="Una frase corta que represente tu marca"
                    value="{{ cfg.slogan }}">
-            <div class="form-text">Aparece en el login y debajo del nombre en la nota de venta.</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Dirección</label>
-            <input type="text" name="direccion" class="form-control"
-                   value="{{ cfg.direccion }}">
-            <div class="form-text">Aparece en el encabezado de la nota de venta.</div>
-          </div>
-          <div class="row g-2 mb-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Teléfono</label>
-              <input type="text" name="telefono" class="form-control"
-                     value="{{ cfg.telefono }}">
-              <div class="form-text">Encabezado de la nota de venta.</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">Email</label>
-              <input type="email" name="email" class="form-control"
-                     value="{{ cfg.email }}">
-              <div class="form-text">Pie de la nota de venta (contacto).</div>
-            </div>
-          </div>
-          <div class="mb-0">
-            <label class="form-label fw-semibold">Sitio web</label>
-            <input type="url" name="sitio_web" class="form-control"
-                   placeholder="https://"
-                   value="{{ cfg.sitio_web }}">
-            <div class="form-text">Pie de la nota de venta (contacto).</div>
+            <div class="form-text-clean">Aparece en el login y debajo del nombre en la nota de venta.</div>
           </div>
         </div>
       </div>
 
-      <div class="card mt-3">
-        <div class="card-header">Notas de venta</div>
-        <div class="card-body">
-          <label class="form-label fw-semibold">Mensaje al pie de la nota</label>
+      <!-- CONTACTO -->
+      <div class="dn-section">
+        <div class="dn-section-head">
+          <div class="dn-section-icon" style="background:rgba(14,165,233,.12);color:#0EA5E9">
+            <i class="bi bi-geo-alt-fill"></i>
+          </div>
+          <div>
+            <div class="dn-section-title">Información de contacto</div>
+            <div class="dn-section-sub">Datos para encabezado y pie de la nota de venta</div>
+          </div>
+        </div>
+        <div class="dn-section-body">
+          <div class="mb-3">
+            <label class="form-label-clean"><i class="bi bi-pin-map"></i>Dirección</label>
+            <input type="text" name="direccion" class="form-control"
+                   value="{{ cfg.direccion }}" placeholder="Calle, número, ciudad">
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label-clean"><i class="bi bi-telephone"></i>Teléfono</label>
+              <input type="text" name="telefono" class="form-control"
+                     value="{{ cfg.telefono }}" placeholder="0991234567">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label-clean"><i class="bi bi-envelope"></i>Email</label>
+              <input type="email" name="email" class="form-control"
+                     value="{{ cfg.email }}" placeholder="contacto@tutienda.com">
+            </div>
+          </div>
+
+          <div class="mb-0">
+            <label class="form-label-clean"><i class="bi bi-globe"></i>Sitio web</label>
+            <input type="url" name="sitio_web" class="form-control"
+                   placeholder="https://tutienda.com" value="{{ cfg.sitio_web }}">
+          </div>
+        </div>
+      </div>
+
+      <!-- PERSONALIZACIÓN VISUAL -->
+      <div class="dn-section">
+        <div class="dn-section-head">
+          <div class="dn-section-icon" style="background:var(--primary-light);color:var(--primary)" id="head-color-icon">
+            <i class="bi bi-palette-fill"></i>
+          </div>
+          <div>
+            <div class="dn-section-title">Color del sistema</div>
+            <div class="dn-section-sub">Personaliza el color principal de botones, links y badges</div>
+          </div>
+        </div>
+        <div class="dn-section-body">
+
+          <label class="form-label-clean mb-3">
+            <i class="bi bi-grid-3x3-gap"></i>Paletas predefinidas
+          </label>
+          <div class="color-row">
+            <div class="color-swatch" data-color="#4F46E5" style="background:#4F46E5;color:#4F46E5" title="Indigo"></div>
+            <div class="color-swatch" data-color="#7C3AED" style="background:#7C3AED;color:#7C3AED" title="Violeta"></div>
+            <div class="color-swatch" data-color="#DB2777" style="background:#DB2777;color:#DB2777" title="Rosa"></div>
+            <div class="color-swatch" data-color="#DC2626" style="background:#DC2626;color:#DC2626" title="Rojo"></div>
+            <div class="color-swatch" data-color="#EA580C" style="background:#EA580C;color:#EA580C" title="Naranja"></div>
+            <div class="color-swatch" data-color="#D97706" style="background:#D97706;color:#D97706" title="Ámbar"></div>
+            <div class="color-swatch" data-color="#16A34A" style="background:#16A34A;color:#16A34A" title="Verde"></div>
+            <div class="color-swatch" data-color="#0D9488" style="background:#0D9488;color:#0D9488" title="Verde azulado"></div>
+            <div class="color-swatch" data-color="#0EA5E9" style="background:#0EA5E9;color:#0EA5E9" title="Celeste"></div>
+            <div class="color-swatch" data-color="#2563EB" style="background:#2563EB;color:#2563EB" title="Azul"></div>
+            <div class="color-swatch" data-color="#475569" style="background:#475569;color:#475569" title="Gris pizarra"></div>
+            <div class="color-swatch" data-color="#0F172A" style="background:#0F172A;color:#0F172A" title="Negro"></div>
+          </div>
+
+          <label class="form-label-clean">
+            <i class="bi bi-eyedropper"></i>O usa un color personalizado (HEX)
+          </label>
+          <div class="color-custom">
+            <input type="color" id="color-picker" value="{{ cfg.color_primario }}">
+            <input type="text" id="color-hex" name="color_primario"
+                   value="{{ cfg.color_primario }}" maxlength="7"
+                   pattern="^#[0-9A-Fa-f]{6}$" placeholder="#4F46E5">
+          </div>
+
+          <!-- Preview en vivo: mini sidebar + contenido -->
+          <div class="color-preview" id="color-preview">
+            <span class="color-preview-label">Vista previa en vivo</span>
+
+            <div class="preview-sidebar">
+              <div class="preview-sidebar-brand">
+                <div class="preview-sidebar-brand-icon"><i class="bi bi-shop"></i></div>
+                <span>Mi Tienda</span>
+              </div>
+              <div class="preview-sidebar-link active"><i class="bi bi-grid"></i>Dashboard</div>
+              <div class="preview-sidebar-link"><i class="bi bi-cart"></i>POS</div>
+              <div class="preview-sidebar-link"><i class="bi bi-people"></i>Clientes</div>
+            </div>
+
+            <div class="preview-content">
+              <div class="preview-content-row">
+                <button type="button" class="preview-btn">Botón principal</button>
+                <a href="#" class="preview-link" onclick="event.preventDefault()">Enlace</a>
+                <span class="preview-badge">Badge</span>
+              </div>
+              <input type="text" class="preview-input" value="Campo enfocado" readonly>
+            </div>
+          </div>
+
+          <div class="alert mt-3 mb-0" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);color:#92400E;font-size:12.5px;padding:10px 14px;border-radius:10px">
+            <i class="bi bi-info-circle me-1"></i>
+            Los cambios de color se aplican al guardar y se ven en todas las pantallas del sistema.
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTA DE VENTA -->
+      <div class="dn-section">
+        <div class="dn-section-head">
+          <div class="dn-section-icon" style="background:rgba(16,185,129,.12);color:#10B981">
+            <i class="bi bi-receipt"></i>
+          </div>
+          <div>
+            <div class="dn-section-title">Nota de venta</div>
+            <div class="dn-section-sub">Mensaje al pie de cada comprobante impreso</div>
+          </div>
+        </div>
+        <div class="dn-section-body">
+          <label class="form-label-clean">
+            <i class="bi bi-chat-quote"></i>Mensaje al pie
+          </label>
           <textarea name="mensaje_nota_venta" class="form-control" rows="3"
                     placeholder="¡Gracias por su compra!">{{ cfg.mensaje_nota_venta }}</textarea>
-          <div class="form-text">Este texto aparecerá en cada nota de venta impresa.</div>
+          <div class="form-text-clean">Aparecerá impreso en cada nota de venta.</div>
         </div>
       </div>
     </div>
 
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-header">Logo</div>
-        <div class="card-body d-flex flex-column align-items-center text-center gap-3">
-          <div id="logo-preview"
-               style="width:100%;aspect-ratio:1;border-radius:12px;overflow:hidden;background:var(--table-head-bg);display:flex;align-items:center;justify-content:center">
+    <!-- Columna lateral: LOGO -->
+    <div class="col-lg-4">
+      <div class="dn-section logo-card" style="position:sticky;top:80px">
+        <div class="dn-section-head">
+          <div class="dn-section-icon" style="background:rgba(124,58,237,.12);color:#7C3AED">
+            <i class="bi bi-image-fill"></i>
+          </div>
+          <div>
+            <div class="dn-section-title">Logo</div>
+            <div class="dn-section-sub">Aparece en sidebar, login y nota de venta</div>
+          </div>
+        </div>
+        <div class="dn-section-body">
+          <div class="logo-preview-wrap {% if cfg.logo %}has-logo{% endif %}" id="logo-preview">
             {% if cfg.logo %}
-              <img src="{{ cfg.logo.url }}" id="preview-img" alt="Logo actual"
-                   style="width:100%;height:100%;object-fit:contain;padding:16px">
+              <img src="{{ cfg.logo.url }}" id="preview-img" alt="Logo actual">
             {% else %}
-              <i class="bi bi-shop" id="preview-icon" style="font-size:42px;color:var(--border)"></i>
-              <img id="preview-img" style="display:none;width:100%;height:100%;object-fit:contain;padding:16px" alt="">
+              <i class="bi bi-shop logo-empty" id="preview-icon"></i>
+              <img id="preview-img" style="display:none" alt="">
             {% endif %}
           </div>
-          <label class="btn btn-outline-secondary btn-sm w-100" style="cursor:pointer">
+
+          <label class="btn btn-outline-secondary w-100" style="cursor:pointer">
             <i class="bi bi-upload me-1"></i>
             {% if cfg.logo %}Cambiar logo{% else %}Subir logo{% endif %}
             <input type="file" name="logo" accept="image/*" id="logo-input" class="d-none">
           </label>
-          <div class="form-text">PNG con fondo transparente recomendado.</div>
+
+          {% if cfg.logo %}
+          <button type="button" class="btn btn-sm w-100 mt-2"
+                  style="background:transparent;color:#DC2626;border:1px solid rgba(220,38,38,.3)"
+                  id="btn-quitar-logo">
+            <i class="bi bi-x-lg me-1"></i>Quitar logo
+          </button>
+          <input type="hidden" name="quitar_logo" id="quitar-logo-flag" value="0">
+          {% endif %}
+
+          <div class="form-text-clean mt-2">
+            <i class="bi bi-info-circle me-1"></i>
+            PNG con fondo transparente. Idealmente cuadrado (512×512 px).
+          </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="col-12 mt-2">
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">
-          <i class="bi bi-check2 me-1"></i>Guardar cambios
-        </button>
-        <a href="{% url 'config_panel' %}" class="btn btn-outline-secondary">Cancelar</a>
-      </div>
-    </div>
+  <!-- Botones acción -->
+  <div class="d-flex justify-content-end gap-2 mt-4 mb-3">
+    <a href="{% url 'config_panel' %}" class="btn btn-outline-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check2 me-1"></i>Guardar cambios
+    </button>
   </div>
 </form>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  document.getElementById('logo-input').addEventListener('change', function() {
-    const file = this.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = e => {
-      const img = document.getElementById('preview-img');
-      const icon = document.getElementById('preview-icon');
-      img.src = e.target.result;
-      img.style.display = 'block';
-      if (icon) icon.style.display = 'none';
-    };
-    reader.readAsDataURL(file);
+// === LOGO PREVIEW ===
+document.getElementById('logo-input').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img  = document.getElementById('preview-img');
+    const icon = document.getElementById('preview-icon');
+    const wrap = document.getElementById('logo-preview');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    if (icon) icon.style.display = 'none';
+    wrap.classList.add('has-logo');
+  };
+  reader.readAsDataURL(file);
+});
+
+// === COLOR PICKER ===
+const colorPicker = document.getElementById('color-picker');
+const colorHex    = document.getElementById('color-hex');
+const swatches    = document.querySelectorAll('.color-swatch');
+const preview     = document.getElementById('color-preview');
+
+function hexToRgb(h) {
+  h = (h || '').replace('#','');
+  if (h.length !== 6) h = '4F46E5';
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+function rgbToHex(r,g,b) {
+  const c = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2,'0');
+  return '#' + c(r) + c(g) + c(b);
+}
+
+function aplicarColor(hex) {
+  hex = hex.toUpperCase();
+  if (!/^#[0-9A-F]{6}$/.test(hex)) return;
+  colorPicker.value = hex;
+  colorHex.value = hex;
+  const [r,g,b] = hexToRgb(hex);
+  preview.style.setProperty('--preview-color', hex);
+  preview.style.setProperty('--preview-rgb', `${r},${g},${b}`);
+
+  // Sidebar tintado: misma fórmula del backend (15% primario + base oscura)
+  const sidebar = rgbToHex(r * 0.15 + 5, g * 0.15 + 8, b * 0.15 + 16);
+  preview.style.setProperty('--preview-sidebar', sidebar);
+
+  // Marcar swatch seleccionado
+  swatches.forEach(s => s.classList.toggle('selected', s.dataset.color.toUpperCase() === hex));
+}
+
+swatches.forEach(s => {
+  s.addEventListener('click', () => aplicarColor(s.dataset.color));
+});
+
+colorPicker.addEventListener('input', () => aplicarColor(colorPicker.value));
+
+colorHex.addEventListener('input', () => {
+  const v = colorHex.value.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(v)) aplicarColor(v);
+});
+
+// Init: aplicar color guardado
+aplicarColor('{{ cfg.color_primario }}');
+
+// === QUITAR LOGO ===
+const btnQuitar = document.getElementById('btn-quitar-logo');
+if (btnQuitar) {
+  btnQuitar.addEventListener('click', () => {
+    if (!confirm('¿Quitar el logo actual?')) return;
+    const img  = document.getElementById('preview-img');
+    const wrap = document.getElementById('logo-preview');
+    img.src = ''; img.style.display = 'none';
+    wrap.classList.remove('has-logo');
+    let icon = document.getElementById('preview-icon');
+    if (!icon) {
+      icon = document.createElement('i');
+      icon.id = 'preview-icon';
+      icon.className = 'bi bi-shop logo-empty';
+      wrap.appendChild(icon);
+    } else {
+      icon.style.display = '';
+    }
+    document.getElementById('quitar-logo-flag').value = '1';
   });
+}
 </script>
 {% endblock %}
