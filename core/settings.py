@@ -56,6 +56,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.configuracion.context_processors.config_general',
+                'apps.configuracion.context_processors.aviso_pago_proveedor',
             ],
         },
     },
@@ -91,6 +92,20 @@ LANGUAGE_CODE = 'es-ec'
 TIME_ZONE = 'America/Guayaquil'
 USE_I18N = True
 USE_TZ = True
+
+# ─────────────────────────────────────────────────────────────
+# AVISO DE PAGO AL PROVEEDOR DEL SISTEMA (visible solo al dueño)
+# Configurable 100% por variables de entorno en Railway.
+# Cuando el cliente te paga, actualizas DEV_PAGO_FECHA a la próxima fecha.
+# ─────────────────────────────────────────────────────────────
+DEV_PAGO_FECHA              = config('DEV_PAGO_FECHA',              default='')   # 'YYYY-MM-DD'
+DEV_PAGO_MONTO              = config('DEV_PAGO_MONTO',              default='')   # '15.00'
+DEV_PAGO_MONEDA             = config('DEV_PAGO_MONEDA',             default='USD')
+DEV_PAGO_CONCEPTO           = config('DEV_PAGO_CONCEPTO',           default='Hosting + soporte mensual del sistema')
+DEV_PAGO_CONTACTO_NOMBRE    = config('DEV_PAGO_CONTACTO_NOMBRE',    default='')
+DEV_PAGO_CONTACTO_TELEFONO  = config('DEV_PAGO_CONTACTO_TELEFONO',  default='')
+DEV_PAGO_CONTACTO_EMAIL     = config('DEV_PAGO_CONTACTO_EMAIL',     default='')
+DEV_PAGO_INSTRUCCIONES      = config('DEV_PAGO_INSTRUCCIONES',      default='')   # ej. 'Banco Pichincha · Ahorros · 22XXXXXXX · CI 015XXXXXXX'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
