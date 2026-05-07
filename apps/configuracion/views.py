@@ -1,3 +1,4 @@
+import logging
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -5,6 +6,8 @@ from django.contrib.auth import update_session_auth_hash
 
 from apps.usuarios.decorators import requiere_dueno
 from .models import ConfiguracionGeneral
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -130,6 +133,7 @@ def mi_cuenta(request):
         stats['ventas_count'] = agg_ventas['cnt'] or 0
         stats['ventas_total'] = agg_ventas['total'] or 0
     except Exception:
+        logger.exception('No se pudieron calcular stats de ventas para %s', user.username)
         stats['ventas_count'] = 0
         stats['ventas_total'] = 0
 
@@ -141,6 +145,7 @@ def mi_cuenta(request):
         stats['compras_count'] = agg_compras['cnt'] or 0
         stats['compras_total'] = agg_compras['total'] or 0
     except Exception:
+        logger.exception('No se pudieron calcular stats de compras para %s', user.username)
         stats['compras_count'] = 0
         stats['compras_total'] = 0
 

@@ -18,9 +18,12 @@ from .exceptions import (
 
 
 def _calcular_total_items(items: list) -> Decimal:
+    """Calcula el total leyendo el precio actual de cada producto.
+    Debe llamarse dentro de una transacción atómica; usa select_for_update
+    para evitar que el precio cambie entre lectura y commit."""
     total = Decimal('0.00')
     for item in items:
-        producto = Producto.objects.get(pk=item['producto_id'])
+        producto = Producto.objects.select_for_update().get(pk=item['producto_id'])
         total += producto.precio * item['cantidad']
     return total
 

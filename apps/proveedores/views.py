@@ -1,12 +1,16 @@
 import json
+import logging
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
+from django.views.decorators.http import require_POST
 from apps.usuarios.decorators import requiere_dueno, requiere_no_vendedor
 from apps.inventario.models import Producto
 from .models import Proveedor, Compra, ItemCompra
+
+logger = logging.getLogger(__name__)
 
 
 # ── Proveedores ───────────────────────────────────────────────────────────────
@@ -146,8 +150,12 @@ def crear_compra(request):
             messages.success(request, f'Compra #{compra.pk} registrada. Stock actualizado.')
             return redirect('lista_compras')
 
-        except Exception as e:
-            messages.error(request, f'Error al registrar: {e}')
+        except (ValueError, KeyError, json.JSONDecodeError) as e:
+            # Errores esperables de validación: sí los mostramos al usuario
+            messages.error(request, f'Datos inválidos: {e}')
+        except Exception:
+            logger.exception('Error inesperado al registrar compra')
+            messages.error(request, 'No se pudo registrar la compra. Intenta de nuevo.')
 
     return render(request, 'proveedores/form_compra.html', {
         'proveedores': proveedores, 'productos_json': productos_json,
@@ -160,11 +168,11 @@ def detalle_compra(request, pk):
     return render(request, 'proveedores/detalle_compra.html', {'compra': compra})
 
 
+@require_POST
 @requiere_dueno
 def marcar_pagada(request, pk):
     compra = get_object_or_404(Compra, pk=pk)
-    if request.method == 'POST':
-        compra.estado = Compra.PAGADA
-        compra.save(update_fields=['estado'])
-        messages.success(request, f'Compra #{pk} marcada como pagada.')
+    compra.estado = Compra.PAGADA
+    compra.save(update_fields=['estado'])
+    messages.success(request, f'Compra #{pk} marcada como pagada.')
     return redirect('detalle_compra', pk=pk)

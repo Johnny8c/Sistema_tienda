@@ -1,11 +1,15 @@
+import logging
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.db.models import Sum
+from django.db.models import Sum, ProtectedError
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from .models import Usuario
 from .decorators import requiere_dueno
+
+logger = logging.getLogger(__name__)
 
 
 def vista_login(request):
@@ -69,123 +73,18 @@ def _empleados_seleccionables():
 
 
 def _agrupar_por_forma_pago(ventas_qs):
-    """Devuelve [{forma, label, n, total, pct, icono, color}, ...] para gráficos."""
-    from django.db.models import Sum, Count
-    from decimal import Decimal
-    METAS = {
-        'efectivo':      ('Efectivo',           'bi-cash-coin',    '#10B981'),
-        'tarjeta':       ('Tarjeta',            'bi-credit-card',  '#4F46E5'),
-        'transferencia': ('QR / Transferencia', 'bi-qr-code',      '#0EA5E9'),
-    }
-    raw = ventas_qs.values('forma_pago').annotate(
-        total=Sum('total'), n=Count('id')
-    ).order_by('-total')
-    total_general = sum(r['total'] or 0 for r in raw) or Decimal('1')
-    out = []
-    for r in raw:
-        label, icono, color = METAS.get(r['forma_pago'], (r['forma_pago'].title(), 'bi-currency-dollar', '#94A3B8'))
-        t = r['total'] or Decimal('0')
-        out.append({
-            'forma': r['forma_pago'], 'label': label,
-            'n': r['n'], 'total': t,
-            'pct': int((t / total_general) * 100) if total_general > 0 else 0,
-            'icono': icono, 'color': color,
-        })
-    return out
+    """Wrapper backwards-compatible. Lógica está en services.py."""
+    from .services import agrupar_ventas_por_forma_pago
+    return agrupar_ventas_por_forma_pago(ventas_qs)
 
 
 # ── DASHBOARD DUEÑO (vista global) ─────────────────────────────
 
 def _dashboard_dueno(request):
-    from datetime import timedelta
-    from decimal import Decimal
-    from django.db.models import Sum, Count, F
-    from apps.deudores.models import Adelanto, Deuda
-    from apps.ventas.models import Venta, ItemVenta
-    from apps.inventario.models import Producto
-    from apps.clientes.models import Cliente
-    from apps.configuracion.models import ConfiguracionGeneral
-
-    cfg = ConfiguracionGeneral.objects.first()
-    stock_minimo = cfg.stock_minimo_alerta if cfg else 5
-
-    hoy = timezone.now().date()
-    inicio_mes = hoy.replace(day=1)
-
-    ventas_hoy_qs   = Venta.objects.filter(fecha__date=hoy)
-    total_ventas_hoy = ventas_hoy_qs.aggregate(t=Sum('total'))['t'] or 0
-    tickets_hoy     = ventas_hoy_qs.count()
-    ticket_promedio = (total_ventas_hoy / tickets_hoy) if tickets_hoy else 0
-
-    total_ventas_mes = Venta.objects.filter(
-        fecha__date__gte=inicio_mes
-    ).aggregate(t=Sum('total'))['t'] or 0
-
-    total_por_cobrar = Deuda.objects.filter(
-        estado=Deuda.PENDIENTE
-    ).aggregate(t=Sum('saldo_pendiente'))['t'] or 0
-
-    adelantos_activos = Adelanto.objects.filter(estado=Adelanto.ACTIVO).count()
-    total_en_adelantos = Adelanto.objects.filter(
-        estado=Adelanto.ACTIVO
-    ).aggregate(t=Sum('total') - Sum('saldo_pendiente'))['t'] or 0
-
-    variantes_activas = Producto.objects.filter(activo=True)
-    stock_bajo_count = variantes_activas.filter(stock__gt=0, stock__lte=stock_minimo).count()
-    sin_stock_count  = variantes_activas.filter(stock=0).count()
-    valor_inventario = sum((Decimal(str(v.precio)) * v.stock) for v in variantes_activas)
-    total_clientes   = Cliente.objects.filter(activo=True).count()
-
-    ventas_7d = []
-    max_dia = Decimal('0')
-    for i in range(6, -1, -1):
-        d = hoy - timedelta(days=i)
-        total_d = Venta.objects.filter(fecha__date=d).aggregate(t=Sum('total'))['t'] or Decimal('0')
-        if total_d > max_dia: max_dia = total_d
-        ventas_7d.append({'fecha': d, 'dia': d.strftime('%a').lower()[:3], 'total': total_d})
-    for d in ventas_7d:
-        d['pct'] = int((d['total'] / max_dia * 100)) if max_dia > 0 else 0
-
-    inicio_30d = hoy - timedelta(days=30)
-    top_productos = (ItemVenta.objects.filter(venta__fecha__date__gte=inicio_30d)
-        .values('producto__catalogo__nombre')
-        .annotate(unidades=Sum('cantidad'), ingreso=Sum(F('cantidad') * F('precio_unitario')))
-        .order_by('-unidades')[:5])
-
-    stock_critico = variantes_activas.filter(stock__gt=0, stock__lte=stock_minimo) \
-        .select_related('catalogo').order_by('stock')[:6]
-    top_deudores = Deuda.objects.filter(estado=Deuda.PENDIENTE) \
-        .select_related('cliente').order_by('-saldo_pendiente')[:5]
-    ultimas_ventas = Venta.objects.select_related('cliente', 'vendedor').order_by('-fecha')[:5]
-
-    # Ventas de hoy agrupadas por forma de pago
-    ventas_por_forma = _agrupar_por_forma_pago(ventas_hoy_qs)
-
-    return render(request, 'usuarios/dashboard.html', {
-        'total_ventas_hoy':   total_ventas_hoy,
-        'tickets_hoy':        tickets_hoy,
-        'ticket_promedio':    ticket_promedio,
-        'total_ventas_mes':   total_ventas_mes,
-        'total_por_cobrar':   total_por_cobrar,
-        'adelantos_activos':  adelantos_activos,
-        'total_en_adelantos': total_en_adelantos,
-        'stock_bajo_count':   stock_bajo_count,
-        'sin_stock_count':    sin_stock_count,
-        'valor_inventario':   valor_inventario,
-        'total_clientes':     total_clientes,
-        'ventas_7d':          ventas_7d,
-        'top_productos':      top_productos,
-        'stock_critico':      stock_critico,
-        'top_deudores':       top_deudores,
-        'ultimas_ventas':     ultimas_ventas,
-        'adelantos_proximos': Adelanto.objects.filter(
-            estado=Adelanto.ACTIVO,
-            fecha_limite__lte=hoy + timedelta(days=cfg.dias_alerta_vencimiento if cfg else 7),
-        ).select_related('cliente').order_by('fecha_limite')[:5],
-        'stock_minimo':       stock_minimo,
-        'ventas_por_forma':   ventas_por_forma,
-        'empleados_disponibles': _empleados_seleccionables(),
-    })
+    from .services import datos_dashboard_dueno
+    contexto = datos_dashboard_dueno()
+    contexto['empleados_disponibles'] = _empleados_seleccionables()
+    return render(request, 'usuarios/dashboard.html', contexto)
 
 
 # ── DASHBOARD VENDEDOR (datos filtrados por vendedor) ──────────
@@ -438,20 +337,21 @@ def editar_empleado(request, pk):
     })
 
 
+@require_POST
 @requiere_dueno
 def toggle_empleado(request, pk):
     empleado = get_object_or_404(Usuario, pk=pk)
     if empleado == request.user:
         messages.error(request, 'No puedes desactivarte a ti mismo.')
         return redirect('lista_empleados')
-    if request.method == 'POST':
-        empleado.is_active = not empleado.is_active
-        empleado.save()
-        estado = 'activado' if empleado.is_active else 'desactivado'
-        messages.success(request, f'"{empleado.username}" {estado}.')
+    empleado.is_active = not empleado.is_active
+    empleado.save()
+    estado = 'activado' if empleado.is_active else 'desactivado'
+    messages.success(request, f'"{empleado.username}" {estado}.')
     return redirect('lista_empleados')
 
 
+@require_POST
 @requiere_dueno
 def eliminar_empleado(request, pk):
     empleado = get_object_or_404(Usuario, pk=pk)
@@ -461,15 +361,17 @@ def eliminar_empleado(request, pk):
     if empleado.is_superuser:
         messages.error(request, 'No se puede eliminar al superusuario.')
         return redirect('lista_empleados')
-    if request.method == 'POST':
-        nombre = empleado.get_full_name() or empleado.username
-        try:
-            empleado.delete()
-            messages.success(request, f'Empleado "{nombre}" eliminado correctamente.')
-        except Exception:
-            messages.error(
-                request,
-                f'No se puede eliminar a "{nombre}" porque tiene ventas u otros '
-                f'registros asociados. Puedes desactivarlo en su lugar.'
-            )
+    nombre = empleado.get_full_name() or empleado.username
+    try:
+        empleado.delete()
+        messages.success(request, f'Empleado "{nombre}" eliminado correctamente.')
+    except ProtectedError:
+        messages.error(
+            request,
+            f'No se puede eliminar a "{nombre}" porque tiene ventas u otros '
+            f'registros asociados. Puedes desactivarlo en su lugar.'
+        )
+    except Exception:
+        logger.exception('Error inesperado al eliminar empleado %s', empleado.username)
+        messages.error(request, f'No se pudo eliminar a "{nombre}". Intenta más tarde.')
     return redirect('lista_empleados')

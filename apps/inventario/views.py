@@ -1,8 +1,12 @@
+import logging
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
 from .models import CatalogoProducto, Producto
+
+logger = logging.getLogger(__name__)
 
 
 def _form_producto_data(post=None):
@@ -169,16 +173,16 @@ def editar_producto(request, pk):
 
 
 @login_required
+@require_POST
 def desactivar_producto(request, pk):
     if not request.user.es_dueno():
         messages.error(request, 'Solo el dueño puede eliminar productos.')
         return redirect('lista_inventario')
     catalogo = get_object_or_404(CatalogoProducto, pk=pk)
-    if request.method == 'POST':
-        catalogo.activo = False
-        catalogo.save()
-        catalogo.variantes.all().update(activo=False)
-        messages.success(request, f'Producto "{catalogo.nombre}" desactivado.')
+    catalogo.activo = False
+    catalogo.save()
+    catalogo.variantes.all().update(activo=False)
+    messages.success(request, f'Producto "{catalogo.nombre}" desactivado.')
     return redirect('lista_inventario')
 
 
@@ -269,16 +273,16 @@ def ajustar_stock(request, pk):
 
 
 @login_required
+@require_POST
 def desactivar_variante(request, pk):
     if not request.user.es_dueno():
         messages.error(request, 'Solo el dueño puede eliminar variantes.')
         return redirect('lista_inventario')
     variante = get_object_or_404(Producto, pk=pk)
     catalogo_pk = variante.catalogo.pk if variante.catalogo else None
-    if request.method == 'POST':
-        variante.activo = False
-        variante.save()
-        messages.success(request, 'Variante desactivada.')
+    variante.activo = False
+    variante.save()
+    messages.success(request, 'Variante desactivada.')
     if catalogo_pk:
         return redirect('detalle_producto', pk=catalogo_pk)
     return redirect('lista_inventario')
@@ -327,6 +331,7 @@ def api_buscar_codigo(request):
             try:
                 foto_url = p.catalogo.foto.url
             except Exception:
+                logger.exception('No se pudo resolver foto.url del producto %s', p.pk)
                 foto_url = ''
         cat = p.catalogo
         return JsonResponse({
@@ -393,6 +398,7 @@ def imprimir_etiquetas(request):
         try:
             logo_url = cfg.logo.url
         except Exception:
+            logger.exception('No se pudo resolver logo.url del negocio')
             logo_url = ''
 
     return render(request, 'inventario/etiquetas.html', {
