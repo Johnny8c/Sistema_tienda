@@ -3,11 +3,99 @@
 {% block nav_sri %}active{% endblock %}
 {% block page_title %}Facturas SRI{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* KPI cards compactos arriba */
+  .sri-kpi {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .sri-kpi:hover { border-color: var(--primary); }
+  .sri-kpi-icon {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .sri-kpi-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .sri-kpi-value { font-size: 18px; font-weight: 800; color: var(--text-1); line-height: 1.2; }
+  .sri-kpi-sub   { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Tabla rica */
+  .factura-row { transition: background .12s; }
+  .factura-row:hover { background: rgba(79,70,229,.04); }
+  [data-theme="dark"] .factura-row:hover { background: rgba(79,70,229,.12); }
+
+  .cli-mini-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #0EA5E9, #06B6D4);
+    color: #fff; font-weight: 700; font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(14,165,233,.2);
+  }
+
+  .cli-name {
+    font-weight: 600; color: var(--text-1); font-size: 13.5px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 200px;
+  }
+  .cli-cedula { font-family: monospace; font-size: 11px; color: var(--text-muted); }
+
+  .num-factura {
+    font-family: monospace;
+    font-size: 12px;
+    background: var(--table-head-bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    color: var(--text-1);
+    font-weight: 600;
+  }
+
+  .badge-sri-aut    { background: rgba(16,185,129,.15); color: #15803D; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+  .badge-sri-pend   { background: rgba(245,158,11,.15); color: #B45309; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+  .badge-sri-rech   { background: rgba(239,68,68,.15); color: #B91C1C; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+  .badge-sri-borr   { background: var(--table-head-bg); color: var(--text-muted); padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); }
+
+  .badge-conting {
+    background: #FEF3C7; color: #92400E;
+    font-size: 10px; font-weight: 700;
+    padding: 2px 6px; border-radius: 4px;
+    margin-left: 4px;
+  }
+
+  .actions-row { display: inline-flex; gap: 4px; }
+  .btn-icon {
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-2);
+    transition: all .12s;
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .btn-icon:hover {
+    background: var(--primary); color: #fff; border-color: var(--primary);
+  }
+  .btn-icon.disabled {
+    opacity: .4; pointer-events: none; cursor: not-allowed;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div>
     <h1 class="page-header-title">Facturas electrónicas</h1>
-    <p class="page-header-sub">{{ facturas|length }} factura{{ facturas|length|pluralize }}</p>
+    <p class="page-header-sub">{{ facturas|length }} factura{{ facturas|length|pluralize }} {% if facturas|length == 500 %}<span style="color:#B45309">(mostrando últimas 500)</span>{% endif %}</p>
   </div>
   {% if user.es_dueno %}
   <a href="{% url 'configuracion_sri' %}" class="btn btn-outline-secondary">
@@ -16,72 +104,207 @@
   {% endif %}
 </div>
 
+<!-- KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="sri-kpi">
+      <div class="sri-kpi-icon" style="background:rgba(79,70,229,.12);color:#4F46E5">
+        <i class="bi bi-calendar-day"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="sri-kpi-label">Hoy</div>
+        <div class="sri-kpi-value text-money">${{ kpi_hoy.total|default:0|floatformat:2 }}</div>
+        <div class="sri-kpi-sub">{{ kpi_hoy.cnt|default:0 }} factura{{ kpi_hoy.cnt|default:0|pluralize }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="sri-kpi">
+      <div class="sri-kpi-icon" style="background:rgba(14,165,233,.12);color:#0EA5E9">
+        <i class="bi bi-calendar-month"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="sri-kpi-label">Este mes</div>
+        <div class="sri-kpi-value text-money">${{ kpi_mes.total|default:0|floatformat:2 }}</div>
+        <div class="sri-kpi-sub">{{ kpi_mes.cnt|default:0 }} factura{{ kpi_mes.cnt|default:0|pluralize }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="sri-kpi">
+      <div class="sri-kpi-icon" style="background:rgba(245,158,11,.12);color:#B45309">
+        <i class="bi bi-hourglass-split"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="sri-kpi-label">Pendientes SRI</div>
+        <div class="sri-kpi-value" style="color:#B45309">{{ kpi_pendientes }}</div>
+        <div class="sri-kpi-sub">esperando autorización</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="sri-kpi">
+      <div class="sri-kpi-icon" style="background:rgba(239,68,68,.12);color:#DC2626">
+        <i class="bi bi-x-octagon"></i>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="sri-kpi-label">Rechazadas</div>
+        <div class="sri-kpi-value" style="color:#DC2626">{{ kpi_rechazadas }}</div>
+        <div class="sri-kpi-sub">requieren revisión</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filtros -->
 <div class="card mb-3">
   <div class="card-body" style="padding:14px 16px !important">
-    <form method="get" class="d-flex gap-2 flex-wrap">
-      <div style="position:relative;flex:1;min-width:200px;max-width:340px">
-        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
-        <input type="text" name="q" value="{{ q }}" class="form-control" style="padding-left:36px"
-               placeholder="Buscar por cliente…">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" style="font-size:12px">Desde</label>
+        <input type="date" name="desde" value="{{ fecha_desde }}" class="form-control">
       </div>
-      <select name="estado" class="form-select" style="width:auto">
-        <option value="">Todos los estados</option>
-        {% for v, l in estados %}
-        <option value="{{ v }}" {% if estado_sel == v %}selected{% endif %}>{{ l }}</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-outline-secondary">Filtrar</button>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" style="font-size:12px">Hasta</label>
+        <input type="date" name="hasta" value="{{ fecha_hasta }}" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold" style="font-size:12px">Estado</label>
+        <select name="estado" class="form-select">
+          <option value="">Todos</option>
+          {% for v, l in estados %}
+          <option value="{{ v }}" {% if estado_sel == v %}selected{% endif %}>{{ l }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if user.es_dueno %}
+      <div class="col-md-2">
+        <label class="form-label fw-semibold" style="font-size:12px">Vendedor</label>
+        <select name="vendedor" class="form-select">
+          <option value="">Todos</option>
+          {% for v in vendedores %}
+          <option value="{{ v.pk }}" {% if vendedor_id == v.pk|stringformat:'s' %}selected{% endif %}>
+            {{ v.get_full_name|default:v.username }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="{% if user.es_dueno %}col-md-2{% else %}col-md-4{% endif %}">
+        <label class="form-label fw-semibold" style="font-size:12px">Buscar cliente</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nombre…">
+      </div>
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary"><i class="bi bi-funnel me-1"></i>Aplicar filtros</button>
+        <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">Limpiar</a>
+      </div>
     </form>
   </div>
 </div>
 
+<!-- Tabla enriquecida -->
 <div class="card">
   <div style="overflow-x:auto">
-    <table class="table table-hover mb-0">
+    <table class="table mb-0" style="vertical-align: middle">
       <thead>
         <tr>
-          <th>Número</th>
+          <th style="width:140px">Número</th>
           <th>Cliente</th>
-          <th>Fecha</th>
-          <th>Estado</th>
-          <th class="text-end">Total</th>
-          <th></th>
+          <th style="width:110px">Fecha</th>
+          {% if user.es_dueno %}<th style="width:140px">Vendedor</th>{% endif %}
+          <th style="width:160px">Estado</th>
+          <th class="text-end" style="width:120px">Total</th>
+          <th class="text-end" style="width:160px">Acciones</th>
         </tr>
       </thead>
       <tbody>
         {% for f in facturas %}
-        <tr>
-          <td class="fw-semibold">{{ f.numero_factura }}</td>
-          <td>{{ f.cliente.nombre }}</td>
-          <td>{{ f.fecha_emision|date:"d/m/Y" }}</td>
+        <tr class="factura-row">
           <td>
-            {% if f.estado == 'autorizada' %}
-              <span class="badge badge-pagada">Autorizada</span>
-            {% elif f.estado == 'rechazada' %}
-              <span class="badge" style="background:#FEE2E2;color:#991B1B">Rechazada</span>
-            {% elif f.estado == 'emitida' %}
-              <span class="badge badge-pendiente">Pendiente SRI</span>
-            {% elif f.estado == 'borrador' %}
-              <span class="badge badge-cancelado">Borrador</span>
+            <a href="{% url 'detalle_factura' f.pk %}" class="num-factura text-decoration-none">
+              {{ f.numero_factura }}
+            </a>
+            {% if f.es_contingencia %}<span class="badge-conting">CONT</span>{% endif %}
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="cli-mini-avatar">{{ f.cliente.nombre|slice:":2"|upper }}</div>
+              <div style="min-width:0">
+                <div class="cli-name" title="{{ f.cliente.nombre }}">{{ f.cliente.nombre }}</div>
+                <div class="cli-cedula">{{ f.cliente.cedula_ruc }}</div>
+              </div>
+            </div>
+          </td>
+          <td style="font-size:13px;color:var(--text-2)">
+            {{ f.fecha_emision|date:"d/m/Y" }}
+          </td>
+          {% if user.es_dueno %}
+          <td style="font-size:13px;color:var(--text-2)">
+            {% if f.creada_por %}
+              {{ f.creada_por.get_full_name|default:f.creada_por.username }}
             {% else %}
-              <span class="badge badge-cancelado">{{ f.get_estado_display }}</span>
-            {% endif %}
-            {% if f.es_contingencia %}
-              <span class="badge" style="background:#FEF3C7;color:#92400E">Contingencia</span>
+              <span style="color:var(--text-muted)">—</span>
             {% endif %}
           </td>
-          <td class="text-end fw-semibold text-money">${{ f.total|floatformat:2 }}</td>
+          {% endif %}
+          <td>
+            {% if f.estado == 'autorizada' %}
+              <span class="badge-sri-aut"><i class="bi bi-check-circle-fill"></i>Autorizada</span>
+            {% elif f.estado == 'rechazada' %}
+              <span class="badge-sri-rech"><i class="bi bi-x-circle-fill"></i>Rechazada</span>
+            {% elif f.estado == 'emitida' %}
+              <span class="badge-sri-pend"><i class="bi bi-hourglass-split"></i>Pendiente SRI</span>
+            {% elif f.estado == 'borrador' %}
+              <span class="badge-sri-borr"><i class="bi bi-file-earmark"></i>Borrador</span>
+            {% else %}
+              <span class="badge-sri-borr">{{ f.get_estado_display }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end fw-bold text-money" style="font-size:14px">
+            ${{ f.total|floatformat:2 }}
+          </td>
           <td class="text-end">
-            <a href="{% url 'detalle_factura' f.pk %}" class="btn btn-sm btn-outline-secondary">
-              Ver
-            </a>
+            <div class="actions-row">
+              <a href="{% url 'detalle_factura' f.pk %}" class="btn-icon" title="Ver detalle">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{% url 'descargar_ride' f.pk %}" target="_blank"
+                 class="btn-icon {% if not f.clave_acceso %}disabled{% endif %}" title="Descargar PDF (RIDE)">
+                <i class="bi bi-file-earmark-pdf"></i>
+              </a>
+              <a href="{% url 'descargar_xml' f.pk %}"
+                 class="btn-icon {% if not f.xml_firmado %}disabled{% endif %}" title="Descargar XML firmado">
+                <i class="bi bi-file-earmark-code"></i>
+              </a>
+              {% if f.estado == 'emitida' %}
+              <form method="post" action="{% url 'verificar_autorizacion' f.pk %}" style="display:inline">
+                {% csrf_token %}
+                <button class="btn-icon" title="Reconsultar al SRI" style="border:none;cursor:pointer">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="text-center py-5" style="color:var(--text-muted)">
-            <i class="bi bi-receipt" style="font-size:32px;display:block;margin-bottom:8px"></i>
-            No hay facturas emitidas todavía.
+          <td colspan="{% if user.es_dueno %}7{% else %}6{% endif %}" class="text-center py-5" style="color:var(--text-muted)">
+            <i class="bi bi-receipt" style="font-size:40px;display:block;margin-bottom:10px"></i>
+            <div class="fw-semibold mb-1">
+              {% if estado_sel or q or fecha_desde or fecha_hasta or vendedor_id %}
+                Sin resultados con esos filtros
+              {% else %}
+                No hay facturas emitidas todavía
+              {% endif %}
+            </div>
+            <div class="small">
+              {% if estado_sel or q or fecha_desde or fecha_hasta or vendedor_id %}
+                Ajusta los filtros para ver más facturas.
+              {% else %}
+                Las facturas se generan al cobrar una venta con la opción "Emitir factura SRI" activa.
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% endfor %}

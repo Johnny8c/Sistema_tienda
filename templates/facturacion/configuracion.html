@@ -3,6 +3,211 @@
 {% block nav_sri %}active{% endblock %}
 {% block page_title %}Facturación SRI{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Banner de estado */
+  .sri-status {
+    border-radius: 14px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    display: flex; align-items: center; gap: 16px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+  }
+  .sri-status-icon {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .sri-status-content { flex: 1; min-width: 0; }
+  .sri-status-title { font-weight: 700; font-size: 15px; color: var(--text-1); }
+  .sri-status-sub   { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .sri-status-pills {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    align-items: center;
+  }
+  .sri-pill {
+    padding: 5px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .sri-pill.ok      { background: rgba(16,185,129,.12); color: #15803D; }
+  .sri-pill.warn    { background: rgba(245,158,11,.12); color: #B45309; }
+  .sri-pill.err     { background: rgba(239,68,68,.12); color: #B91C1C; }
+  .sri-pill.prod    { background: rgba(220,38,38,.12); color: #B91C1C; }
+  .sri-pill.test    { background: rgba(99,102,241,.12); color: var(--primary); }
+
+  /* Secciones */
+  .sri-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .sri-section-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .sri-section-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .sri-section-title { font-weight: 700; font-size: 15px; color: var(--text-1); }
+  .sri-section-sub   { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+  .sri-section-body  { padding: 20px; }
+
+  /* Form labels más limpios */
+  .form-label-clean {
+    font-weight: 600; font-size: 13px;
+    color: var(--text-1);
+    margin-bottom: 6px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .form-label-clean i { color: var(--text-muted); font-size: 13px; }
+  .form-text-clean { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+
+  /* === AMBIENTE: cards en lugar de select === */
+  .ambiente-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .ambiente-card {
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--card-bg);
+    text-align: left;
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .ambiente-card:hover { border-color: var(--primary); }
+  .ambiente-card.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .ambiente-card-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .ambiente-card-title { font-weight: 700; font-size: 13px; color: var(--text-1); }
+  .ambiente-card-desc  { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; margin-top: 2px; }
+  .ambiente-card.selected .ambiente-card-title { color: var(--primary); }
+
+  /* === Secuencial === */
+  .secuencial-display {
+    background: var(--table-head-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    font-family: monospace;
+  }
+  .secuencial-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .secuencial-num { font-size: 18px; font-weight: 800; color: var(--text-1); margin-top: 4px; letter-spacing: .03em; }
+
+  /* === CERTIFICADO === */
+  .cert-status {
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+    display: flex; gap: 12px; align-items: center;
+  }
+  .cert-status.ok   { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.25); }
+  .cert-status.warn { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.3); }
+  .cert-status.err  { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.3); }
+
+  .cert-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .cert-titular {
+    font-size: 13px; font-weight: 700; color: var(--text-1);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cert-vence { font-size: 11.5px; color: var(--text-muted); }
+
+  .file-input-wrap {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    transition: border-color .15s, background .15s;
+    cursor: pointer;
+    background: var(--table-head-bg);
+  }
+  .file-input-wrap:hover {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .file-input-wrap input { display: none; }
+  .file-input-icon {
+    font-size: 28px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .file-input-label {
+    font-size: 13px; font-weight: 700; color: var(--text-1);
+    margin-bottom: 2px;
+  }
+  .file-input-hint { font-size: 11.5px; color: var(--text-muted); }
+  .file-selected {
+    background: rgba(16,185,129,.08);
+    border-color: #10B981;
+    color: #15803D;
+  }
+  .file-selected .file-input-icon { color: #10B981; }
+
+  /* IVA chips */
+  .iva-row {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .iva-chip {
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+    background: var(--table-head-bg);
+    color: var(--text-2);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .iva-chip:hover { border-color: var(--primary); color: var(--primary); }
+  .iva-chip.selected {
+    background: var(--primary);
+    color: #fff; border-color: var(--primary);
+  }
+
+  /* Tip cards */
+  .tip-card {
+    background: rgba(245,158,11,.06);
+    border: 1px solid rgba(245,158,11,.25);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    color: var(--text-2);
+    line-height: 1.5;
+    margin-top: 16px;
+  }
+  .tip-card i { color: #B45309; }
+  .tip-card b { color: var(--text-1); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="d-flex align-items-center gap-3">
@@ -10,80 +215,224 @@
     <a href="{% url 'config_panel' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
     {% endif %}
     <div>
-      <h1 class="page-header-title">Configuración Facturación Electrónica</h1>
+      <h1 class="page-header-title">Facturación electrónica SRI</h1>
       <p class="page-header-sub">Datos del emisor, certificado digital y secuenciales</p>
     </div>
   </div>
   <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">
-    <i class="bi bi-receipt me-1"></i>Ver facturas
+    <i class="bi bi-receipt me-1"></i>Ver facturas emitidas
   </a>
 </div>
 
-<form method="post" enctype="multipart/form-data" style="max-width:880px">
+<form method="post" enctype="multipart/form-data" id="form-sri">
   {% csrf_token %}
 
+  <!-- BANNER DE ESTADO -->
+  {% if cfg %}
+  <div class="sri-status">
+    <div class="sri-status-icon"
+         style="{% if cfg.cert_configurado %}background:rgba(16,185,129,.12);color:#10B981{% else %}background:rgba(245,158,11,.12);color:#B45309{% endif %}">
+      <i class="bi {% if cfg.cert_configurado %}bi-shield-check{% else %}bi-shield-exclamation{% endif %}"></i>
+    </div>
+    <div class="sri-status-content">
+      <div class="sri-status-title">
+        {% if cfg.cert_configurado %}
+          Sistema listo para emitir facturas
+        {% else %}
+          Falta configurar el certificado digital
+        {% endif %}
+      </div>
+      <div class="sri-status-sub">
+        {% if cfg.cert_configurado %}
+          Certificado válido y datos del emisor configurados.
+        {% else %}
+          Sube tu archivo .p12 e ingresa la contraseña para empezar a facturar.
+        {% endif %}
+      </div>
+    </div>
+    <div class="sri-status-pills">
+      {% if cfg.ambiente == 'produccion' %}
+        <span class="sri-pill prod"><i class="bi bi-broadcast"></i>Producción</span>
+      {% else %}
+        <span class="sri-pill test"><i class="bi bi-tools"></i>Pruebas</span>
+      {% endif %}
+      {% if cfg.cert_configurado %}
+        <span class="sri-pill ok"><i class="bi bi-check-circle-fill"></i>Certificado activo</span>
+      {% else %}
+        <span class="sri-pill warn"><i class="bi bi-exclamation-circle"></i>Sin certificado</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row g-3">
-    <div class="col-md-8">
-      <div class="card">
-        <div class="card-header">Datos del emisor</div>
-        <div class="card-body">
-          <div class="row g-2 mb-3">
+    <!-- Columna principal -->
+    <div class="col-lg-8">
+
+      <!-- DATOS DEL EMISOR -->
+      <div class="sri-section">
+        <div class="sri-section-head">
+          <div class="sri-section-icon" style="background:var(--primary-light);color:var(--primary)">
+            <i class="bi bi-building-fill"></i>
+          </div>
+          <div>
+            <div class="sri-section-title">Datos del emisor</div>
+            <div class="sri-section-sub">Información tributaria registrada en el SRI</div>
+          </div>
+        </div>
+        <div class="sri-section-body">
+          <div class="row g-3 mb-3">
             <div class="col-sm-4">
-              <label class="form-label fw-semibold">RUC <span class="text-danger">*</span></label>
+              <label class="form-label-clean">
+                <i class="bi bi-card-text"></i>RUC <span class="text-danger">*</span>
+              </label>
               <input type="text" name="ruc" class="form-control" maxlength="13" required
-                     value="{{ cfg.ruc|default:'' }}">
+                     value="{{ cfg.ruc|default:'' }}" placeholder="13 dígitos">
+              <div class="form-text-clean">Termina en 001</div>
             </div>
             <div class="col-sm-8">
-              <label class="form-label fw-semibold">Razón social <span class="text-danger">*</span></label>
+              <label class="form-label-clean">
+                <i class="bi bi-building"></i>Razón social <span class="text-danger">*</span>
+              </label>
               <input type="text" name="razon_social" class="form-control" required
-                     value="{{ cfg.razon_social|default:'' }}">
+                     value="{{ cfg.razon_social|default:'' }}" placeholder="Nombre legal de la empresa">
             </div>
           </div>
+
           <div class="mb-3">
-            <label class="form-label fw-semibold">Nombre comercial</label>
+            <label class="form-label-clean">
+              <i class="bi bi-shop"></i>Nombre comercial
+            </label>
             <input type="text" name="nombre_comercial" class="form-control"
-                   value="{{ cfg.nombre_comercial|default:'' }}">
+                   value="{{ cfg.nombre_comercial|default:'' }}" placeholder="Marca con la que opera (opcional)">
           </div>
+
           <div class="mb-3">
-            <label class="form-label fw-semibold">Dirección matriz <span class="text-danger">*</span></label>
+            <label class="form-label-clean">
+              <i class="bi bi-geo-alt"></i>Dirección matriz <span class="text-danger">*</span>
+            </label>
             <input type="text" name="direccion" class="form-control" required
-                   value="{{ cfg.direccion|default:'' }}">
+                   value="{{ cfg.direccion|default:'' }}" placeholder="Calle, número, ciudad">
           </div>
-          <div class="row g-2 mb-3">
-            <div class="col-sm-4">
-              <label class="form-label fw-semibold">Teléfono</label>
-              <input type="text" name="telefono" class="form-control"
-                     value="{{ cfg.telefono|default:'' }}">
-            </div>
-            <div class="col-sm-4">
-              <label class="form-label fw-semibold">Establecimiento</label>
+
+          <div class="mb-0">
+            <label class="form-label-clean">
+              <i class="bi bi-telephone"></i>Teléfono
+            </label>
+            <input type="text" name="telefono" class="form-control"
+                   value="{{ cfg.telefono|default:'' }}" placeholder="022345678 / 0991234567">
+          </div>
+        </div>
+      </div>
+
+      <!-- ESTABLECIMIENTO Y SECUENCIALES -->
+      <div class="sri-section">
+        <div class="sri-section-head">
+          <div class="sri-section-icon" style="background:rgba(14,165,233,.12);color:#0EA5E9">
+            <i class="bi bi-shop-window"></i>
+          </div>
+          <div>
+            <div class="sri-section-title">Establecimiento y secuenciales</div>
+            <div class="sri-section-sub">Códigos asignados por el SRI para tu local</div>
+          </div>
+        </div>
+        <div class="sri-section-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label-clean">
+                <i class="bi bi-1-circle"></i>Establecimiento
+              </label>
               <input type="text" name="establecimiento" class="form-control" maxlength="3"
-                     value="{{ cfg.establecimiento|default:'001' }}">
+                     value="{{ cfg.establecimiento|default:'001' }}" placeholder="001">
+              <div class="form-text-clean">3 dígitos (ej. 001)</div>
             </div>
-            <div class="col-sm-4">
-              <label class="form-label fw-semibold">Punto de emisión</label>
+            <div class="col-md-4">
+              <label class="form-label-clean">
+                <i class="bi bi-2-circle"></i>Punto de emisión
+              </label>
               <input type="text" name="punto_emision" class="form-control" maxlength="3"
-                     value="{{ cfg.punto_emision|default:'001' }}">
+                     value="{{ cfg.punto_emision|default:'001' }}" placeholder="001">
+              <div class="form-text-clean">3 dígitos (ej. 001)</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label-clean">
+                <i class="bi bi-hash"></i>Próxima factura
+              </label>
+              <div class="secuencial-display">
+                <div class="secuencial-num">
+                  {{ cfg.establecimiento|default:'001' }}-{{ cfg.punto_emision|default:'001' }}-{{ cfg.siguiente_secuencial|default:1|stringformat:"09d" }}
+                </div>
+              </div>
             </div>
           </div>
-          <div class="row g-2 mb-3">
-            <div class="col-sm-4">
-              <label class="form-label fw-semibold">Ambiente</label>
-              <select name="ambiente" class="form-select">
-                <option value="pruebas"    {% if cfg.ambiente == 'pruebas' %}selected{% endif %}>Pruebas</option>
-                <option value="produccion" {% if cfg.ambiente == 'produccion' %}selected{% endif %}>Producción</option>
-              </select>
-            </div>
-            <div class="col-sm-4">
-              <label class="form-label fw-semibold">IVA %</label>
-              <input type="number" name="iva_porcentaje" class="form-control" min="0" max="100"
+        </div>
+      </div>
+
+      <!-- CONFIGURACIÓN TRIBUTARIA -->
+      <div class="sri-section">
+        <div class="sri-section-head">
+          <div class="sri-section-icon" style="background:rgba(245,158,11,.12);color:#B45309">
+            <i class="bi bi-sliders"></i>
+          </div>
+          <div>
+            <div class="sri-section-title">Configuración tributaria</div>
+            <div class="sri-section-sub">Ambiente, IVA y obligaciones</div>
+          </div>
+        </div>
+        <div class="sri-section-body">
+
+          <!-- Ambiente -->
+          <label class="form-label-clean mb-2">
+            <i class="bi bi-globe"></i>Ambiente
+          </label>
+          <div class="ambiente-grid mb-3">
+            <label class="ambiente-card {% if cfg.ambiente == 'pruebas' or not cfg %}selected{% endif %}" data-ambiente="pruebas">
+              <input type="radio" name="ambiente" value="pruebas" class="d-none"
+                     {% if cfg.ambiente == 'pruebas' or not cfg %}checked{% endif %}>
+              <div class="ambiente-card-icon" style="background:rgba(99,102,241,.12);color:var(--primary)">
+                <i class="bi bi-tools"></i>
+              </div>
+              <div>
+                <div class="ambiente-card-title">Pruebas</div>
+                <div class="ambiente-card-desc">Para testear sin emitir comprobantes reales. Usar mientras configuras.</div>
+              </div>
+            </label>
+            <label class="ambiente-card {% if cfg.ambiente == 'produccion' %}selected{% endif %}" data-ambiente="produccion">
+              <input type="radio" name="ambiente" value="produccion" class="d-none"
+                     {% if cfg.ambiente == 'produccion' %}checked{% endif %}>
+              <div class="ambiente-card-icon" style="background:rgba(220,38,38,.12);color:#DC2626">
+                <i class="bi bi-broadcast"></i>
+              </div>
+              <div>
+                <div class="ambiente-card-title">Producción</div>
+                <div class="ambiente-card-desc">Comprobantes con validez tributaria. Solo activa cuando todo esté listo.</div>
+              </div>
+            </label>
+          </div>
+
+          <!-- IVA -->
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label-clean">
+                <i class="bi bi-percent"></i>IVA aplicado
+              </label>
+              <input type="number" name="iva_porcentaje" id="iva-input" class="form-control" min="0" max="100"
                      value="{{ cfg.iva_porcentaje|default:15 }}">
+              <div class="iva-row">
+                <span class="iva-chip" data-iva="0">0%</span>
+                <span class="iva-chip" data-iva="12">12%</span>
+                <span class="iva-chip" data-iva="15">15%</span>
+              </div>
             </div>
-            <div class="col-sm-4 d-flex align-items-end">
-              <div class="form-check">
+
+            <div class="col-md-6 d-flex align-items-end">
+              <div class="form-check" style="padding-bottom: 4px">
                 <input type="checkbox" name="obligado_contabilidad" class="form-check-input" id="obli"
                        {% if cfg.obligado_contabilidad %}checked{% endif %}>
-                <label class="form-check-label" for="obli">Obligado a llevar contabilidad</label>
+                <label class="form-check-label fw-semibold" for="obli">
+                  <i class="bi bi-journal-text me-1 text-muted"></i>Obligado a llevar contabilidad
+                </label>
+                <div class="form-text-clean">Activa esta opción si tu RUC está obligado.</div>
               </div>
             </div>
           </div>
@@ -91,36 +440,153 @@
       </div>
     </div>
 
-    <div class="col-md-4">
-      <div class="card h-100">
-        <div class="card-header">Certificado digital (.p12)</div>
-        <div class="card-body">
-          {% if cfg.cert_titular %}
-          <div class="alert alert-info py-2 small">
-            <strong>Cargado:</strong><br>
-            {{ cfg.cert_titular }}<br>
-            <span class="text-muted">Vence: {{ cfg.cert_vencimiento|date:"d/m/Y" }}</span>
+    <!-- Columna lateral: CERTIFICADO -->
+    <div class="col-lg-4">
+      <div class="sri-section" style="position:sticky;top:80px">
+        <div class="sri-section-head">
+          <div class="sri-section-icon" style="background:rgba(124,58,237,.12);color:#7C3AED">
+            <i class="bi bi-shield-lock-fill"></i>
+          </div>
+          <div>
+            <div class="sri-section-title">Certificado digital</div>
+            <div class="sri-section-sub">Archivo .p12 emitido por una EC autorizada</div>
+          </div>
+        </div>
+        <div class="sri-section-body">
+          {% if cfg.cert_configurado %}
+          <div class="cert-status ok">
+            <div class="cert-icon" style="background:rgba(16,185,129,.18);color:#10B981">
+              <i class="bi bi-shield-fill-check"></i>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="cert-titular" title="{{ cfg.cert_titular }}">{{ cfg.cert_titular|default:"Certificado cargado" }}</div>
+              {% if cfg.cert_vencimiento %}
+              <div class="cert-vence">
+                <i class="bi bi-calendar3 me-1"></i>Vence: {{ cfg.cert_vencimiento|date:"d/m/Y" }}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          {% else %}
+          <div class="cert-status warn">
+            <div class="cert-icon" style="background:rgba(245,158,11,.18);color:#B45309">
+              <i class="bi bi-shield-exclamation"></i>
+            </div>
+            <div>
+              <div class="cert-titular">Sin certificado configurado</div>
+              <div class="cert-vence">No se podrán emitir facturas hasta cargarlo.</div>
+            </div>
           </div>
           {% endif %}
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Archivo .p12</label>
-            <input type="file" name="certificado_p12" class="form-control" accept=".p12,.pfx">
-            <div class="form-text">{% if cfg.cert_configurado %}Solo si quieres reemplazar el actual.{% endif %}</div>
+
+          <!-- Drag & drop area -->
+          <label class="file-input-wrap" id="file-wrap">
+            <input type="file" name="certificado_p12" id="file-cert" accept=".p12,.pfx">
+            <div class="file-input-icon"><i class="bi bi-cloud-arrow-up-fill"></i></div>
+            <div class="file-input-label" id="file-label">
+              {% if cfg.cert_configurado %}Cambiar certificado{% else %}Subir archivo .p12{% endif %}
+            </div>
+            <div class="file-input-hint">.p12 o .pfx · Máx. 5 MB</div>
+          </label>
+
+          <div class="mt-3 mb-2">
+            <label class="form-label-clean">
+              <i class="bi bi-key"></i>Contraseña del certificado
+            </label>
+            <div class="position-relative">
+              <input type="password" name="clave_certificado" id="cert-pass" class="form-control"
+                     placeholder="{% if cfg.cert_configurado %}••••••••  (deja vacío para mantener){% else %}Contraseña que protege el .p12{% endif %}">
+              <button type="button" id="toggle-pass" class="btn btn-sm btn-link"
+                      style="position:absolute;right:6px;top:50%;transform:translateY(-50%);color:var(--text-muted);padding:4px 8px"
+                      tabindex="-1">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
           </div>
-          <div class="mb-2">
-            <label class="form-label fw-semibold">Contraseña del certificado</label>
-            <input type="password" name="clave_certificado" class="form-control"
-                   placeholder="{% if cfg.cert_configurado %}••••••••{% endif %}">
+
+          <div class="tip-card">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            Tu certificado se cifra con <b>AES-256-GCM</b> antes de guardarse. Solo el sistema puede descifrarlo al firmar.
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="col-12 mt-2">
-      <button type="submit" class="btn btn-primary">
-        <i class="bi bi-check2 me-1"></i>Guardar configuración
-      </button>
-    </div>
+  <!-- Botones acción -->
+  <div class="d-flex justify-content-end gap-2 mt-4 mb-3">
+    <a href="{% url 'lista_facturas' %}" class="btn btn-outline-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check2 me-1"></i>Guardar configuración
+    </button>
   </div>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// === Ambiente cards ===
+document.querySelectorAll('.ambiente-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.ambiente-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    card.querySelector('input[type="radio"]').checked = true;
+  });
+});
+
+// === IVA chips ===
+const ivaInput = document.getElementById('iva-input');
+const ivaChips = document.querySelectorAll('.iva-chip');
+
+function syncIvaChips() {
+  const v = parseInt(ivaInput.value);
+  ivaChips.forEach(c => c.classList.toggle('selected', parseInt(c.dataset.iva) === v));
+}
+ivaChips.forEach(chip => {
+  chip.addEventListener('click', () => {
+    ivaInput.value = chip.dataset.iva;
+    syncIvaChips();
+  });
+});
+ivaInput.addEventListener('input', syncIvaChips);
+syncIvaChips();
+
+// === File input ===
+const fileInput = document.getElementById('file-cert');
+const fileWrap  = document.getElementById('file-wrap');
+const fileLabel = document.getElementById('file-label');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files[0]) {
+    const f = fileInput.files[0];
+    fileWrap.classList.add('file-selected');
+    fileLabel.textContent = f.name;
+  }
+});
+
+// === Toggle password ===
+const togglePass = document.getElementById('toggle-pass');
+const certPass   = document.getElementById('cert-pass');
+togglePass.addEventListener('click', () => {
+  const isPass = certPass.type === 'password';
+  certPass.type = isPass ? 'text' : 'password';
+  togglePass.querySelector('i').className = isPass ? 'bi bi-eye-slash' : 'bi bi-eye';
+});
+
+// === Auto-actualizar preview de secuencial ===
+const estInput = document.querySelector('input[name="establecimiento"]');
+const ptoInput = document.querySelector('input[name="punto_emision"]');
+const secNum   = document.querySelector('.secuencial-num');
+const siguiente = '{{ cfg.siguiente_secuencial|default:1 }}';
+
+function updateSecuencial() {
+  if (!secNum) return;
+  const est = (estInput.value || '001').padStart(3,'0').slice(0,3);
+  const pto = (ptoInput.value || '001').padStart(3,'0').slice(0,3);
+  const sig = String(siguiente).padStart(9,'0');
+  secNum.textContent = `${est}-${pto}-${sig}`;
+}
+if (estInput) estInput.addEventListener('input', updateSecuencial);
+if (ptoInput) ptoInput.addEventListener('input', updateSecuencial);
+</script>
 {% endblock %}

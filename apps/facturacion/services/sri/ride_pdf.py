@@ -9,9 +9,25 @@ from decimal import Decimal
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
+from reportlab.lib.utils import ImageReader
 
 import barcode
 from barcode.writer import ImageWriter
+
+
+def _cargar_logo_negocio():
+    """Devuelve un ImageReader del logo configurado, o None si no hay."""
+    try:
+        from apps.configuracion.models import ConfiguracionGeneral
+        cfg = ConfiguracionGeneral.get_singleton()
+        if not cfg or not cfg.mostrar_logo_en_nota or not cfg.logo:
+            return None
+        # Funciona tanto para storage local como para Cloudinary
+        with cfg.logo.open('rb') as f:
+            return ImageReader(io.BytesIO(f.read()))
+    except Exception as e:
+        print(f'[RIDE] No se pudo cargar el logo del negocio: {e}')
+        return None
 
 A4_W, A4_H = A4
 MARGIN = 36
@@ -75,6 +91,39 @@ def _text(c, x, y, text, *, font='Helvetica', size=8, color='#111111', max_w=Non
         c.drawString(x, y, str(text))
 
 
+def _wrap_text(c, text, max_w, font='Helvetica', size=8):
+    """Divide un texto en líneas que quepan en max_w (puntos)."""
+    if not text:
+        return []
+    words = str(text).split()
+    if not words:
+        return []
+    lines = []
+    current = ''
+    for word in words:
+        candidate = (current + ' ' + word).strip()
+        if c.stringWidth(candidate, font, size) <= max_w:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            # Si una sola palabra es más ancha que max_w, la cortamos por caracteres
+            if c.stringWidth(word, font, size) > max_w:
+                buf = ''
+                for ch in word:
+                    if c.stringWidth(buf + ch, font, size) <= max_w:
+                        buf += ch
+                    else:
+                        lines.append(buf)
+                        buf = ch
+                current = buf
+            else:
+                current = word
+    if current:
+        lines.append(current)
+    return lines
+
+
 def generar_ride_pdf(factura, items, configuracion, cliente) -> bytes:
     """
     Genera el RIDE en PDF y devuelve los bytes.
@@ -99,18 +148,61 @@ def generar_ride_pdf(factura, items, configuracion, cliente) -> bytes:
     _draw_box(c, MARGIN, Y(header_top + header_h), left_w, header_h, stroke='#DDDDDD')
     _draw_box(c, right_x, Y(header_top + header_h), right_w, header_h, stroke='#DDDDDD')
 
-    # Razón social
-    _text(c, MARGIN + 8, Y(header_top + 18), configuracion.razon_social or 'EMISOR',
-          font='Helvetica-Bold', size=11)
+    # Logo (si está configurado y la preferencia está activa)
+    logo_img = _cargar_logo_negocio()
+    text_x_offset = MARGIN + 8
+    if logo_img is not None:
+        try:
+            logo_size = 56  # área cuadrada de 56pt (~2cm)
+            logo_x = MARGIN + 8
+            logo_y = Y(header_top + 8 + logo_size)  # esquina inferior izq del logo
+            c.drawImage(
+                logo_img, logo_x, logo_y,
+                width=logo_size, height=logo_size,
+                preserveAspectRatio=True, mask='auto',
+            )
+            text_x_offset = MARGIN + 8 + logo_size + 10  # texto al lado del logo
+        except Exception as e:
+            print(f'[RIDE] Error dibujando logo: {e}')
+            text_x_offset = MARGIN + 8
+
+    # Ancho útil para el bloque de texto del emisor (resta padding y posible ancho del logo)
+    text_max_w = (MARGIN + left_w) - text_x_offset - 8
+
+    # Cursor vertical dinámico (en "Y desde arriba")
+    y_cursor = header_top + 18
+
+    # Razón social (puede partirse en 2 líneas si es muy larga)
+    razon = configuracion.razon_social or 'EMISOR'
+    razon_lines = _wrap_text(c, razon, text_max_w, 'Helvetica-Bold', 11)[:2]
+    for line in razon_lines:
+        _text(c, text_x_offset, Y(y_cursor), line, font='Helvetica-Bold', size=11)
+        y_cursor += 13
+
+    # Nombre comercial (1 línea, opcional)
     if configuracion.nombre_comercial and configuracion.nombre_comercial != configuracion.razon_social:
-        _text(c, MARGIN + 8, Y(header_top + 32), configuracion.nombre_comercial,
-              font='Helvetica', size=9, color='#444444')
+        nc_lines = _wrap_text(c, configuracion.nombre_comercial, text_max_w, 'Helvetica', 9)[:1]
+        for line in nc_lines:
+            _text(c, text_x_offset, Y(y_cursor), line,
+                  font='Helvetica', size=9, color='#444444')
+            y_cursor += 12
+
+    y_cursor += 4  # gap visual antes de los datos de contacto
+
+    # Dirección (con wrap a múltiples líneas, máximo 2 para no romper layout)
     if configuracion.direccion:
-        _text(c, MARGIN + 8, Y(header_top + 50), f'Dirección: {configuracion.direccion}',
-              font='Helvetica', size=8, color='#555555')
+        dir_lines = _wrap_text(c, f'Dirección: {configuracion.direccion}',
+                               text_max_w, 'Helvetica', 8)[:2]
+        for line in dir_lines:
+            _text(c, text_x_offset, Y(y_cursor), line,
+                  font='Helvetica', size=8, color='#555555')
+            y_cursor += 10
+
+    # Teléfono
     if configuracion.telefono:
-        _text(c, MARGIN + 8, Y(header_top + 64), f'Teléfono: {configuracion.telefono}',
+        _text(c, text_x_offset, Y(y_cursor), f'Teléfono: {configuracion.telefono}',
               font='Helvetica', size=8, color='#555555')
+        y_cursor += 10
 
     # RUC banner
     _draw_box(c, right_x, Y(header_top + 28), right_w, 28, fill='#1E40AF', radius=4)

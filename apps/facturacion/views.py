@@ -81,18 +81,70 @@ def configuracion_sri(request):
 @login_required
 @requiere_no_bodeguero
 def lista_facturas(request):
-    estado = request.GET.get('estado', '')
-    q      = request.GET.get('q', '')
-    facturas = FacturaSRI.objects.select_related('cliente').order_by('-creada_en')
+    from datetime import datetime
+    from apps.usuarios.models import Usuario
+
+    estado      = request.GET.get('estado', '')
+    q           = request.GET.get('q', '')
+    fecha_desde = request.GET.get('desde', '')
+    fecha_hasta = request.GET.get('hasta', '')
+    vendedor_id = request.GET.get('vendedor', '')
+
+    facturas = FacturaSRI.objects.select_related('cliente', 'creada_por').order_by('-creada_en')
+
+    # Vendedor solo ve sus propias facturas
+    if not request.user.es_dueno():
+        facturas = facturas.filter(creada_por=request.user)
+
     if estado:
         facturas = facturas.filter(estado=estado)
     if q:
         facturas = facturas.filter(cliente__nombre__icontains=q)
+    if fecha_desde:
+        try:
+            facturas = facturas.filter(fecha_emision__gte=datetime.strptime(fecha_desde, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if fecha_hasta:
+        try:
+            facturas = facturas.filter(fecha_emision__lte=datetime.strptime(fecha_hasta, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if vendedor_id and request.user.es_dueno():
+        facturas = facturas.filter(creada_por_id=vendedor_id)
+
+    vendedores = (Usuario.objects.filter(rol__in=[Usuario.ROL_VENDEDOR, Usuario.ROL_DUENO])
+                  .order_by('first_name', 'username')) if request.user.es_dueno() else None
+
+    # KPIs sobre el queryset filtrado
+    from django.db.models import Sum, Count, Q
+    from django.utils import timezone
+    hoy = timezone.now().date()
+    base = FacturaSRI.objects.all()
+    if not request.user.es_dueno():
+        base = base.filter(creada_por=request.user)
+    kpi_hoy = base.filter(fecha_emision=hoy).aggregate(
+        cnt=Count('id'), total=Sum('total')
+    )
+    kpi_mes = base.filter(fecha_emision__year=hoy.year, fecha_emision__month=hoy.month).aggregate(
+        cnt=Count('id'), total=Sum('total')
+    )
+    kpi_pendientes = base.filter(estado=FacturaSRI.EMITIDA).count()
+    kpi_rechazadas = base.filter(estado=FacturaSRI.RECHAZADA).count()
+
     return render(request, 'facturacion/lista.html', {
-        'facturas': facturas,
+        'facturas':   facturas[:500],
         'estado_sel': estado,
-        'q': q,
-        'estados': FacturaSRI.ESTADOS,
+        'q':          q,
+        'fecha_desde': fecha_desde,
+        'fecha_hasta': fecha_hasta,
+        'vendedor_id': vendedor_id,
+        'vendedores':  vendedores,
+        'estados':     FacturaSRI.ESTADOS,
+        'kpi_hoy':       kpi_hoy,
+        'kpi_mes':       kpi_mes,
+        'kpi_pendientes': kpi_pendientes,
+        'kpi_rechazadas': kpi_rechazadas,
     })
 
 
@@ -100,6 +152,10 @@ def lista_facturas(request):
 @requiere_no_bodeguero
 def detalle_factura(request, pk):
     factura = get_object_or_404(FacturaSRI, pk=pk)
+    # El vendedor solo puede ver sus propias facturas
+    if not request.user.es_dueno() and factura.creada_por_id != request.user.pk:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden('No tienes permiso para ver esta factura.')
     return render(request, 'facturacion/detalle.html', {
         'factura': factura,
         'items': factura.items.all(),
@@ -222,6 +278,28 @@ def _emitir_factura(request, factura, cfg):
         return redirect('detalle_factura', pk=factura.pk)
 
     tipo_emision = '2' if cfg.contingencia_activa else '1'
+
+    # Si la factura fue RECHAZADA antes, el SRI ya registró ese secuencial y no
+    # lo acepta de nuevo (ERROR 45 SECUENCIAL REGISTRADO). Tomamos uno nuevo.
+    if factura.estado == FacturaSRI.RECHAZADA:
+        from django.db import transaction as _tx
+        with _tx.atomic():
+            cfg_locked = ConfiguracionSRI.objects.select_for_update().get(pk=cfg.pk)
+            nuevo_seq = cfg_locked.siguiente_secuencial
+            cfg_locked.siguiente_secuencial += 1
+            cfg_locked.save(update_fields=['siguiente_secuencial'])
+        factura.numero_factura = f'{cfg_locked.establecimiento}-{cfg_locked.punto_emision}-{nuevo_seq:09d}'
+        # Limpiar datos del intento anterior para no arrastrar inconsistencias
+        factura.clave_acceso = None
+        factura.xml_firmado = ''
+        factura.sri_respuesta = ''
+        factura.sri_numero_autorizacion = ''
+        factura.sri_fecha_autorizacion = None
+        factura.estado = FacturaSRI.BORRADOR
+        factura.save()
+        # Refrescar cfg con valores nuevos para que el resto del flujo lea bien
+        cfg = cfg_locked
+
     estab        = cfg.establecimiento
     pto          = cfg.punto_emision
     secuencial   = int(factura.numero_factura.split('-')[-1])
@@ -261,7 +339,17 @@ def _emitir_factura(request, factura, cfg):
         factura.estado = FacturaSRI.RECHAZADA
         factura.sri_respuesta = err
         factura.save(update_fields=['estado', 'sri_respuesta', 'sri_intentos_recepcion'])
-        messages.error(request, f'SRI devolvió la factura: {err}')
+        # Si el error es por fecha, dar contexto adicional con la fecha realmente enviada
+        err_lower = err.lower()
+        if 'fecha' in err_lower:
+            messages.error(
+                request,
+                f'SRI devolvió la factura: {err}\n\n'
+                f'🕒 Fecha enviada: {factura.fecha_emision.strftime("%d/%m/%Y")}. '
+                f'Verifica que el reloj del servidor sea la fecha real actual (Configuración → Hora y fecha en Windows).'
+            )
+        else:
+            messages.error(request, f'SRI devolvió la factura: {err}')
         return redirect('detalle_factura', pk=factura.pk)
 
     factura.save(update_fields=['sri_intentos_recepcion'])
