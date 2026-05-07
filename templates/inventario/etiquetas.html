@@ -1,0 +1,1801 @@
+{% extends 'base.html' %}
+{% load color_filters %}
+{% block title %}Imprimir etiquetas{% endblock %}
+{% block nav_inventario %}active{% endblock %}
+{% block page_title %}Imprimir etiquetas{% endblock %}
+
+{% block extra_head %}
+<style>
+  .et-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .et-section-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 14px; color: var(--text-1);
+  }
+  .et-section-head i { color: var(--primary); }
+  .et-section-body { padding: 16px 18px; }
+
+  /* === PROGRESS BAR === */
+  .progress-card {
+    background: linear-gradient(135deg, var(--primary-light) 0%, transparent 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .progress-row {
+    display: flex; align-items: center; gap: 14px;
+    flex-wrap: wrap;
+  }
+  .progress-text {
+    flex: 1; min-width: 200px;
+  }
+  .progress-text .pct {
+    font-size: 24px; font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+  }
+  .progress-text .lbl {
+    font-size: 13px; color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .progress-bar-wrap {
+    flex: 2; min-width: 220px;
+    height: 10px;
+    background: var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 5px;
+    transition: width .35s ease;
+    box-shadow: 0 0 12px rgba(var(--primary-rgb),.35);
+  }
+  .progress-stats {
+    display: flex; gap: 14px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+  .progress-stats span b { color: var(--text-1); font-weight: 700; }
+
+  /* === STATUS BADGES === */
+  .impr-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10.5px; font-weight: 700;
+    padding: 2px 8px; border-radius: 10px;
+    text-transform: uppercase; letter-spacing: .03em;
+    flex-shrink: 0;
+  }
+  .impr-badge.ok {
+    background: rgba(16,185,129,.15);
+    color: #15803D;
+  }
+  .impr-badge.pend {
+    background: rgba(245,158,11,.12);
+    color: #B45309;
+  }
+  [data-theme="dark"] .impr-badge.ok { background: rgba(16,185,129,.2); color: #34D399; }
+  [data-theme="dark"] .impr-badge.pend { background: rgba(245,158,11,.18); color: #FCD34D; }
+
+  .impr-meta {
+    font-size: 11px; color: var(--text-muted);
+    margin-top: 2px;
+  }
+  .impr-meta i { font-size: 10px; }
+
+  /* Filtro toggle */
+  .filtro-pendientes {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px;
+    background: var(--table-head-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 12.5px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .filtro-pendientes input { margin: 0; }
+
+  /* === Impresión rápida (1 click) === */
+  .quick-print-section {
+    background: linear-gradient(135deg, var(--primary-light) 0%, transparent 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .quick-print-title {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; font-weight: 700;
+    color: var(--text-1);
+    margin-bottom: 10px;
+  }
+  .quick-print-title i { color: var(--primary); }
+  .quick-print-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+  }
+  .quick-print-btn {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 14px;
+    border: 1.5px solid var(--border);
+    background: var(--card-bg);
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+    transition: all .15s;
+    width: 100%;
+  }
+  .quick-print-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(var(--primary-rgb),.18);
+  }
+  .quick-print-btn:disabled {
+    opacity: .4; cursor: not-allowed;
+  }
+  .quick-print-btn.primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 4px 10px rgba(var(--primary-rgb),.25);
+  }
+  .quick-print-btn.primary:hover:not(:disabled) {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    box-shadow: 0 8px 18px rgba(var(--primary-rgb),.35);
+  }
+  .quick-print-btn-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .quick-print-btn.primary .quick-print-btn-icon {
+    background: rgba(255,255,255,.2);
+    color: #fff;
+  }
+  .quick-print-btn-text { flex: 1; min-width: 0; }
+  .quick-print-btn-text .t1 { font-size: 13px; font-weight: 700; line-height: 1.1; }
+  .quick-print-btn-text .t2 { font-size: 11px; opacity: .8; margin-top: 2px; }
+  .quick-print-btn-count {
+    background: rgba(0,0,0,.08);
+    color: inherit;
+    font-weight: 800; font-size: 12px;
+    padding: 3px 10px; border-radius: 12px;
+    flex-shrink: 0;
+  }
+  .quick-print-btn.primary .quick-print-btn-count {
+    background: rgba(255,255,255,.25);
+  }
+
+  /* === Banner de countdown para impresión === */
+  .print-banner {
+    position: fixed;
+    bottom: 24px; left: 50%;
+    transform: translateX(-50%) translateY(120%);
+    z-index: 9999;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 20px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.18);
+    display: flex; align-items: center; gap: 16px;
+    min-width: 380px;
+    transition: transform .35s cubic-bezier(.2,.7,.4,1.2);
+  }
+  .print-banner.visible { transform: translateX(-50%) translateY(0); }
+  .print-banner-icon {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .print-banner-progress {
+    position: absolute; inset: -2px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--primary);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .print-banner-text { flex: 1; min-width: 0; }
+  .print-banner-title { font-weight: 700; font-size: 14px; color: var(--text-1); }
+  .print-banner-sub {
+    font-size: 12px; color: var(--text-muted); margin-top: 2px;
+  }
+  .print-banner-sub b { color: var(--primary); font-size: 16px; }
+  .print-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .print-banner-btn {
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-1);
+    border-radius: 8px;
+    padding: 7px 14px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: all .12s;
+  }
+  .print-banner-btn:hover { border-color: var(--text-muted); }
+  .print-banner-btn.primary {
+    background: var(--primary);
+    color: #fff; border-color: var(--primary);
+  }
+  .print-banner-btn.primary:hover { background: var(--primary-dark); }
+  .print-banner-btn.danger { color: #DC2626; }
+  .print-banner-btn.danger:hover { background: rgba(220,38,38,.08); border-color: #DC2626; }
+
+  @media (max-width: 540px) {
+    .print-banner {
+      left: 12px; right: 12px;
+      transform: translateY(120%);
+      min-width: 0;
+    }
+    .print-banner.visible { transform: translateY(0); }
+  }
+
+  /* === Acciones rápidas masivas === */
+  .quick-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .quick-pill {
+    flex: 1; min-width: 120px;
+    background: var(--table-head-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 12px; font-weight: 600;
+    color: var(--text-2);
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all .15s;
+  }
+  .quick-pill:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-light);
+  }
+  .quick-pill:disabled {
+    opacity: .4; cursor: not-allowed;
+  }
+  .quick-pill .badge-count {
+    background: var(--primary);
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
+  }
+
+  /* Cantidad por defecto */
+  .qty-default {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px;
+    background: var(--table-head-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .qty-default-label { color: var(--text-muted); font-weight: 500; }
+  .qty-default-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+  .qty-chip {
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text-2);
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 11.5px;
+    font-weight: 700;
+    transition: all .12s;
+  }
+  .qty-chip:hover { border-color: var(--primary); color: var(--primary); }
+  .qty-chip.selected {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .qty-chip-custom {
+    width: 50px;
+    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 6px;
+    background: var(--card-bg);
+    color: var(--text-1);
+    font-size: 11.5px;
+    font-weight: 700;
+  }
+
+  /* En el resultado: contador + botón "todas las variantes" */
+  .pr-actions {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+    flex-shrink: 0;
+  }
+  .pr-add-cat {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .12s;
+    white-space: nowrap;
+  }
+  .pr-add-cat:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-light);
+  }
+  .pr-counter {
+    background: var(--primary);
+    color: #fff;
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  /* Buscador y lista permanente */
+  .pr-search-wrap { position: relative; }
+
+  /* Lista permanente de inventario */
+  .inv-list {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    max-height: 540px;
+    overflow-y: auto;
+    margin-top: 10px;
+  }
+  .inv-list-empty {
+    padding: 32px 16px; text-align: center;
+    color: var(--text-muted); font-size: 13px;
+  }
+  .inv-list-summary {
+    padding: 10px 14px;
+    background: var(--table-head-bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--text-muted);
+    position: sticky; top: 0; z-index: 2;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .inv-list-summary b { color: var(--text-1); font-weight: 700; }
+
+  .pr-result {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    display: flex; align-items: center; gap: 12px;
+    transition: background .12s;
+  }
+  .pr-result:hover { background: var(--table-head-bg); }
+  .pr-result:last-child { border-bottom: none; }
+
+  /* Grupo por catalogo */
+  .cat-group-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--table-head-bg);
+    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    font-size: 12.5px;
+    position: sticky; top: 39px;
+    z-index: 1;
+  }
+  .cat-group-header:first-of-type { border-top: none; }
+  .cat-group-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .cat-group-info { flex: 1; min-width: 0; }
+  .cat-group-name {
+    font-weight: 700; color: var(--text-1);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .cat-group-meta {
+    font-size: 11px; color: var(--text-muted);
+    margin-top: 1px;
+  }
+  .cat-group-add {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 12px;
+    font-size: 11px; font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(var(--primary-rgb),.2);
+    transition: transform .1s, box-shadow .15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .cat-group-add:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(var(--primary-rgb),.3);
+  }
+  .pr-result.in-group { padding-left: 38px; }
+  .pr-result.in-group::before {
+    content: '';
+    position: absolute; left: 22px; top: 0; bottom: 0;
+    width: 1px; background: var(--border);
+  }
+  .pr-result { position: relative; }
+
+  /* Stock chip prominente */
+  .stock-chip-mini {
+    font-size: 10.5px; font-weight: 700;
+    padding: 3px 8px; border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .stock-chip-mini.ok    { background: rgba(16,185,129,.15); color: #15803D; }
+  .stock-chip-mini.low   { background: rgba(245,158,11,.15); color: #B45309; }
+  .stock-chip-mini.zero  { background: rgba(239,68,68,.12); color: #B91C1C; }
+
+  /* Botón "+stock" en cada row */
+  .pr-add-stock {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(var(--primary-rgb),.25);
+    transition: transform .1s, box-shadow .15s;
+  }
+  .pr-add-stock:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(var(--primary-rgb),.35);
+  }
+  .pr-add-stock:disabled {
+    opacity: .35; cursor: not-allowed;
+    box-shadow: none; transform: none;
+  }
+  .pr-result-info { flex: 1; min-width: 0; }
+  .pr-result-name { font-weight: 700; font-size: 13px; color: var(--text-1); }
+  .pr-result-meta { font-size: 11.5px; color: var(--text-muted); }
+  .pr-result-code {
+    font-family: monospace; font-size: 11px;
+    background: var(--table-head-bg); color: var(--text-muted);
+    padding: 2px 6px; border-radius: 4px;
+  }
+
+  /* Lista de seleccionados */
+  .selected-list {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .selected-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    background: var(--table-head-bg);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .si-info { flex: 1; min-width: 0; }
+  .si-name { font-weight: 700; font-size: 13px; color: var(--text-1); }
+  .si-meta { font-size: 11.5px; color: var(--text-muted); }
+  .si-color-dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 1.5px solid var(--card-bg);
+    box-shadow: 0 0 0 1px var(--border);
+    display: inline-block;
+    margin-right: 4px; vertical-align: middle;
+  }
+  .si-qty {
+    display: flex; align-items: center; gap: 4px;
+  }
+  .si-qty button {
+    width: 28px; height: 28px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    border-radius: 6px;
+    color: var(--text-1);
+    cursor: pointer;
+    font-weight: 700;
+  }
+  .si-qty button:hover { border-color: var(--primary); color: var(--primary); }
+  .si-qty input {
+    width: 56px; text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px;
+    background: var(--card-bg);
+    color: var(--text-1);
+    font-weight: 700;
+  }
+  .si-remove {
+    background: transparent; border: none;
+    color: #DC2626; padding: 4px 8px; cursor: pointer;
+    border-radius: 6px;
+  }
+  .si-remove:hover { background: rgba(220,38,38,.1); }
+
+  /* Opciones */
+  .opt-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .size-card {
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all .15s;
+    text-align: center;
+    background: var(--card-bg);
+  }
+  .size-card:hover { border-color: var(--primary); }
+  .size-card.selected {
+    border-color: var(--primary);
+    background: var(--primary-light);
+  }
+  .size-card-name { font-size: 13px; font-weight: 700; color: var(--text-1); }
+  .size-card.selected .size-card-name { color: var(--primary); }
+  .size-card-dim { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; }
+  .size-card-preview {
+    margin: 6px auto;
+    border: 1.5px solid var(--border);
+    background: var(--table-head-bg);
+    border-radius: 3px;
+  }
+
+  /* Toggle pequeño */
+  .opt-toggle {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--table-head-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .opt-toggle input { margin: 0; }
+
+  /* PREVIEW de etiquetas */
+  .preview-area {
+    background: #E5E7EB;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    min-height: 300px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-content: flex-start;
+    justify-content: center;
+  }
+  [data-theme="dark"] .preview-area { background: rgba(0,0,0,.3); }
+
+  .empty-preview {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 60px 20px;
+    width: 100%;
+  }
+
+  /* === LA ETIQUETA EN SÍ (estilo retail) === */
+  .label {
+    background: #fff;
+    color: #000;
+    border: 1px solid #D1D5DB;
+    padding: 1.6mm 2mm;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    page-break-inside: avoid;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.15;
+  }
+  .label-header {
+    display: flex;
+    align-items: center;
+    gap: 1.2mm;
+    padding-bottom: 0.6mm;
+    margin-bottom: 0.8mm;
+    border-bottom: 0.2mm solid #D1D5DB;
+    min-height: 0;
+  }
+  .label-header img {
+    object-fit: contain;
+    flex-shrink: 0;
+  }
+  .label-business {
+    font-size: 5.5pt;
+    color: #4B5563;
+    font-weight: 700;
+    letter-spacing: 0.4pt;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+  }
+  .label-name {
+    font-weight: 800;
+    color: #000;
+    line-height: 1.1;
+    margin-bottom: 0.4mm;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .label-variant {
+    color: #4B5563;
+    display: flex;
+    align-items: center;
+    gap: 1mm;
+    flex-wrap: wrap;
+    margin-bottom: 0.6mm;
+  }
+  .label-variant .talla-tag {
+    background: #111;
+    color: #fff;
+    padding: 0.3mm 1.4mm;
+    border-radius: 0.6mm;
+    font-weight: 700;
+    letter-spacing: 0.3pt;
+    text-transform: uppercase;
+  }
+  .label-variant .color-info {
+    display: inline-flex; align-items: center; gap: 0.6mm;
+  }
+  .label-variant .color-dot-print {
+    width: 1.8mm; height: 1.8mm;
+    border-radius: 50%;
+    border: 0.2mm solid #aaa;
+    display: inline-block;
+  }
+  .label-precio {
+    font-weight: 900;
+    color: #000;
+    letter-spacing: -0.5pt;
+    line-height: 1;
+    margin-top: 0.2mm;
+    margin-bottom: 0.4mm;
+  }
+  .label-barcode-wrap {
+    margin-top: auto;
+    width: 100%;
+    padding-top: 0.4mm;
+  }
+  .label-barcode {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .label-code-text {
+    font-family: monospace;
+    text-align: center;
+  }
+
+  /* === PRINT MEDIA === */
+  /* @page se inyecta dinámicamente desde JS según el tamaño elegido (ver JS) */
+  /* Por defecto el clon-de-impresión está oculto en pantalla */
+  #print-clone { display: none; }
+
+  @media print {
+    /* Ocultar TODO lo que vive en body normalmente */
+    body > * { display: none !important; }
+
+    /* Solo mostrar el clon-de-impresión */
+    #print-clone {
+      display: block !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+    }
+
+    html, body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+    }
+
+    /* Cada etiqueta = una página propia */
+    #print-clone .label {
+      border: none !important;
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 1.6mm 2mm !important;
+      page-break-after: always;
+      page-break-inside: avoid;
+      break-after: page;
+      break-inside: avoid;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    #print-clone .label:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+    .label-barcode { display: block !important; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_inventario' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <div>
+      <h1 class="page-header-title">Imprimir etiquetas</h1>
+      <p class="page-header-sub">Selecciona productos, define cantidades y configura el tamaño de la etiqueta</p>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <button id="btn-clear" class="btn btn-outline-secondary">
+      <i class="bi bi-trash me-1"></i>Limpiar
+    </button>
+    <button id="btn-print" class="btn btn-primary" disabled>
+      <i class="bi bi-printer me-1"></i>Imprimir
+      <span id="total-count" class="badge bg-light text-dark ms-1">0</span>
+    </button>
+  </div>
+</div>
+
+<!-- BARRA DE PROGRESO GLOBAL -->
+<div class="progress-card" id="progress-card">
+  <div class="progress-row">
+    <div class="progress-text">
+      <div class="pct"><span id="pg-pct">0%</span></div>
+      <div class="lbl">del catálogo etiquetado</div>
+    </div>
+    <div style="flex:2;min-width:220px">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="pg-bar" style="width:0%"></div>
+      </div>
+      <div class="progress-stats mt-2">
+        <span><i class="bi bi-check-circle-fill text-success me-1"></i><b id="pg-impresas">0</b> impresas</span>
+        <span><i class="bi bi-hourglass-split me-1" style="color:#B45309"></i><b id="pg-pendientes">0</b> pendientes</span>
+        <span><i class="bi bi-tag me-1"></i><b id="pg-total">0</b> total</span>
+      </div>
+    </div>
+    <button class="btn btn-sm btn-outline-secondary" id="btn-reset-marcas" type="button"
+            title="Borrar el historial de marcado de impresión (solo este dispositivo)">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Reiniciar marcas
+    </button>
+  </div>
+</div>
+
+<div class="row g-3">
+  <!-- COLUMNA IZQUIERDA: configuración -->
+  <div class="col-lg-5">
+
+    <!-- IMPRESIÓN RÁPIDA: 1-click -->
+    <div class="quick-print-section">
+      <div class="quick-print-title">
+        <i class="bi bi-rocket-takeoff-fill"></i>
+        Impresión rápida (1 click)
+      </div>
+      <div class="quick-print-grid">
+        <button type="button" class="quick-print-btn primary" id="qp-pendientes">
+          <div class="quick-print-btn-icon"><i class="bi bi-printer-fill"></i></div>
+          <div class="quick-print-btn-text">
+            <div class="t1">Imprimir faltantes</div>
+            <div class="t2">Solo las pendientes</div>
+          </div>
+          <span class="quick-print-btn-count" id="qp-pendientes-count">0</span>
+        </button>
+        <button type="button" class="quick-print-btn" id="qp-todo">
+          <div class="quick-print-btn-icon"><i class="bi bi-collection-fill"></i></div>
+          <div class="quick-print-btn-text">
+            <div class="t1">Imprimir todo</div>
+            <div class="t2">Todo el catálogo</div>
+          </div>
+          <span class="quick-print-btn-count" id="qp-todo-count">0</span>
+        </button>
+        <button type="button" class="quick-print-btn" id="qp-reimprimir">
+          <div class="quick-print-btn-icon"><i class="bi bi-arrow-counterclockwise"></i></div>
+          <div class="quick-print-btn-text">
+            <div class="t1">Reimprimir</div>
+            <div class="t2">Solo las ya impresas</div>
+          </div>
+          <span class="quick-print-btn-count" id="qp-reimprimir-count">0</span>
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;text-align:center">
+        <i class="bi bi-info-circle me-1"></i>Usa el modo <b>Auto</b> de cantidad → 1 etiqueta por unidad en stock
+      </div>
+    </div>
+
+    <!-- Buscador de productos -->
+    <div class="et-section">
+      <div class="et-section-head">
+        <i class="bi bi-search"></i>Agregar productos
+      </div>
+      <div class="et-section-body">
+
+        <!-- Cantidad por defecto -->
+        <div class="qty-default">
+          <span class="qty-default-label"><i class="bi bi-stack me-1"></i>Cantidad al agregar:</span>
+          <div class="qty-default-chips">
+            <span class="qty-chip selected" data-qty="auto" title="Usa el stock disponible de cada variante">
+              <i class="bi bi-magic"></i> Auto
+            </span>
+            <span class="qty-chip" data-qty="1">1</span>
+            <span class="qty-chip" data-qty="3">3</span>
+            <span class="qty-chip" data-qty="5">5</span>
+            <span class="qty-chip" data-qty="10">10</span>
+            <input type="number" id="qty-custom" class="qty-chip-custom" placeholder="—" min="1" max="999">
+          </div>
+        </div>
+
+        <!-- Acciones rápidas masivas -->
+        <div class="quick-actions">
+          <button type="button" class="quick-pill" id="qa-pendientes">
+            <i class="bi bi-funnel-fill"></i>Todas pendientes
+            <span class="badge-count" id="qa-pendientes-count">0</span>
+          </button>
+          <button type="button" class="quick-pill" id="qa-busqueda">
+            <i class="bi bi-search"></i>Todas las visibles
+            <span class="badge-count" id="qa-busqueda-count">0</span>
+          </button>
+        </div>
+
+        <div class="pr-search-wrap">
+          <input type="text" id="pr-search" class="form-control"
+                 placeholder="🔎 Filtrar por nombre, código, talla o color…">
+        </div>
+        <label class="filtro-pendientes">
+          <input type="checkbox" id="opt-solo-pendientes">
+          <span><i class="bi bi-funnel me-1"></i>Mostrar solo etiquetas <b>pendientes</b> de imprimir</span>
+        </label>
+
+        <!-- Lista permanente del inventario -->
+        <div class="inv-list" id="inv-list">
+          <div class="inv-list-summary" id="inv-summary">
+            <span><b id="inv-count">0</b> variantes con código de barras</span>
+            <span id="inv-stock-total" style="font-size:11px"></span>
+          </div>
+          <div id="inv-rows"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Productos seleccionados -->
+    <div class="et-section">
+      <div class="et-section-head">
+        <i class="bi bi-list-check"></i>Productos seleccionados
+        <span id="selected-count" class="ms-auto" style="font-size:12px;color:var(--text-muted);font-weight:500">0 variantes · 0 etiquetas</span>
+      </div>
+      <div class="et-section-body" id="selected-body">
+        <div id="empty-selected" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">
+          <i class="bi bi-tag" style="font-size:28px;display:block;margin-bottom:6px"></i>
+          Sin productos seleccionados
+        </div>
+        <div class="selected-list" id="selected-list"></div>
+      </div>
+    </div>
+
+    <!-- Tamaño y opciones -->
+    <div class="et-section">
+      <div class="et-section-head">
+        <i class="bi bi-rulers"></i>Tamaño de etiqueta
+      </div>
+      <div class="et-section-body">
+        <div class="opt-grid">
+          <label class="size-card" data-w="30" data-h="20" data-name="30×20mm">
+            <input type="radio" name="label-size" value="30x20" class="d-none">
+            <div class="size-card-preview" style="width:24mm;height:16mm"></div>
+            <div class="size-card-name">30×20mm</div>
+            <div class="size-card-dim">Pequeña — solo precio</div>
+          </label>
+          <label class="size-card selected" data-w="50" data-h="30" data-name="50×30mm">
+            <input type="radio" name="label-size" value="50x30" class="d-none" checked>
+            <div class="size-card-preview" style="width:30mm;height:18mm"></div>
+            <div class="size-card-name">50×30mm</div>
+            <div class="size-card-dim">⭐ Recomendada</div>
+          </label>
+          <label class="size-card" data-w="60" data-h="40" data-name="60×40mm">
+            <input type="radio" name="label-size" value="60x40" class="d-none">
+            <div class="size-card-preview" style="width:30mm;height:20mm"></div>
+            <div class="size-card-name">60×40mm</div>
+            <div class="size-card-dim">Con logo</div>
+          </label>
+          <label class="size-card" data-w="100" data-h="50" data-name="100×50mm">
+            <input type="radio" name="label-size" value="100x50" class="d-none">
+            <div class="size-card-preview" style="width:32mm;height:16mm"></div>
+            <div class="size-card-name">100×50mm</div>
+            <div class="size-card-dim">Grande — caja</div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Opciones de contenido -->
+    <div class="et-section">
+      <div class="et-section-head">
+        <i class="bi bi-sliders"></i>Qué incluir
+      </div>
+      <div class="et-section-body">
+        <div class="d-flex flex-column gap-2">
+          <label class="opt-toggle">
+            <input type="checkbox" id="opt-logo" {% if not logo_url %}disabled{% endif %}>
+            <span>
+              <i class="bi bi-image me-1"></i>Logo del negocio
+              {% if not logo_url %}
+              <small class="d-block" style="font-size:10.5px;color:var(--text-muted);margin-top:2px">
+                <i class="bi bi-info-circle me-1"></i>Sube un logo en
+                <a href="{% url 'config_datos_negocio' %}" style="color:var(--primary)">Datos del negocio</a>
+              </small>
+              {% else %}
+              <small class="d-block" style="font-size:10.5px;color:var(--text-muted);margin-top:2px">
+                Recomendado en etiquetas 60×40mm o más grandes
+              </small>
+              {% endif %}
+            </span>
+          </label>
+          <label class="opt-toggle">
+            <input type="checkbox" id="opt-nombre" checked>
+            <span>Nombre del producto</span>
+          </label>
+          <label class="opt-toggle">
+            <input type="checkbox" id="opt-variante" checked>
+            <span>Talla y color</span>
+          </label>
+          <label class="opt-toggle">
+            <input type="checkbox" id="opt-precio" checked>
+            <span>Precio</span>
+          </label>
+          <label class="opt-toggle">
+            <input type="checkbox" id="opt-codigo" checked>
+            <span>Código (texto)</span>
+          </label>
+          <label class="opt-toggle">
+            <input type="checkbox" id="opt-negocio">
+            <span>Nombre del negocio (texto)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- COLUMNA DERECHA: PREVIEW -->
+  <div class="col-lg-7">
+    <div class="et-section" style="position:sticky;top:80px">
+      <div class="et-section-head">
+        <i class="bi bi-eye"></i>Vista previa
+        <span class="ms-auto" style="font-size:11.5px;color:var(--text-muted);font-weight:500">
+          <i class="bi bi-info-circle me-1"></i>Así se imprimirá cada etiqueta
+        </span>
+      </div>
+      <div class="preview-area" id="preview-area">
+        <div class="empty-preview">
+          <i class="bi bi-tag" style="font-size:48px;display:block;margin-bottom:12px"></i>
+          <div style="font-weight:700;color:var(--text-1)">Sin etiquetas para mostrar</div>
+          <div style="font-size:13px;margin-top:4px">Agrega productos a la izquierda para verlos aquí</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Banner de cuenta regresiva al imprimir -->
+<div class="print-banner" id="print-banner">
+  <div class="print-banner-icon">
+    <i class="bi bi-printer-fill"></i>
+    <div class="print-banner-progress"></div>
+  </div>
+  <div class="print-banner-text">
+    <div class="print-banner-title">Vista previa lista</div>
+    <div class="print-banner-sub">
+      Imprimiendo en <b id="banner-count">3</b> segundo<span id="banner-plural">s</span>…
+    </div>
+  </div>
+  <div class="print-banner-actions">
+    <button class="print-banner-btn danger" id="banner-cancelar">
+      <i class="bi bi-x-lg me-1"></i>Cancelar
+    </button>
+    <button class="print-banner-btn primary" id="banner-imprimir">
+      <i class="bi bi-printer me-1"></i>Imprimir ya
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script>
+const PRODUCTOS = {{ productos_json|safe }};
+const NOMBRE_NEGOCIO = "{{ nombre_negocio|escapejs }}";
+const LOGO_URL = "{{ logo_url|escapejs }}";
+const PRESELECT_PRODUCTO = "{{ producto_preseleccionado|default:'' }}";
+const PRESELECT_VARIANTE = "{{ variante_preseleccionada|default:'' }}";
+
+// === HISTORIAL DE IMPRESIÓN (localStorage) ===
+const IMPR_KEY = 'etiquetas_impresas_v1';
+function loadImpr() {
+  try { return JSON.parse(localStorage.getItem(IMPR_KEY) || '{}'); }
+  catch (e) { return {}; }
+}
+function saveImpr(obj) {
+  localStorage.setItem(IMPR_KEY, JSON.stringify(obj));
+}
+function marcarImpresas(productos) {
+  const data = loadImpr();
+  const ahora = Date.now();
+  productos.forEach(({ producto, cantidad }) => {
+    if (!producto.codigo_barras) return;
+    const prev = data[producto.codigo_barras];
+    data[producto.codigo_barras] = {
+      ts: ahora,
+      total: (prev?.total || 0) + cantidad,
+    };
+  });
+  saveImpr(data);
+}
+function fueImpresa(codigo) {
+  return !!loadImpr()[codigo];
+}
+function infoImpresion(codigo) {
+  return loadImpr()[codigo] || null;
+}
+function fechaRel(ts) {
+  const ahora = Date.now();
+  const diff = Math.floor((ahora - ts) / 1000);
+  if (diff < 60) return 'hace un momento';
+  if (diff < 3600) return `hace ${Math.floor(diff/60)} min`;
+  if (diff < 86400) return `hace ${Math.floor(diff/3600)} h`;
+  if (diff < 604800) return `hace ${Math.floor(diff/86400)} día${Math.floor(diff/86400)!==1?'s':''}`;
+  return new Date(ts).toLocaleDateString('es-EC', {day:'2-digit',month:'short',year:'numeric'});
+}
+
+// Estado
+const seleccionados = new Map(); // id -> {producto, cantidad}
+let labelW = 50, labelH = 30, labelName = '50×30mm';
+let cantidadPorDefecto = 'auto';        // 'auto' | número
+let ultimasMatches = []; // últimos resultados de búsqueda visibles
+
+function resolverCantidad(producto) {
+  if (cantidadPorDefecto === 'auto') {
+    // 'auto' = stock disponible. Si stock <= 0, defaultear a 1 para que algo se imprima.
+    return Math.max(1, producto.stock_disponible || producto.stock || 1);
+  }
+  return parseInt(cantidadPorDefecto) || 1;
+}
+
+// Helpers
+function colorEspanolACss(nombre) {
+  const map = {
+    'blanco':'#FFFFFF','negro':'#000000','gris':'#9CA3AF','plata':'#C0C0C0',
+    'rojo':'#DC2626','rosa':'#F472B6','rosado':'#F9A8D4',
+    'naranja':'#F97316','amarillo':'#FACC15','verde':'#16A34A',
+    'azul':'#2563EB','azul oscuro':'#1E40AF','azul claro':'#60A5FA',
+    'celeste':'#7DD3FC','marino':'#172554',
+    'morado':'#9333EA','violeta':'#8B5CF6','lila':'#C4B5FD',
+    'café':'#92400E','cafe':'#92400E','marrón':'#78350F','marron':'#78350F',
+    'beige':'#E7DCC0','crema':'#FFFDD0','coral':'#FB7185'
+  };
+  if (!nombre) return '#94A3B8';
+  return map[nombre.toLowerCase().trim()] || nombre.toLowerCase();
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// === BUSCADOR + LISTA PERMANENTE ===
+const search = document.getElementById('pr-search');
+const invRows = document.getElementById('inv-rows');
+
+search.addEventListener('input', renderResultados);
+
+function stockChipClass(s) {
+  if (s <= 0) return 'zero';
+  if (s <= 5) return 'low';
+  return 'ok';
+}
+
+function renderResultados() {
+  const q = search.value.trim().toLowerCase();
+  const soloPend = document.getElementById('opt-solo-pendientes').checked;
+  let conCodigo = PRODUCTOS.filter(p => p.codigo_barras);
+  if (soloPend) conCodigo = conCodigo.filter(p => !fueImpresa(p.codigo_barras));
+
+  const matches = q
+    ? conCodigo.filter(p =>
+        p.nombre.toLowerCase().includes(q) ||
+        p.codigo_barras.toLowerCase().includes(q) ||
+        (p.color || '').toLowerCase().includes(q) ||
+        (p.talla || '').toLowerCase().includes(q))
+    : conCodigo;
+
+  ultimasMatches = matches;
+  renderQuickActionCounts();
+
+  // Agrupar por catalogo_id
+  const grupos = new Map(); // catalogo_id -> {nombre, categoria, variantes: []}
+  matches.forEach(p => {
+    const key = p.catalogo_id || `__solo_${p.id}`;
+    if (!grupos.has(key)) {
+      grupos.set(key, {
+        catalogo_id: p.catalogo_id,
+        nombre: p.nombre,
+        categoria: p.categoria,
+        variantes: [],
+      });
+    }
+    grupos.get(key).variantes.push(p);
+  });
+
+  // Resumen del header: catálogos · variantes · stock
+  const stockTotal = matches.reduce((s, p) => s + (p.stock_disponible || 0), 0);
+  document.getElementById('inv-count').innerHTML =
+    `<b>${grupos.size}</b> producto${grupos.size!==1?'s':''} · <b>${matches.length}</b> variante${matches.length!==1?'s':''}`;
+  document.getElementById('inv-stock-total').innerHTML = stockTotal > 0
+    ? `<i class="bi bi-boxes me-1"></i><b style="color:var(--text-1)">${stockTotal}</b> uds en stock`
+    : '';
+
+  if (!matches.length) {
+    const msg = soloPend
+      ? '🎉 No hay variantes pendientes de imprimir'
+      : (q ? 'Sin resultados para esa búsqueda' : 'Sin productos con código de barras');
+    invRows.innerHTML = `<div class="inv-list-empty">
+      <i class="bi bi-tag" style="font-size:28px;display:block;margin-bottom:8px"></i>${msg}
+    </div>`;
+    return;
+  }
+
+  // Render con grupos
+  let html = '';
+  for (const grupo of grupos.values()) {
+    const stockGrupo = grupo.variantes.reduce((s, v) => s + (v.stock_disponible || 0), 0);
+    const pendientesGrupo = grupo.variantes.filter(v => !fueImpresa(v.codigo_barras)).length;
+    const grupoStatus = pendientesGrupo === 0
+      ? `<span class="impr-badge ok" style="margin-left:6px"><i class="bi bi-check-all"></i>Todas impresas</span>`
+      : pendientesGrupo === grupo.variantes.length
+      ? `<span class="impr-badge pend" style="margin-left:6px"><i class="bi bi-circle"></i>${pendientesGrupo} pend.</span>`
+      : `<span class="impr-badge pend" style="margin-left:6px"><i class="bi bi-circle-half"></i>${pendientesGrupo}/${grupo.variantes.length} pend.</span>`;
+
+    // Header del grupo (catálogo padre)
+    if (grupo.catalogo_id) {
+      html += `
+        <div class="cat-group-header">
+          <div class="cat-group-icon"><i class="bi bi-collection"></i></div>
+          <div class="cat-group-info">
+            <div class="cat-group-name">${escapeHtml(grupo.nombre)} ${grupoStatus}</div>
+            <div class="cat-group-meta">
+              ${grupo.categoria ? escapeHtml(grupo.categoria) + ' · ' : ''}
+              <b style="color:var(--text-1)">${grupo.variantes.length}</b> variante${grupo.variantes.length!==1?'s':''}
+              · <b style="color:var(--text-1)">${stockGrupo}</b> uds en stock
+            </div>
+          </div>
+          <button type="button" class="cat-group-add"
+                  onclick="agregarVariantesDeCatalogo(${grupo.catalogo_id}, event)"
+                  title="Agregar todas las variantes de este producto">
+            <i class="bi bi-plus-lg me-1"></i>Agregar todas
+          </button>
+        </div>`;
+    }
+
+    // Variantes (filas indentadas)
+    grupo.variantes.forEach(p => {
+      const info = infoImpresion(p.codigo_barras);
+      const badge = info
+        ? `<span class="impr-badge ok"><i class="bi bi-check-circle-fill"></i>Impresa</span>`
+        : `<span class="impr-badge pend"><i class="bi bi-circle"></i>Pendiente</span>`;
+      const yaSeleccionado = seleccionados.get(p.id);
+      const counter = yaSeleccionado
+        ? `<span class="pr-counter">×${yaSeleccionado.cantidad}</span>` : '';
+      const stockDisp = p.stock_disponible || 0;
+      const stockBtn = stockDisp > 0
+        ? `<button type="button" class="pr-add-stock" onclick="agregarConStock(${p.id}, event)" title="Agregar ${stockDisp} etiquetas (= stock disponible)">+${stockDisp} stock</button>`
+        : `<button type="button" class="pr-add-stock" disabled title="Sin stock">Sin stock</button>`;
+
+      html += `
+        <div class="pr-result ${grupo.catalogo_id ? 'in-group' : ''}" data-id="${p.id}">
+          <div class="pr-result-info">
+            <div class="pr-result-name">
+              ${p.talla ? `Talla ${escapeHtml(p.talla)}` : 'Sin talla'}
+              ${p.color ? ` · <span class="si-color-dot" style="background:${colorEspanolACss(p.color)}"></span>${escapeHtml(p.color)}` : ''}
+            </div>
+            <div class="pr-result-meta">
+              $${parseFloat(p.precio).toFixed(2)}
+              · <span class="pr-result-code">${escapeHtml(p.codigo_barras)}</span>
+            </div>
+            ${info ? `<div class="impr-meta"><i class="bi bi-clock-history"></i> Última: ${fechaRel(info.ts)} · ${info.total} ud${info.total!==1?'s':''}</div>` : ''}
+          </div>
+          <div class="pr-actions">
+            <div class="d-flex align-items-center gap-2">
+              ${badge}
+              <span class="stock-chip-mini ${stockChipClass(stockDisp)}">
+                <i class="bi bi-box-seam"></i> ${stockDisp}
+              </span>
+              ${counter}
+            </div>
+            ${stockBtn}
+          </div>
+        </div>`;
+    });
+  }
+  invRows.innerHTML = html;
+
+  invRows.querySelectorAll('.pr-result').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const id = parseInt(el.dataset.id);
+      agregarSeleccionado(id);
+    });
+  });
+}
+
+// === SELECCIONADOS ===
+function agregarSeleccionado(id, qtyOverride) {
+  const p = PRODUCTOS.find(x => x.id === id);
+  if (!p) return;
+  const cant = qtyOverride != null ? qtyOverride : resolverCantidad(p);
+  if (seleccionados.has(id)) {
+    seleccionados.get(id).cantidad += cant;
+  } else {
+    seleccionados.set(id, { producto: p, cantidad: cant });
+  }
+  renderSeleccionados();
+  renderPreview();
+  renderResultados();
+}
+
+function agregarMultiples(ids, qtyOverride) {
+  ids.forEach(id => {
+    const p = PRODUCTOS.find(x => x.id === id);
+    if (!p) return;
+    const cant = qtyOverride != null ? qtyOverride : resolverCantidad(p);
+    if (seleccionados.has(id)) {
+      seleccionados.get(id).cantidad += cant;
+    } else {
+      seleccionados.set(id, { producto: p, cantidad: cant });
+    }
+  });
+  renderSeleccionados();
+  renderPreview();
+  renderResultados();
+}
+
+function agregarVariantesDeCatalogo(catalogoId, evento) {
+  if (evento) { evento.preventDefault(); evento.stopPropagation(); }
+  const variantes = PRODUCTOS.filter(p => p.catalogo_id === catalogoId && p.codigo_barras);
+  if (variantes.length === 0) return;
+  agregarMultiples(variantes.map(v => v.id));
+}
+
+function agregarConStock(id, evento) {
+  if (evento) { evento.preventDefault(); evento.stopPropagation(); }
+  const p = PRODUCTOS.find(x => x.id === id);
+  if (!p) return;
+  const stock = Math.max(1, p.stock_disponible || p.stock || 1);
+  agregarSeleccionado(id, stock);
+}
+
+function cambiarCantidad(id, delta) {
+  const item = seleccionados.get(id);
+  if (!item) return;
+  item.cantidad = Math.max(0, item.cantidad + delta);
+  if (item.cantidad === 0) seleccionados.delete(id);
+  renderSeleccionados();
+  renderPreview();
+}
+
+function setCantidad(id, val) {
+  const item = seleccionados.get(id);
+  if (!item) return;
+  const n = Math.max(0, Math.min(parseInt(val) || 0, 999));
+  item.cantidad = n;
+  if (n === 0) seleccionados.delete(id);
+  renderSeleccionados();
+  renderPreview();
+}
+
+function quitarSeleccionado(id) {
+  seleccionados.delete(id);
+  renderSeleccionados();
+  renderPreview();
+}
+
+function renderSeleccionados() {
+  const list  = document.getElementById('selected-list');
+  const empty = document.getElementById('empty-selected');
+  const count = document.getElementById('selected-count');
+
+  if (seleccionados.size === 0) {
+    empty.style.display = '';
+    list.innerHTML = '';
+    count.textContent = '0 variantes · 0 etiquetas';
+    return;
+  }
+  empty.style.display = 'none';
+
+  let total = 0;
+  list.innerHTML = [...seleccionados.values()].map(item => {
+    const p = item.producto;
+    total += item.cantidad;
+    const info = infoImpresion(p.codigo_barras);
+    const badge = info
+      ? `<span class="impr-badge ok"><i class="bi bi-check-circle-fill"></i>Impresa</span>`
+      : `<span class="impr-badge pend"><i class="bi bi-circle"></i>Pendiente</span>`;
+    return `
+      <div class="selected-item">
+        <div class="si-info">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="si-name">${escapeHtml(p.nombre)}</span>
+            ${badge}
+          </div>
+          <div class="si-meta">
+            ${p.talla ? `Talla ${escapeHtml(p.talla)}` : ''}
+            ${p.color ? ` · <span class="si-color-dot" style="background:${colorEspanolACss(p.color)}"></span>${escapeHtml(p.color)}` : ''}
+            · $${parseFloat(p.precio).toFixed(2)}
+          </div>
+          ${info ? `<div class="impr-meta"><i class="bi bi-clock-history"></i> ${fechaRel(info.ts)} · ${info.total} ud${info.total!==1?'s':''}</div>` : ''}
+        </div>
+        <div class="si-qty">
+          <button onclick="cambiarCantidad(${p.id}, -1)" title="Disminuir">−</button>
+          <input type="number" min="0" max="999" value="${item.cantidad}"
+                 onchange="setCantidad(${p.id}, this.value)">
+          <button onclick="cambiarCantidad(${p.id}, 1)" title="Aumentar">+</button>
+        </div>
+        <button class="si-remove" onclick="quitarSeleccionado(${p.id})" title="Quitar">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+    `;
+  }).join('');
+  count.textContent = `${seleccionados.size} variante${seleccionados.size !== 1 ? 's' : ''} · ${total} etiqueta${total !== 1 ? 's' : ''}`;
+}
+
+// === TAMAÑO ===
+function actualizarPaginaImpresion() {
+  // Inyecta @page con el tamaño exacto de la etiqueta para que
+  // la impresora térmica avance una etiqueta por página.
+  let style = document.getElementById('print-page-style');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'print-page-style';
+    document.head.appendChild(style);
+  }
+  style.textContent = `@page { size: ${labelW}mm ${labelH}mm; margin: 0; }`;
+}
+
+// === CLON DE IMPRESIÓN ===
+// Justo antes de imprimir, copiamos solo las etiquetas a un contenedor limpio
+// en body root. Así el resto del DOM (sidebar, headers, secciones) no consume
+// páginas en blanco al paginar el documento al tamaño de etiqueta.
+window.addEventListener('beforeprint', () => {
+  const previewArea = document.getElementById('preview-area');
+  if (!previewArea) return;
+  // Si no hay etiquetas reales (solo el placeholder vacío) no clonamos
+  const labels = previewArea.querySelectorAll('.label');
+  if (!labels.length) return;
+
+  // Quitar clon previo si quedó
+  const existente = document.getElementById('print-clone');
+  if (existente) existente.remove();
+
+  const clone = document.createElement('div');
+  clone.id = 'print-clone';
+  labels.forEach(l => clone.appendChild(l.cloneNode(true)));
+  document.body.appendChild(clone);
+});
+
+window.addEventListener('afterprint', () => {
+  const clone = document.getElementById('print-clone');
+  if (clone) clone.remove();
+});
+
+document.querySelectorAll('.size-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.size-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    card.querySelector('input').checked = true;
+    labelW = parseInt(card.dataset.w);
+    labelH = parseInt(card.dataset.h);
+    labelName = card.dataset.name;
+    actualizarPaginaImpresion();
+    renderPreview();
+  });
+});
+
+// Aplicar tamaño inicial (50x30 default)
+actualizarPaginaImpresion();
+
+// === OPCIONES ===
+['opt-logo','opt-nombre','opt-variante','opt-precio','opt-codigo','opt-negocio'].forEach(id => {
+  document.getElementById(id).addEventListener('change', renderPreview);
+});
+
+// === PREVIEW ===
+function renderPreview() {
+  const area = document.getElementById('preview-area');
+  const total = [...seleccionados.values()].reduce((s, i) => s + i.cantidad, 0);
+
+  // Botón imprimir + contador
+  const btnPrint = document.getElementById('btn-print');
+  document.getElementById('total-count').textContent = total;
+  btnPrint.disabled = total === 0;
+
+  if (total === 0) {
+    area.innerHTML = `
+      <div class="empty-preview">
+        <i class="bi bi-tag" style="font-size:48px;display:block;margin-bottom:12px"></i>
+        <div style="font-weight:700;color:var(--text-1)">Sin etiquetas para mostrar</div>
+        <div style="font-size:13px;margin-top:4px">Agrega productos a la izquierda para verlos aquí</div>
+      </div>`;
+    return;
+  }
+
+  const optLogo     = document.getElementById('opt-logo').checked && !!LOGO_URL;
+  const optNombre   = document.getElementById('opt-nombre').checked;
+  const optVariante = document.getElementById('opt-variante').checked;
+  const optPrecio   = document.getElementById('opt-precio').checked;
+  const optCodigo   = document.getElementById('opt-codigo').checked;
+  const optNegocio  = document.getElementById('opt-negocio').checked;
+
+  // Tamaños relativos según etiqueta
+  const fontName = labelW <= 30 ? '7pt' : labelW <= 50 ? '8pt' : '10pt';
+  const fontPrecio = labelW <= 30 ? '11pt' : labelW <= 50 ? '13pt' : '16pt';
+  const barcodeH = labelH <= 20 ? 8 : labelH <= 30 ? 10 : 14;
+  const barcodeFontSize = labelW <= 30 ? 8 : 10;
+  const logoH = labelH <= 20 ? 4 : labelH <= 30 ? 6 : labelH <= 40 ? 8 : 10;
+
+  const labels = [];
+  [...seleccionados.values()].forEach(item => {
+    for (let i = 0; i < item.cantidad; i++) {
+      labels.push(item.producto);
+    }
+  });
+
+  // Tamaño de talla-tag y variant según etiqueta
+  const fontVariant = labelW <= 30 ? '6pt' : labelW <= 50 ? '7pt' : '8pt';
+
+  area.innerHTML = labels.map((p, idx) => {
+    // Header (logo + nombre del negocio) — combinado en una sola línea cuando hay ambos
+    let headerHtml = '';
+    if (optLogo || optNegocio) {
+      const logoImg = optLogo
+        ? `<img src="${LOGO_URL}" style="height:${logoH}mm;max-width:${Math.min(labelW * 0.35, 16)}mm" alt="">`
+        : '';
+      const businessText = optNegocio
+        ? `<span class="label-business">${escapeHtml(NOMBRE_NEGOCIO)}</span>`
+        : '';
+      headerHtml = `<div class="label-header">${logoImg}${businessText}</div>`;
+    }
+
+    // Nombre del producto
+    const nombreHtml = optNombre
+      ? `<div class="label-name" style="font-size:${fontName}">${escapeHtml(p.nombre)}</div>`
+      : '';
+
+    // Variante (talla como tag negro + color como circulito)
+    let variantHtml = '';
+    if (optVariante && (p.talla || p.color)) {
+      const tallaPart = p.talla ? `<span class="talla-tag">${escapeHtml(p.talla)}</span>` : '';
+      const colorPart = p.color
+        ? `<span class="color-info">
+             <span class="color-dot-print" style="background:${colorEspanolACss(p.color)}"></span>
+             ${escapeHtml(p.color)}
+           </span>`
+        : '';
+      variantHtml = `<div class="label-variant" style="font-size:${fontVariant}">${tallaPart}${colorPart}</div>`;
+    }
+
+    // Precio (destacado)
+    const precioHtml = optPrecio
+      ? `<div class="label-precio" style="font-size:${fontPrecio}">$${parseFloat(p.precio).toFixed(2)}</div>`
+      : '';
+
+    return `
+      <div class="label" style="width:${labelW}mm;height:${labelH}mm">
+        ${headerHtml}
+        ${nombreHtml}
+        ${variantHtml}
+        ${precioHtml}
+        <div class="label-barcode-wrap">
+          <svg class="label-barcode" id="bc-${idx}" style="height:${barcodeH}mm"></svg>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Renderizar barcodes
+  labels.forEach((p, idx) => {
+    try {
+      JsBarcode(`#bc-${idx}`, p.codigo_barras, {
+        format: 'CODE128',
+        displayValue: optCodigo,
+        height: barcodeH * 3,
+        width: 1.4,
+        fontSize: barcodeFontSize,
+        margin: 0,
+        background: '#FFFFFF',
+        lineColor: '#000000',
+      });
+    } catch(e) { console.warn('Barcode error:', e); }
+  });
+}
+
+// === BOTONES ===
+document.getElementById('btn-print').addEventListener('click', () => {
+  if (seleccionados.size === 0) return;
+  // Imprimir primero (window.print() es bloqueante)
+  window.print();
+  // Después marcar como impresas (luego de cerrar el diálogo)
+  setTimeout(() => {
+    const items = [...seleccionados.values()];
+    const variantes = items.length;
+    const totalEt = items.reduce((s,i) => s+i.cantidad, 0);
+    if (confirm(`¿Marcar las ${variantes} variante${variantes!==1?'s':''} (${totalEt} etiqueta${totalEt!==1?'s':''}) como impresas?\n\nEsto actualizará el indicador de progreso.`)) {
+      marcarImpresas(items);
+      renderSeleccionados();
+      renderProgreso();
+      renderQuickActionCounts();
+    }
+  }, 400);
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (seleccionados.size === 0) return;
+  if (confirm('¿Quitar todos los productos de la lista?')) {
+    seleccionados.clear();
+    renderSeleccionados();
+    renderPreview();
+  }
+});
+
+document.getElementById('btn-reset-marcas').addEventListener('click', () => {
+  const data = loadImpr();
+  const cnt = Object.keys(data).length;
+  if (cnt === 0) return alert('No hay marcas de impresión registradas todavía.');
+  if (confirm(`Esto borrará el historial de impresión de ${cnt} variante${cnt!==1?'s':''} (solo en este dispositivo).\n\n¿Continuar?`)) {
+    localStorage.removeItem(IMPR_KEY);
+    renderProgreso();
+    renderSeleccionados();
+    renderResultados();
+    renderQuickActionCounts();
+  }
+});
+
+document.getElementById('opt-solo-pendientes').addEventListener('change', () => {
+  renderResultados();
+  renderQuickActionCounts();
+});
+
+// === CANTIDAD POR DEFECTO ===
+document.querySelectorAll('.qty-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.qty-chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+    const raw = chip.dataset.qty;
+    cantidadPorDefecto = (raw === 'auto') ? 'auto' : parseInt(raw);
+    document.getElementById('qty-custom').value = '';
+  });
+});
+document.getElementById('qty-custom').addEventListener('input', (e) => {
+  const v = parseInt(e.target.value);
+  if (v && v > 0 && v <= 999) {
+    document.querySelectorAll('.qty-chip').forEach(c => c.classList.remove('selected'));
+    cantidadPorDefecto = v;
+  }
+});
+
+// === ACCIONES RÁPIDAS MASIVAS ===
+function getPendientes() {
+  return PRODUCTOS.filter(p => p.codigo_barras && !fueImpresa(p.codigo_barras));
+}
+
+function getImpresas() {
+  return PRODUCTOS.filter(p => p.codigo_barras && fueImpresa(p.codigo_barras));
+}
+function getTodas() {
+  return PRODUCTOS.filter(p => p.codigo_barras);
+}
+
+function renderQuickActionCounts() {
+  const pendientes = getPendientes();
+  const impresas = getImpresas();
+  const todas = getTodas();
+
+  document.getElementById('qa-pendientes-count').textContent = pendientes.length;
+  document.getElementById('qa-pendientes').disabled = pendientes.length === 0;
+  document.getElementById('qa-busqueda-count').textContent = ultimasMatches.length;
+  document.getElementById('qa-busqueda').disabled = ultimasMatches.length === 0;
+
+  document.getElementById('qp-pendientes-count').textContent = pendientes.length;
+  document.getElementById('qp-pendientes').disabled = pendientes.length === 0;
+  document.getElementById('qp-todo-count').textContent = todas.length;
+  document.getElementById('qp-todo').disabled = todas.length === 0;
+  document.getElementById('qp-reimprimir-count').textContent = impresas.length;
+  document.getElementById('qp-reimprimir').disabled = impresas.length === 0;
+}
+
+function descripcionCantidad() {
+  return cantidadPorDefecto === 'auto'
+    ? 'según el stock disponible de cada una'
+    : `${cantidadPorDefecto} ud${cantidadPorDefecto!==1?'s':''} c/u`;
+}
+
+document.getElementById('qa-pendientes').addEventListener('click', () => {
+  const pendientes = getPendientes();
+  if (!pendientes.length) return;
+  if (!confirm(`Agregar ${pendientes.length} variante${pendientes.length!==1?'s':''} pendiente${pendientes.length!==1?'s':''} al carrito (${descripcionCantidad()})?`)) return;
+  agregarMultiples(pendientes.map(p => p.id));
+});
+
+document.getElementById('qa-busqueda').addEventListener('click', () => {
+  if (!ultimasMatches.length) return;
+  if (!confirm(`Agregar ${ultimasMatches.length} variante${ultimasMatches.length!==1?'s':''} visible${ultimasMatches.length!==1?'s':''} al carrito (${descripcionCantidad()})?`)) return;
+  agregarMultiples(ultimasMatches.map(p => p.id));
+});
+
+// === IMPRESIÓN RÁPIDA (1 click con cuenta regresiva) ===
+const printBanner = document.getElementById('print-banner');
+let printCountdownTimer = null;
+let printCountdownActive = false;
+
+function ocultarBannerImpresion() {
+  printBanner.classList.remove('visible');
+  if (printCountdownTimer) {
+    clearInterval(printCountdownTimer);
+    printCountdownTimer = null;
+  }
+  printCountdownActive = false;
+}
+
+function iniciarImpresion(autoMarcar) {
+  ocultarBannerImpresion();
+
+  // Listener temporal para detectar cuando se cierre el diálogo
+  window.print();
+
+  setTimeout(() => {
+    if (!autoMarcar) return;
+    const items = [...seleccionados.values()];
+    if (!items.length) return;
+    const variantes = items.length;
+    const totalEt = items.reduce((s, i) => s + i.cantidad, 0);
+    if (confirm(`¿Marcar las ${variantes} variante${variantes!==1?'s':''} (${totalEt} etiqueta${totalEt!==1?'s':''}) como impresas?\n\nElige "Cancelar" si la impresión falló o cancelaste.`)) {
+      marcarImpresas(items);
+      renderSeleccionados();
+      renderProgreso();
+      renderQuickActionCounts();
+      renderResultados();
+    }
+  }, 500);
+}
+
+function imprimirRapido(productos, etiqueta, autoMarcar = true) {
+  if (!productos.length) {
+    alert(`No hay variantes ${etiqueta}.`);
+    return;
+  }
+
+  if (seleccionados.size > 0) {
+    if (!confirm(`Tu carrito actual (${seleccionados.size} variante${seleccionados.size!==1?'s':''}) se reemplazará por: ${etiqueta}.\n\n¿Continuar?`)) return;
+  }
+
+  // Reemplazar selección y renderizar preview
+  seleccionados.clear();
+  productos.forEach(p => {
+    seleccionados.set(p.id, { producto: p, cantidad: resolverCantidad(p) });
+  });
+  renderSeleccionados();
+  renderPreview();
+
+  // Scroll suave al preview para que el usuario lo vea
+  document.getElementById('preview-area').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Mostrar banner de cuenta regresiva (3 segundos por defecto)
+  let segundos = 3;
+  const elCount = document.getElementById('banner-count');
+  const elPlural = document.getElementById('banner-plural');
+  elCount.textContent = segundos;
+  elPlural.textContent = 's';
+
+  // Mostrar banner con animación
+  setTimeout(() => printBanner.classList.add('visible'), 300);
+
+  printCountdownActive = true;
+  printCountdownTimer = setInterval(() => {
+    segundos -= 1;
+    if (segundos <= 0) {
+      clearInterval(printCountdownTimer);
+      printCountdownTimer = null;
+      if (printCountdownActive) {
+        iniciarImpresion(autoMarcar);
+      }
+      return;
+    }
+    elCount.textContent = segundos;
+    elPlural.textContent = segundos === 1 ? '' : 's';
+  }, 1000);
+
+  // Configurar botones del banner para esta sesión
+  document.getElementById('banner-imprimir').onclick = () => iniciarImpresion(autoMarcar);
+  document.getElementById('banner-cancelar').onclick = ocultarBannerImpresion;
+}
+
+document.getElementById('qp-pendientes').addEventListener('click', () => {
+  imprimirRapido(getPendientes(), 'pendientes', true);
+});
+
+document.getElementById('qp-todo').addEventListener('click', () => {
+  imprimirRapido(getTodas(), 'del catálogo', true);
+});
+
+document.getElementById('qp-reimprimir').addEventListener('click', () => {
+  // Las ya impresas: re-imprimimos pero NO actualizamos el timestamp ni sumamos al contador
+  imprimirRapido(getImpresas(), 'ya impresas (reimpresión)', false);
+});
+
+// === PROGRESO GLOBAL ===
+function renderProgreso() {
+  const conCodigo = PRODUCTOS.filter(p => p.codigo_barras);
+  const total = conCodigo.length;
+  if (total === 0) {
+    document.getElementById('progress-card').style.display = 'none';
+    return;
+  }
+  const data = loadImpr();
+  const impresas = conCodigo.filter(p => data[p.codigo_barras]).length;
+  const pendientes = total - impresas;
+  const pct = Math.round((impresas / total) * 100);
+
+  document.getElementById('pg-pct').textContent = pct + '%';
+  document.getElementById('pg-impresas').textContent = impresas;
+  document.getElementById('pg-pendientes').textContent = pendientes;
+  document.getElementById('pg-total').textContent = total;
+  document.getElementById('pg-bar').style.width = pct + '%';
+}
+
+// === PRESELECCIÓN desde querystring ===
+if (PRESELECT_VARIANTE) {
+  agregarSeleccionado(parseInt(PRESELECT_VARIANTE));
+} else if (PRESELECT_PRODUCTO) {
+  PRODUCTOS.forEach(p => {
+    if (String(p.catalogo_id) === PRESELECT_PRODUCTO && p.codigo_barras) {
+      agregarSeleccionado(p.id);
+    }
+  });
+}
+
+// Inicializar lista de matches con todos los con-código (para que el contador de "visibles" tenga sentido inicial)
+ultimasMatches = PRODUCTOS.filter(p => p.codigo_barras);
+
+renderSeleccionados();
+renderPreview();
+renderProgreso();
+renderQuickActionCounts();
+</script>
+{% endblock %}

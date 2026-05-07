@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load color_filters %}
 {% block title %}{{ catalogo.nombre }} — Inventario{% endblock %}
 {% block nav_inventario %}active{% endblock %}
 {% block page_title %}{{ catalogo.nombre }}{% endblock %}
@@ -13,7 +14,10 @@
     </div>
   </div>
   {% if user.puede_gestionar_inventario %}
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'imprimir_etiquetas' %}?producto={{ catalogo.pk }}" class="btn btn-outline-secondary">
+      <i class="bi bi-printer me-1"></i>Imprimir etiquetas
+    </a>
     <a href="{% url 'agregar_variante' catalogo.pk %}" class="btn btn-primary">
       <i class="bi bi-plus-lg me-1"></i>Agregar variante
     </a>
@@ -63,8 +67,10 @@
       <div class="col-sm-4">
         <div class="kpi-card h-100">
           <div class="kpi-icon amber"><i class="bi bi-tag"></i></div>
-          <div class="kpi-label">Precio base</div>
-          <div class="kpi-value" style="font-size:22px">${{ catalogo.precio_base|floatformat:2 }}</div>
+          <div class="kpi-label">Rango de precio</div>
+          <div class="kpi-value" style="font-size:18px">
+            ${{ catalogo.precio_minimo|floatformat:2 }} <span style="color:var(--text-muted);font-weight:400">→</span> ${{ catalogo.precio_maximo|floatformat:2 }}
+          </div>
         </div>
       </div>
       {% if catalogo.descripcion %}
@@ -110,7 +116,7 @@
           <td>
             {% if v.color %}
             <span class="d-flex align-items-center gap-2">
-              <span style="width:14px;height:14px;border-radius:50%;background:{{ v.color|lower }};border:1px solid var(--border);flex-shrink:0"></span>
+              <span style="width:14px;height:14px;border-radius:50%;background:{{ v.color|color_css }};border:1px solid var(--border);flex-shrink:0"></span>
               {{ v.color }}
             </span>
             {% else %}—{% endif %}
@@ -121,12 +127,10 @@
             <div class="d-flex align-items-center gap-2">
               <svg class="barcode" data-code="{{ v.codigo_barras }}" style="height:28px"></svg>
               {% if not user.es_vendedor %}
-              <button class="btn btn-sm btn-outline-secondary btn-icon imprimir-etiqueta"
-                      data-nombre="{{ catalogo.nombre }}" data-talla="{{ v.talla }}"
-                      data-color="{{ v.color }}" data-precio="{{ v.precio }}"
-                      data-codigo="{{ v.codigo_barras }}" title="Imprimir etiqueta">
+              <a href="{% url 'imprimir_etiquetas' %}?variante={{ v.pk }}"
+                 class="btn btn-sm btn-outline-secondary btn-icon" title="Imprimir etiqueta">
                 <i class="bi bi-printer"></i>
-              </button>
+              </a>
               {% endif %}
             </div>
             <div style="font-size:10px;color:var(--text-muted);margin-top:2px">{{ v.codigo_barras }}</div>

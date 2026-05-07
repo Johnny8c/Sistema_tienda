@@ -26,28 +26,41 @@
             <input type="text" name="nombre" class="form-control" required autofocus
                    value="{{ catalogo.nombre|default:f.nombre|default:'' }}">
           </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Categoría</label>
+            <select name="categoria" class="form-select">
+              {% for val, label in categorias %}
+              <option value="{{ val }}"
+                {% if catalogo.categoria == val %}selected
+                {% elif f.categoria == val %}selected{% endif %}>
+                {{ label }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Rango de precio (mínimo y máximo) -->
           <div class="row g-2 mb-3">
             <div class="col">
-              <label class="form-label fw-semibold">Categoría</label>
-              <select name="categoria" class="form-select">
-                {% for val, label in categorias %}
-                <option value="{{ val }}"
-                  {% if catalogo.categoria == val %}selected
-                  {% elif f.categoria == val %}selected{% endif %}>
-                  {{ label }}
-                </option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col">
-              <label class="form-label fw-semibold">Precio base <span class="text-danger">*</span></label>
+              <label class="form-label fw-semibold">Precio mínimo <span class="text-danger">*</span></label>
               <div class="input-group">
                 <span class="input-group-text">$</span>
-                <input type="number" name="precio_base" class="form-control" step="0.01" min="0" required
-                       value="{{ catalogo.precio_base|unlocalize|default:f.precio_base|default:'' }}">
+                <input type="number" name="precio_minimo" class="form-control" step="0.01" min="0" required
+                       value="{{ catalogo.precio_minimo|unlocalize|default:f.precio_minimo|default:'' }}">
               </div>
+              <div class="form-text">No se podrá vender por debajo de este precio.</div>
+            </div>
+            <div class="col">
+              <label class="form-label fw-semibold">Precio máximo <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" name="precio_maximo" class="form-control" step="0.01" min="0" required
+                       value="{{ catalogo.precio_maximo|unlocalize|default:f.precio_maximo|default:'' }}">
+              </div>
+              <div class="form-text">Precio sugerido máximo de venta.</div>
             </div>
           </div>
+
           <div class="mb-0">
             <label class="form-label fw-semibold">Descripción</label>
             <textarea name="descripcion" class="form-control" rows="3"
@@ -89,26 +102,17 @@
         <div class="card-header">Primera variante <span class="text-muted fw-normal small">(podrás agregar más después)</span></div>
         <div class="card-body">
           <div class="row g-2">
-            <div class="col-sm-3">
+            <div class="col-sm-4">
               <label class="form-label fw-semibold">Color</label>
               <input type="text" name="color" class="form-control" placeholder="Ej: Azul, Rojo…"
                      value="{{ f.color|default:'' }}">
             </div>
-            <div class="col-sm-3">
+            <div class="col-sm-4">
               <label class="form-label fw-semibold">Talla</label>
               <input type="text" name="talla" class="form-control" placeholder="S, M, L, 32…"
                      value="{{ f.talla|default:'' }}">
             </div>
-            <div class="col-sm-3">
-              <label class="form-label fw-semibold">Precio variante</label>
-              <div class="input-group">
-                <span class="input-group-text">$</span>
-                <input type="number" name="precio" class="form-control" step="0.01" min="0"
-                       id="precio-variante" value="{{ f.precio|default:'' }}"
-                       placeholder="Igual al base">
-              </div>
-            </div>
-            <div class="col-sm-3">
+            <div class="col-sm-4">
               <label class="form-label fw-semibold">Stock inicial</label>
               <input type="number" name="stock" class="form-control" min="0"
                      value="{{ f.stock|default:'0' }}">
@@ -148,14 +152,5 @@
     };
     reader.readAsDataURL(file);
   });
-
-  // Precio variante = precio base por defecto
-  const precioBase = document.querySelector('[name="precio_base"]');
-  const precioVar  = document.getElementById('precio-variante');
-  if (precioBase && precioVar) {
-    precioBase.addEventListener('input', () => {
-      if (!precioVar.value) precioVar.placeholder = precioBase.value;
-    });
-  }
 </script>
 {% endblock %}

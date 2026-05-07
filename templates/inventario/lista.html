@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load color_filters %}
 {% block title %}Inventario{% endblock %}
 {% block nav_inventario %}active{% endblock %}
 {% block page_title %}Inventario{% endblock %}
@@ -10,8 +11,7 @@
     border: 1px solid var(--border);
     border-radius: 14px;
     overflow: hidden;
-    transition: box-shadow .2s, transform .2s;
-    cursor: pointer;
+    transition: box-shadow .2s, transform .2s, border-color .2s;
     text-decoration: none;
     color: inherit;
     display: flex;
@@ -21,34 +21,91 @@
     box-shadow: 0 8px 24px rgba(0,0,0,.12);
     transform: translateY(-2px);
     color: inherit;
+    border-color: var(--primary);
   }
   [data-theme="dark"] .producto-card:hover {
     box-shadow: 0 8px 32px rgba(0,0,0,.5);
   }
+
   .producto-foto {
-    width: 100%; aspect-ratio: 1;
-    object-fit: cover; background: var(--table-head-bg);
-    display: flex; align-items: center; justify-content: center;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #FAFAFA;
+    overflow: hidden;
+    position: relative;
     flex-shrink: 0;
   }
-  .producto-foto img { width: 100%; height: 100%; object-fit: cover; }
+  [data-theme="dark"] .producto-foto { background: rgba(255,255,255,.04); }
+  .producto-foto img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    padding: 10px;
+    display: block;
+    transition: transform .25s ease;
+  }
+  .producto-card:hover .producto-foto img { transform: scale(1.05); }
   .producto-foto-placeholder {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
     color: var(--border); font-size: 48px;
   }
+
   .producto-info { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; }
-  .producto-nombre { font-weight: 700; font-size: 14px; color: var(--text-1); margin-bottom: 4px; }
-  .producto-cat {
-    font-size: 11px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: .06em; color: var(--text-muted); margin-bottom: 10px;
+  .producto-nombre {
+    font-weight: 700; font-size: 14px; color: var(--text-1);
+    margin-bottom: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .producto-precio { font-size: 16px; font-weight: 700; color: var(--primary); }
-  .producto-stock {
-    margin-top: auto; padding-top: 10px;
+  .producto-cat {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .producto-precio { font-size: 16px; font-weight: 800; color: var(--primary); margin-bottom: 10px; }
+
+  /* Tallas chips */
+  .tallas-row {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin-bottom: 8px;
+  }
+  .talla-chip {
+    font-size: 10px; font-weight: 700;
+    padding: 2px 7px; border-radius: 4px;
+    background: var(--table-head-bg);
+    color: var(--text-2);
+    border: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+
+  /* Colores dots */
+  .colores-row {
+    display: flex; flex-wrap: wrap; gap: 4px;
+    margin-bottom: 10px;
+    align-items: center;
+  }
+  .color-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1.5px solid var(--card-bg);
+    box-shadow: 0 0 0 1px var(--border);
+    display: inline-block;
+  }
+  .colores-row-label {
+    font-size: 10px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .05em;
+    margin-right: 4px;
+  }
+
+  /* Footer con stats + CTA */
+  .producto-meta {
+    margin-top: auto;
+    padding-top: 10px;
     border-top: 1px solid var(--border);
     display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px;
   }
   .stock-chip {
-    font-size: 12px; font-weight: 600;
+    font-size: 11px; font-weight: 700;
     padding: 3px 8px; border-radius: 6px;
   }
   .stock-ok   { background: #DCFCE7; color: #15803D; }
@@ -57,6 +114,26 @@
   [data-theme="dark"] .stock-ok   { background: rgba(21,128,61,.2);  color: #86EFAC; }
   [data-theme="dark"] .stock-low  { background: rgba(146,64,14,.2);  color: #FCD34D; }
   [data-theme="dark"] .stock-zero { background: rgba(153,27,27,.2);  color: #FCA5A5; }
+
+  .producto-cta {
+    width: 100%;
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--table-head-bg);
+    color: var(--text-1);
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .producto-card:hover .producto-cta {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+  }
+  .producto-cta i { transition: transform .15s; }
+  .producto-card:hover .producto-cta i { transform: translateX(3px); }
 </style>
 {% endblock %}
 
@@ -71,6 +148,9 @@
       <i class="bi bi-upc-scan me-1"></i>Consultar precio
     </a>
     {% if user.puede_gestionar_inventario %}
+    <a href="{% url 'imprimir_etiquetas' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-printer me-1"></i>Imprimir etiquetas
+    </a>
     <a href="{% url 'crear_producto' %}" class="btn btn-primary">
       <i class="bi bi-plus-lg me-1"></i>Nuevo producto
     </a>
@@ -101,9 +181,9 @@
 
 <!-- Grid de productos -->
 {% if catalogos %}
-<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px">
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px">
   {% for c in catalogos %}
-  {% with stock=c.stock_total_disponible variantes_count=c.variantes.count %}
+  {% with stock=c.stock_total_disponible variantes_count=c.variantes.count pmin=c.precio_min pmax=c.precio_max %}
   <a href="{% url 'detalle_producto' c.pk %}" class="producto-card">
     <div class="producto-foto">
       {% if c.foto %}
@@ -113,16 +193,51 @@
       {% endif %}
     </div>
     <div class="producto-info">
-      <div class="producto-nombre">{{ c.nombre }}</div>
+      <div class="producto-nombre" title="{{ c.nombre }}">{{ c.nombre }}</div>
       <div class="producto-cat">{{ c.get_categoria_display }}</div>
-      <div class="producto-precio">${{ c.precio_base|floatformat:2 }}</div>
-      <div class="producto-stock">
+
+      <div class="producto-precio">
+        {% if pmin == pmax %}
+          ${{ pmin|floatformat:2 }}
+        {% else %}
+          ${{ pmin|floatformat:2 }} <span style="color:var(--text-muted);font-weight:400">→</span> ${{ pmax|floatformat:2 }}
+        {% endif %}
+      </div>
+
+      {% if c.tallas_unicas %}
+      <div class="tallas-row">
+        {% for t in c.tallas_unicas|slice:":5" %}
+        <span class="talla-chip">{{ t }}</span>
+        {% endfor %}
+        {% if c.tallas_unicas|length > 5 %}
+        <span class="talla-chip" style="background:transparent">+{{ c.tallas_unicas|length|add:"-5" }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if c.colores_unicos %}
+      <div class="colores-row">
+        <span class="colores-row-label">{{ c.colores_unicos|length }} color{{ c.colores_unicos|length|pluralize:"es" }}</span>
+        {% for col in c.colores_unicos|slice:":6" %}
+        <span class="color-dot" style="background: {{ col|color_css }}" title="{{ col }}"></span>
+        {% endfor %}
+        {% if c.colores_unicos|length > 6 %}
+        <span style="font-size:10px;color:var(--text-muted)">+{{ c.colores_unicos|length|add:"-6" }}</span>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="producto-meta">
         <span style="font-size:11px;color:var(--text-muted)">
           {{ variantes_count }} variante{{ variantes_count|pluralize }}
         </span>
         <span class="stock-chip {% if stock == 0 %}stock-zero{% elif stock <= config_general.stock_minimo_alerta %}stock-low{% else %}stock-ok{% endif %}">
           {{ stock }} uds.
         </span>
+      </div>
+
+      <div class="producto-cta">
+        Ver detalles <i class="bi bi-arrow-right ms-1"></i>
       </div>
     </div>
   </a>

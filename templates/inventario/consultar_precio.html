@@ -1,121 +1,667 @@
 {% extends 'base.html' %}
+{% load color_filters %}
 {% block title %}Consultar precio{% endblock %}
 {% block nav_consultar %}active{% endblock %}
 {% block page_title %}Consultar precio{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Container centrado y mobile-first */
+  .consulta-wrap {
+    max-width: 540px;
+    margin: 0 auto;
+  }
+
+  /* === ACCIÓN PRINCIPAL: CÁMARA === */
+  .scan-action {
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    border-radius: 18px;
+    padding: 28px 20px;
+    color: #fff;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(79,70,229,.25);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .scan-action::after {
+    content: ''; position: absolute;
+    top: -50%; right: -30%; width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(255,255,255,.15) 0%, transparent 70%);
+  }
+
+  .scan-icon {
+    width: 84px; height: 84px;
+    margin: 0 auto 14px;
+    background: rgba(255,255,255,.18);
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 38px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .scan-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; position: relative; z-index: 1; }
+  .scan-sub   { font-size: 13.5px; opacity: .9; margin-bottom: 18px; position: relative; z-index: 1; }
+
+  .btn-scan {
+    width: 100%;
+    background: #fff;
+    color: #4F46E5;
+    border: none;
+    border-radius: 12px;
+    padding: 16px;
+    font-weight: 700;
+    font-size: 16px;
+    transition: transform .15s, box-shadow .15s;
+    position: relative; z-index: 1;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-scan:active { transform: scale(.98); }
+  .btn-scan:hover { box-shadow: 0 6px 16px rgba(0,0,0,.2); }
+
+  /* Cámara expandida */
+  #reader {
+    width: 100%; max-width: 480px; margin: 14px auto 0;
+    border-radius: 14px; overflow: hidden;
+    background: #000;
+    display: none;
+  }
+  #reader.active { display: block; }
+  #reader video { width: 100% !important; }
+
+  /* === DIVISOR "O" === */
+  .divider-o {
+    display: flex; align-items: center; gap: 12px;
+    margin: 14px 0;
+    color: var(--text-muted);
+    font-size: 12px; font-weight: 600;
+  }
+  .divider-o::before, .divider-o::after {
+    content: ''; flex: 1; height: 1px;
+    background: var(--border);
+  }
+
+  /* === BÚSQUEDA MANUAL === */
+  .manual-card {
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 6px;
+    display: flex; gap: 6px; align-items: center;
+    transition: border-color .15s, box-shadow .15s;
+    margin-bottom: 22px;
+  }
+  .manual-card:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(79,70,229,.12);
+  }
+  .manual-card input {
+    flex: 1;
+    border: none; outline: none; background: transparent;
+    padding: 10px 14px;
+    font-size: 15px; font-weight: 500;
+    color: var(--text-1);
+    min-width: 0;
+  }
+  .manual-card input::placeholder { color: var(--text-muted); }
+  .manual-card .btn-buscar {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 16px;
+    font-weight: 700; font-size: 14px;
+    flex-shrink: 0;
+  }
+  .manual-card .btn-buscar:active { transform: scale(.96); }
+
+  /* === RESULTADO === */
+  .resultado-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    animation: slideUp .3s ease;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .res-foto {
+    width: 100%;
+    aspect-ratio: 1.3 / 1;
+    background: #FAFAFA;
+    overflow: hidden; position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  [data-theme="dark"] .res-foto { background: rgba(255,255,255,.03); }
+  .res-foto img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain; padding: 18px;
+  }
+  .res-foto-placeholder {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--border); font-size: 56px;
+  }
+
+  .res-stock-badge {
+    position: absolute; top: 14px; right: 14px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+    box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    backdrop-filter: blur(8px);
+  }
+  .stock-ok   { background: rgba(220,252,231,.95); color: #15803D; }
+  .stock-low  { background: rgba(254,243,199,.95); color: #92400E; }
+  .stock-zero { background: rgba(254,226,226,.95); color: #991B1B; }
+
+  .res-body { padding: 22px 20px 16px; }
+
+  .res-cat {
+    display: inline-block;
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--primary);
+    background: rgba(79,70,229,.1);
+    padding: 4px 10px; border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .res-nombre {
+    font-size: 22px; font-weight: 800;
+    color: var(--text-1);
+    line-height: 1.25; margin-bottom: 8px;
+  }
+  .res-variant-row {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+  .res-talla {
+    font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 4px;
+    background: var(--table-head-bg); border: 1px solid var(--border);
+    color: var(--text-2); text-transform: uppercase;
+  }
+
+  /* PRECIO ENORME */
+  .res-precio-block {
+    text-align: center;
+    padding: 20px 12px;
+    background: linear-gradient(135deg, rgba(79,70,229,.06), rgba(124,58,237,.08));
+    border: 1px solid rgba(79,70,229,.18);
+    border-radius: 14px;
+    margin-bottom: 14px;
+  }
+  .res-precio-label {
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .1em; font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .res-precio {
+    font-size: 56px; font-weight: 900;
+    color: var(--primary);
+    line-height: 1; letter-spacing: -.02em;
+  }
+  .res-rango {
+    margin-top: 10px; font-size: 12.5px; color: var(--text-2);
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    background: rgba(255,255,255,.5);
+    border-radius: 20px;
+  }
+  [data-theme="dark"] .res-rango { background: rgba(0,0,0,.2); }
+  .res-rango b { color: var(--text-1); }
+
+  /* Stock detallado */
+  .res-stock-info {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px;
+    background: var(--table-head-bg);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .res-stock-info .label { color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; }
+  .res-stock-info .value { font-weight: 700; color: var(--text-1); font-size: 15px; }
+
+  .res-codigo {
+    text-align: center;
+    font-family: monospace;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    padding: 8px;
+    background: var(--table-head-bg);
+    border-radius: 8px;
+    margin-bottom: 14px;
+  }
+
+  .res-actions {
+    display: flex; gap: 8px;
+  }
+  .res-actions .btn-primary, .res-actions .btn-outline-secondary {
+    padding: 12px 14px;
+    font-size: 14px; font-weight: 700;
+  }
+
+  /* Empty state minimalista */
+  .empty-state {
+    text-align: center;
+    padding: 24px 12px 12px;
+    color: var(--text-muted);
+    font-size: 13.5px;
+  }
+  .empty-state .arrow {
+    font-size: 24px; color: var(--primary);
+    animation: bounce 1.5s infinite;
+    display: block;
+    margin-bottom: 8px;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  /* No encontrado compacto */
+  .no-encontrado {
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.25);
+    border-radius: 14px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  /* === RECIENTES === */
+  .recientes-section { margin-top: 24px; }
+  .recientes-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px;
+    padding: 0 4px;
+  }
+  .recientes-list {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .reciente-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color .15s, transform .15s;
+    text-decoration: none;
+    color: inherit;
+  }
+  .reciente-item:active { transform: scale(.98); }
+  .reciente-item:hover { border-color: var(--primary); color: inherit; }
+  .reciente-foto-mini {
+    width: 48px; height: 48px;
+    border-radius: 10px;
+    background: #FAFAFA;
+    overflow: hidden; flex-shrink: 0;
+    position: relative;
+  }
+  [data-theme="dark"] .reciente-foto-mini { background: rgba(255,255,255,.05); }
+  .reciente-foto-mini img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: contain; padding: 4px;
+  }
+  .reciente-foto-mini i {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--border); font-size: 22px;
+  }
+  .reciente-info { flex: 1; min-width: 0; }
+  .reciente-nombre {
+    font-size: 14px; font-weight: 700; color: var(--text-1);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .reciente-codigo {
+    font-family: monospace; font-size: 11px; color: var(--text-muted);
+  }
+  .reciente-precio {
+    font-size: 16px; font-weight: 800;
+    color: var(--primary);
+    flex-shrink: 0;
+  }
+
+  /* Tablet/desktop: dos columnas con resultado al lado */
+  @media (min-width: 992px) {
+    .consulta-wrap { max-width: 720px; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1 class="page-header-title">Consultar precio</h1>
+  <div>
+    <h1 class="page-header-title">Consultar precio</h1>
+    <p class="page-header-sub">Escanea con la cámara del celular y ve el precio al instante</p>
+  </div>
 </div>
 
-<!-- Escáner de cámara -->
-<div class="card border-0 shadow-sm mb-3" style="max-width:480px; margin:auto">
-  <div class="card-body">
-    <div id="reader" style="width:100%; border-radius:8px; overflow:hidden"></div>
-    <div class="text-center mt-2">
-      <button id="btn-iniciar" class="btn btn-dark"><i class="bi bi-camera"></i> Activar cámara</button>
-      <button id="btn-detener" class="btn btn-outline-secondary d-none">Detener cámara</button>
+<div class="consulta-wrap">
+
+  <!-- ACCIÓN PRINCIPAL: ESCANEAR -->
+  <div class="scan-action">
+    <div class="scan-icon"><i class="bi bi-upc-scan"></i></div>
+    <div class="scan-title">Escanea el código</div>
+    <div class="scan-sub">Apunta con la cámara al código de barras del producto</div>
+    <button class="btn-scan" id="btn-iniciar">
+      <i class="bi bi-camera-fill"></i>
+      <span>Activar cámara</span>
+    </button>
+    <button class="btn-scan d-none" id="btn-detener" style="background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.4)">
+      <i class="bi bi-stop-circle-fill"></i>
+      <span>Detener cámara</span>
+    </button>
+  </div>
+
+  <div id="reader"></div>
+
+  <!-- Divisor -->
+  <div class="divider-o">o ingresa el código</div>
+
+  <!-- BÚSQUEDA MANUAL -->
+  <div class="manual-card">
+    <input type="text" id="codigo-manual" placeholder="Ej. TDA-000001" inputmode="text">
+    <button class="btn-buscar" id="btn-buscar-manual">
+      <i class="bi bi-search"></i>
+    </button>
+  </div>
+
+  <!-- Empty state inicial: solo flecha + tip -->
+  <div id="empty-state" class="empty-state">
+    <i class="bi bi-arrow-up arrow"></i>
+    Pulsa <b style="color:var(--primary)">Activar cámara</b> o escribe un código
+  </div>
+
+  <!-- RESULTADO -->
+  <div id="resultado" style="display:none">
+    <div class="resultado-card">
+      <div class="res-foto" id="res-foto">
+        <span class="res-stock-badge" id="res-stock-badge">0 uds.</span>
+      </div>
+
+      <div class="res-body">
+        <div id="res-cat-wrap"></div>
+        <div class="res-nombre" id="res-nombre">—</div>
+        <div class="res-variant-row" id="res-variant"></div>
+
+        <div class="res-precio-block">
+          <div class="res-precio-label">Precio de venta</div>
+          <div class="res-precio text-money" id="res-precio">$0.00</div>
+          <div id="res-rango-wrap" style="display:none">
+            <span class="res-rango">
+              <i class="bi bi-arrows-collapse-vertical"></i>
+              <b id="res-rango-min">$0</b>&nbsp;–&nbsp;<b id="res-rango-max">$0</b>
+            </span>
+          </div>
+        </div>
+
+        <div class="res-stock-info">
+          <span class="label"><i class="bi bi-box-seam"></i>Disponibles</span>
+          <span class="value" id="res-stock-text">0 uds.</span>
+        </div>
+
+        <div class="res-codigo" id="res-codigo">—</div>
+
+        <div class="res-actions">
+          <a id="res-link-detalle" href="#" class="btn btn-primary flex-fill">
+            <i class="bi bi-eye me-1"></i>Ver ficha
+          </a>
+          <button class="btn btn-outline-secondary flex-fill" id="btn-otra-busqueda">
+            <i class="bi bi-arrow-repeat me-1"></i>Otra
+          </button>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Búsqueda manual por código -->
-<div class="card border-0 shadow-sm mb-3" style="max-width:480px; margin:auto">
-  <div class="card-body">
-    <label class="form-label fw-semibold small">O ingresa el código manualmente</label>
-    <div class="input-group">
-      <input type="text" id="codigo-manual" class="form-control" placeholder="TDA-000001">
-      <button class="btn btn-outline-secondary" id="btn-buscar-manual"><i class="bi bi-search"></i></button>
+  <!-- No encontrado -->
+  <div id="no-encontrado" style="display:none">
+    <div class="no-encontrado">
+      <div style="font-size:32px;color:#DC2626;margin-bottom:6px"><i class="bi bi-search-heart"></i></div>
+      <div style="font-size:15px;font-weight:800;color:#991B1B;margin-bottom:4px">Producto no encontrado</div>
+      <div style="color:#7F1D1D;font-size:13px;margin-bottom:14px">El código no existe o el producto está inactivo.</div>
+      <button class="btn btn-outline-primary btn-sm" id="btn-otra-busqueda-2">
+        <i class="bi bi-arrow-left me-1"></i>Intentar otro código
+      </button>
     </div>
   </div>
-</div>
 
-<!-- Resultado -->
-<div id="resultado" style="display:none; max-width:480px; margin:auto">
-  <div class="card border-0 shadow-sm" id="card-resultado">
-    <div class="card-body text-center py-4">
-      <div id="res-foto"></div>
-      <div class="fs-5 fw-bold mb-1" id="res-nombre"></div>
-      <div class="text-muted small mb-3" id="res-detalle"></div>
-      <div class="display-5 fw-bold text-dark mb-2" id="res-precio"></div>
-      <div class="mb-1" id="res-stock"></div>
-      <div class="text-muted small" id="res-codigo"></div>
+  <!-- RECIENTES -->
+  <div class="recientes-section" id="recientes-card" style="display:none">
+    <div class="recientes-header">
+      <div class="d-flex align-items-center gap-2">
+        <i class="bi bi-clock-history" style="color:var(--text-muted)"></i>
+        <strong style="font-size:13px;color:var(--text-1)">Consultados recientemente</strong>
+      </div>
+      <button class="btn btn-sm" id="btn-limpiar-recientes"
+              style="font-size:11px;padding:4px 10px;color:var(--text-muted);background:transparent;border:none">
+        <i class="bi bi-trash me-1"></i>Limpiar
+      </button>
     </div>
+    <div class="recientes-list" id="recientes-list"></div>
   </div>
-</div>
 
-<div id="no-encontrado" style="display:none; max-width:480px; margin:auto">
-  <div class="alert alert-warning text-center">
-    <i class="bi bi-exclamation-triangle"></i> Producto no encontrado para ese código.
-  </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
+const RECIENTES_KEY = 'consulta_precio_recientes';
+const MAX_RECIENTES = 6;
+const SONIDO_ESCANEO = {{ config_general.sonido_escaneo|yesno:"true,false" }};
 let scanner = null;
+let _audioCtx = null;
+function beep(ok = true) {
+  if (!SONIDO_ESCANEO) return;
+  try {
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = _audioCtx.createOscillator();
+    const g = _audioCtx.createGain();
+    o.connect(g); g.connect(_audioCtx.destination);
+    o.type = 'square';
+    o.frequency.value = ok ? 1200 : 350;
+    g.gain.setValueAtTime(0.0001, _audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.18, _audioCtx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, _audioCtx.currentTime + 0.12);
+    o.start();
+    o.stop(_audioCtx.currentTime + 0.13);
+  } catch(e) {}
+}
 
+const elEmpty   = document.getElementById('empty-state');
+const elRes     = document.getElementById('resultado');
+const elNoEnc   = document.getElementById('no-encontrado');
+const elReader  = document.getElementById('reader');
+const btnIni    = document.getElementById('btn-iniciar');
+const btnDet    = document.getElementById('btn-detener');
+
+// === Búsqueda ===
 async function buscarCodigo(codigo) {
-  document.getElementById('resultado').style.display = 'none';
-  document.getElementById('no-encontrado').style.display = 'none';
+  elEmpty.style.display = 'none';
+  elRes.style.display = 'none';
+  elNoEnc.style.display = 'none';
 
-  const resp = await fetch(`{% url 'api_buscar_codigo' %}?codigo=${encodeURIComponent(codigo)}`);
-  const data = await resp.json();
+  try {
+    const resp = await fetch(`{% url 'api_buscar_codigo' %}?codigo=${encodeURIComponent(codigo)}`);
+    const data = await resp.json();
+    if (data.encontrado) { renderResultado(data); beep(true); }
+    else { elNoEnc.style.display = ''; beep(false); }
+  } catch (e) {
+    elNoEnc.style.display = '';
+    beep(false);
+  }
 
-  if (data.encontrado) {
-    document.getElementById('res-nombre').textContent = data.nombre;
-    document.getElementById('res-detalle').textContent = [data.talla, data.color].filter(Boolean).join(' · ');
-    document.getElementById('res-precio').textContent = '$' + parseFloat(data.precio).toFixed(2);
+  // Vibración táctil al encontrar/no encontrar (móvil)
+  if (navigator.vibrate) navigator.vibrate(40);
+}
 
-    const stockEl = document.getElementById('res-stock');
-    stockEl.innerHTML = data.stock_disponible > 0
-      ? `<span class="badge bg-success">${data.stock_disponible} disponibles</span>`
-      : `<span class="badge bg-danger">Sin stock</span>`;
+function renderResultado(d) {
+  const fotoEl = document.getElementById('res-foto');
+  const fotoBadge = document.getElementById('res-stock-badge');
+  fotoEl.innerHTML = (d.foto_url
+    ? `<img src="${d.foto_url}" alt="">`
+    : `<i class="bi bi-image res-foto-placeholder"></i>`)
+    + fotoBadge.outerHTML;
 
-    document.getElementById('res-codigo').textContent = data.codigo;
+  // Stock badge en la foto (lo recreamos porque innerHTML lo sobreescribió)
+  const newBadge = fotoEl.querySelector('.res-stock-badge');
+  newBadge.textContent = d.stock_disponible + ' uds.';
+  newBadge.classList.remove('stock-ok','stock-low','stock-zero');
+  if (d.stock_disponible === 0) newBadge.classList.add('stock-zero');
+  else if (d.stock_disponible < 5) newBadge.classList.add('stock-low');
+  else newBadge.classList.add('stock-ok');
 
-    const fotoEl = document.getElementById('res-foto');
-    if (data.foto_url) {
-      fotoEl.innerHTML = `<img src="${data.foto_url}" alt="${data.nombre}"
-        style="width:100px;height:100px;object-fit:cover;border-radius:10px;margin-bottom:12px">`;
-    } else {
-      fotoEl.innerHTML = '';
-    }
+  document.getElementById('res-cat-wrap').innerHTML = d.categoria
+    ? `<span class="res-cat">${d.categoria}</span>` : '';
+  document.getElementById('res-nombre').textContent = d.nombre;
 
-    document.getElementById('resultado').style.display = '';
+  const varEl = document.getElementById('res-variant');
+  varEl.innerHTML = '';
+  if (d.talla) varEl.innerHTML += `<span class="res-talla">Talla ${d.talla}</span>`;
+  if (d.color) {
+    varEl.innerHTML += `<span style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-2);font-weight:600">
+      <span style="width:18px;height:18px;border-radius:50%;background:${colorEspanolACss(d.color)};border:2px solid var(--card-bg);box-shadow:0 0 0 1px var(--border)"></span>
+      ${d.color}
+    </span>`;
+  }
+
+  document.getElementById('res-precio').textContent = '$' + parseFloat(d.precio).toFixed(2);
+
+  const rangoWrap = document.getElementById('res-rango-wrap');
+  if (d.precio_minimo && d.precio_maximo) {
+    document.getElementById('res-rango-min').textContent = '$' + parseFloat(d.precio_minimo).toFixed(2);
+    document.getElementById('res-rango-max').textContent = '$' + parseFloat(d.precio_maximo).toFixed(2);
+    rangoWrap.style.display = '';
   } else {
-    document.getElementById('no-encontrado').style.display = '';
+    rangoWrap.style.display = 'none';
+  }
+
+  document.getElementById('res-stock-text').textContent = d.stock_disponible + ' uds.';
+  document.getElementById('res-codigo').textContent = d.codigo || '—';
+
+  if (d.catalogo_id) {
+    document.getElementById('res-link-detalle').href = `/inventario/${d.catalogo_id}/`;
+    document.getElementById('res-link-detalle').style.display = '';
+  }
+
+  elRes.style.display = '';
+  guardarReciente(d);
+  renderRecientes();
+
+  // Auto-scroll suave al resultado
+  setTimeout(() => elRes.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+}
+
+function colorEspanolACss(nombre) {
+  const map = {
+    'blanco':'#FFFFFF','negro':'#000000','gris':'#9CA3AF','plata':'#C0C0C0',
+    'rojo':'#DC2626','rosa':'#F472B6','rosado':'#F9A8D4',
+    'naranja':'#F97316','amarillo':'#FACC15','verde':'#16A34A',
+    'azul':'#2563EB','azul oscuro':'#1E40AF','azul claro':'#60A5FA',
+    'celeste':'#7DD3FC','marino':'#172554',
+    'morado':'#9333EA','violeta':'#8B5CF6','lila':'#C4B5FD',
+    'café':'#92400E','cafe':'#92400E','marrón':'#78350F','marron':'#78350F',
+    'beige':'#E7DCC0','crema':'#FFFDD0','coral':'#FB7185','salmón':'#FCA5A5'
+  };
+  if (!nombre) return '#94A3B8';
+  return map[nombre.toLowerCase().trim()] || nombre.toLowerCase();
+}
+
+// === Recientes ===
+function guardarReciente(d) {
+  const key = d.producto_id || d.codigo;
+  let lista = JSON.parse(localStorage.getItem(RECIENTES_KEY) || '[]');
+  lista = lista.filter(x => (x.producto_id || x.codigo) !== key);
+  lista.unshift({
+    producto_id: d.producto_id, codigo: d.codigo,
+    nombre: d.nombre, precio: d.precio, foto_url: d.foto_url,
+    catalogo_id: d.catalogo_id, ts: Date.now(),
+  });
+  if (lista.length > MAX_RECIENTES) lista = lista.slice(0, MAX_RECIENTES);
+  localStorage.setItem(RECIENTES_KEY, JSON.stringify(lista));
+}
+
+function renderRecientes() {
+  const lista = JSON.parse(localStorage.getItem(RECIENTES_KEY) || '[]');
+  const card = document.getElementById('recientes-card');
+  const list = document.getElementById('recientes-list');
+  if (!lista.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  list.innerHTML = lista.map(r => `
+    <div class="reciente-item" data-codigo="${r.codigo || ''}">
+      <div class="reciente-foto-mini">
+        ${r.foto_url ? `<img src="${r.foto_url}" alt="">` : `<i class="bi bi-image"></i>`}
+      </div>
+      <div class="reciente-info">
+        <div class="reciente-nombre">${r.nombre}</div>
+        <div class="reciente-codigo">${r.codigo || '—'}</div>
+      </div>
+      <div class="reciente-precio">$${parseFloat(r.precio).toFixed(2)}</div>
+    </div>
+  `).join('');
+  list.querySelectorAll('.reciente-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const cod = el.dataset.codigo;
+      if (cod) {
+        document.getElementById('codigo-manual').value = cod;
+        buscarCodigo(cod);
+      }
+    });
+  });
+}
+
+document.getElementById('btn-limpiar-recientes').addEventListener('click', () => {
+  localStorage.removeItem(RECIENTES_KEY);
+  renderRecientes();
+});
+
+// === Cámara ===
+function detenerScanner() {
+  if (scanner) {
+    scanner.stop().then(() => {
+      btnIni.classList.remove('d-none');
+      btnDet.classList.add('d-none');
+      elReader.classList.remove('active');
+      scanner = null;
+    }).catch(() => { scanner = null; });
   }
 }
 
-document.getElementById('btn-iniciar').addEventListener('click', () => {
+btnIni.addEventListener('click', () => {
   scanner = new Html5Qrcode('reader');
+  elReader.classList.add('active');
   scanner.start(
     { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 250, height: 150 } },
+    { fps: 10, qrbox: { width: 260, height: 160 } },
     (decodedText) => {
       buscarCodigo(decodedText);
       document.getElementById('codigo-manual').value = decodedText;
     },
     () => {}
   ).then(() => {
-    document.getElementById('btn-iniciar').classList.add('d-none');
-    document.getElementById('btn-detener').classList.remove('d-none');
+    btnIni.classList.add('d-none');
+    btnDet.classList.remove('d-none');
   }).catch(() => {
-    alert('No se pudo activar la cámara. Usa la búsqueda manual.');
+    elReader.classList.remove('active');
+    if (window.toast) toast('No se pudo activar la cámara. Verifica permisos.', 'error');
+    else alert('No se pudo activar la cámara. Verifica permisos.');
+    scanner = null;
   });
 });
 
-document.getElementById('btn-detener').addEventListener('click', () => {
-  if (scanner) {
-    scanner.stop().then(() => {
-      document.getElementById('btn-iniciar').classList.remove('d-none');
-      document.getElementById('btn-detener').classList.add('d-none');
-    });
-  }
-});
+btnDet.addEventListener('click', detenerScanner);
 
+// === Manual ===
 document.getElementById('btn-buscar-manual').addEventListener('click', () => {
   const codigo = document.getElementById('codigo-manual').value.trim();
   if (codigo) buscarCodigo(codigo);
@@ -123,9 +669,23 @@ document.getElementById('btn-buscar-manual').addEventListener('click', () => {
 
 document.getElementById('codigo-manual').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
+    e.preventDefault();
     const codigo = e.target.value.trim();
     if (codigo) buscarCodigo(codigo);
   }
 });
+
+function reiniciar() {
+  elRes.style.display = 'none';
+  elNoEnc.style.display = 'none';
+  elEmpty.style.display = '';
+  document.getElementById('codigo-manual').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.getElementById('btn-otra-busqueda').addEventListener('click', reiniciar);
+document.getElementById('btn-otra-busqueda-2').addEventListener('click', reiniciar);
+
+// Init
+renderRecientes();
 </script>
 {% endblock %}

@@ -16,13 +16,18 @@ class CatalogoProducto(models.Model):
         ('otro',        'Otro'),
     ]
 
-    nombre       = models.CharField(max_length=200)
-    categoria    = models.CharField(max_length=50, choices=CATEGORIAS, default='otro')
-    descripcion  = models.TextField(blank=True)
-    precio_base  = models.DecimalField(max_digits=10, decimal_places=2)
-    foto         = models.ImageField(upload_to='productos/', blank=True, null=True)
-    activo       = models.BooleanField(default=True)
-    creado_en    = models.DateTimeField(auto_now_add=True)
+    nombre        = models.CharField(max_length=200)
+    categoria     = models.CharField(max_length=50, choices=CATEGORIAS, default='otro')
+    descripcion   = models.TextField(blank=True)
+    precio_base   = models.DecimalField(max_digits=10, decimal_places=2,
+                                        help_text='Precio sugerido / por defecto.')
+    precio_minimo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                        help_text='Precio mínimo permitido al vender (no se puede bajar de aquí).')
+    precio_maximo = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                        help_text='Precio máximo sugerido (techo recomendado).')
+    foto          = models.ImageField(upload_to='productos/', blank=True, null=True)
+    activo        = models.BooleanField(default=True)
+    creado_en     = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name        = 'Catálogo producto'

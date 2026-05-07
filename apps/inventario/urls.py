@@ -16,4 +16,6 @@ urlpatterns = [
     # Consultar precio / API
     path('consultar/',    views.consultar_precio, name='consultar_precio'),
     path('api/codigo/',   views.api_buscar_codigo, name='api_buscar_codigo'),
+    # Etiquetas pegables (impresión por lotes)
+    path('etiquetas/',    views.imprimir_etiquetas, name='imprimir_etiquetas'),
 ]
