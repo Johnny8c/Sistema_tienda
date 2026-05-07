@@ -2,6 +2,7 @@
 Vistas del módulo de facturación electrónica SRI.
 """
 import base64
+import logging
 from datetime import datetime
 from decimal import Decimal
 
@@ -11,6 +12,8 @@ from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction
 from django.utils.dateparse import parse_datetime
+
+logger = logging.getLogger(__name__)
 
 from apps.usuarios.decorators import requiere_dueno, requiere_no_bodeguero
 from apps.clientes.models import Cliente
@@ -118,6 +121,7 @@ def lista_facturas(request):
 
     # KPIs sobre el queryset filtrado
     from django.db.models import Sum, Count, Q
+    from django.core.paginator import Paginator
     from django.utils import timezone
     hoy = timezone.now().date()
     base = FacturaSRI.objects.all()
@@ -132,8 +136,13 @@ def lista_facturas(request):
     kpi_pendientes = base.filter(estado=FacturaSRI.EMITIDA).count()
     kpi_rechazadas = base.filter(estado=FacturaSRI.RECHAZADA).count()
 
+    # Paginación: 50 facturas por página
+    paginator = Paginator(facturas, 50)
+    page_obj  = paginator.get_page(request.GET.get('page'))
+
     return render(request, 'facturacion/lista.html', {
-        'facturas':   facturas[:500],
+        'facturas':   page_obj,
+        'page_obj':   page_obj,
         'estado_sel': estado,
         'q':          q,
         'fecha_desde': fecha_desde,
@@ -175,13 +184,18 @@ def _crear_factura_desde_venta(venta, usuario, cfg):
 
     items_venta = list(venta.items.select_related('producto').all())
     iva_pct = cfg.iva_porcentaje
+    iva_factor = Decimal(iva_pct) / Decimal(100)
 
     # Suponemos que todos aplican IVA por defecto (configurable después)
     subtotal_iva = Decimal('0')
     subtotal_0   = Decimal('0')
+    iva_valor    = Decimal('0')
     items_factura = []
     for idx, iv in enumerate(items_venta):
         base = _round_money(Decimal(str(iv.precio_unitario)) * Decimal(str(iv.cantidad)))
+        # IVA por ítem (igual cálculo que xml_generator) — al sumar nos da el
+        # iva_valor total. Así detalles y totales del XML coinciden exacto.
+        iva_item = _round_money(base * iva_factor)
         items_factura.append({
             'orden':           idx + 1,
             'descripcion':     str(iv.producto)[:300],
@@ -192,8 +206,9 @@ def _crear_factura_desde_venta(venta, usuario, cfg):
             'subtotal':        base,
         })
         subtotal_iva += base
+        iva_valor    += iva_item
 
-    iva_valor = _round_money(subtotal_iva * Decimal(iva_pct) / Decimal(100))
+    iva_valor = _round_money(iva_valor)  # ya está, pero garantizamos
     total     = _round_money(subtotal_0 + subtotal_iva + iva_valor)
 
     # Tomar y avanzar el siguiente secuencial atómicamente
@@ -273,8 +288,9 @@ def _emitir_factura(request, factura, cfg):
     try:
         p12_b64     = descifrar_dato(cfg.certificado_p12)
         p12_password = descifrar_dato(cfg.clave_certificado)
-    except Exception as e:
-        messages.error(request, f'Error al descifrar certificado: {e}')
+    except Exception:
+        logger.exception('Error al descifrar certificado SRI (factura %s)', factura.pk)
+        messages.error(request, 'No se pudo leer el certificado. Verifica la contraseña en Configuración SRI.')
         return redirect('detalle_factura', pk=factura.pk)
 
     tipo_emision = '2' if cfg.contingencia_activa else '1'
@@ -316,8 +332,9 @@ def _emitir_factura(request, factura, cfg):
     try:
         xml_sin = generar_xml(factura, items, cfg, cliente, tipo_emision=tipo_emision)
         xml_firmado = firmar_xml(xml_sin, p12_b64, p12_password)
-    except Exception as e:
-        messages.error(request, f'Error al firmar el comprobante: {e}')
+    except Exception:
+        logger.exception('Error al firmar XML SRI (factura %s)', factura.pk)
+        messages.error(request, 'No se pudo firmar el comprobante. Revisa el certificado o intenta de nuevo.')
         return redirect('detalle_factura', pk=factura.pk)
 
     factura.xml_firmado = xml_firmado
@@ -369,8 +386,8 @@ def _emitir_factura(request, factura, cfg):
             try:
                 fa = parse_datetime(aut['fecha_autorizacion']) or datetime.fromisoformat(aut['fecha_autorizacion'])
                 factura.sri_fecha_autorizacion = fa
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                logger.warning('Fecha de autorización SRI no parseable: %r', aut['fecha_autorizacion'])
         factura.sri_respuesta = f'AUTORIZADO | Nº {aut["numero_autorizacion"]} | {aut["fecha_autorizacion"]}'
         factura.es_contingencia = False
         factura.save()
@@ -439,8 +456,8 @@ def verificar_autorizacion(request, pk):
             try:
                 fa = parse_datetime(aut['fecha_autorizacion']) or datetime.fromisoformat(aut['fecha_autorizacion'])
                 factura.sri_fecha_autorizacion = fa
-            except Exception:
-                pass
+            except (ValueError, TypeError):
+                logger.warning('Fecha de autorización SRI no parseable: %r', aut['fecha_autorizacion'])
         factura.sri_respuesta = f'AUTORIZADO | Nº {aut["numero_autorizacion"]}'
         factura.save()
         messages.success(request, 'Factura autorizada.')

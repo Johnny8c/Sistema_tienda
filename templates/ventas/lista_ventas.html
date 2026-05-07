@@ -157,9 +157,28 @@
   </div>
 </div>
 
-{% if ventas|length >= 500 %}
-<div class="text-center mt-3" style="font-size:12px;color:var(--text-muted)">
-  Mostrando las 500 más recientes. Refina los filtros si necesitas más.
-</div>
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div style="font-size:12.5px;color:var(--text-muted)">
+    Página <b>{{ page_obj.number }}</b> de <b>{{ page_obj.paginator.num_pages }}</b>
+    · Mostrando {{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }} ventas
+  </div>
+  <div class="btn-group" role="group">
+    {% if page_obj.has_previous %}
+      <a href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page=1" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-double-left"></i></a>
+      <a href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+    {% else %}
+      <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-chevron-double-left"></i></button>
+      <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-chevron-left"></i></button>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <a href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+      <a href="?{% for k,v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-double-right"></i></a>
+    {% else %}
+      <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-chevron-right"></i></button>
+      <button class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-chevron-double-right"></i></button>
+    {% endif %}
+  </div>
+</nav>
 {% endif %}
 {% endblock %}

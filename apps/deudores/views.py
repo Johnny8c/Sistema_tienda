@@ -1,4 +1,5 @@
 import json
+import logging
 from decimal import Decimal
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
@@ -10,6 +11,8 @@ from apps.usuarios.decorators import requiere_no_bodeguero, requiere_dueno
 from apps.clientes.models import Cliente
 from apps.inventario.models import Producto
 from .models import Adelanto, Deuda, Pago
+
+logger = logging.getLogger(__name__)
 from .services import (
     crear_adelanto, registrar_abono_adelanto, completar_adelanto, cancelar_adelanto,
     crear_venta_credito, registrar_abono_deuda, saldar_deuda, condonar_deuda,
@@ -264,6 +267,43 @@ def pos(request):
     })
 
 
+def _emitir_factura_si_corresponde(request, venta):
+    """Si la venta lleva flag de emitir_factura y tiene cliente,
+    crea y envía la factura SRI. Devuelve un HttpResponse a usar en
+    redirección, o None si no se debe emitir / falló."""
+    if request.POST.get('emitir_factura') != '1' or not venta.cliente_id:
+        return None
+    from apps.facturacion.models import ConfiguracionSRI
+    from apps.facturacion.views import _crear_factura_desde_venta, _emitir_factura
+    cfg = ConfiguracionSRI.get_singleton()
+    if not cfg or not cfg.cert_configurado:
+        messages.warning(
+            request,
+            f'Venta #{venta.pk} registrada pero no se pudo facturar al SRI: '
+            f'configura tus datos y certificado en SRI → Configuración.'
+        )
+        return None
+    try:
+        factura = _crear_factura_desde_venta(venta, request.user, cfg)
+        return _emitir_factura(request, factura, cfg)
+    except Exception:
+        logger.exception('Fallo al emitir factura SRI desde venta %s', venta.pk)
+        messages.warning(
+            request,
+            f'Venta #{venta.pk} registrada, pero la factura SRI no se pudo emitir. '
+            f'Puedes reintentarla desde Facturación SRI.'
+        )
+        return None
+
+
+def _redireccion_post_venta(venta, cfg_gen):
+    """Redirige a la nota de venta, agregando ?print=auto si la pref lo pide."""
+    response = redirect('nota_venta', pk=venta.pk)
+    if cfg_gen.imprimir_auto_nota:
+        response['Location'] += '?print=auto'
+    return response
+
+
 @login_required
 @requiere_no_bodeguero
 def procesar_venta(request):
@@ -271,6 +311,7 @@ def procesar_venta(request):
         return redirect('pos')
 
     from apps.configuracion.models import ConfiguracionGeneral
+    from apps.ventas.services import crear_venta_contado
     cfg_gen = ConfiguracionGeneral.get_singleton()
 
     tipo = request.POST.get('tipo_venta', 'contado')
@@ -292,109 +333,44 @@ def procesar_venta(request):
             return redirect('pos')
 
         if tipo == 'apartado':
-            monto_inicial = Decimal(request.POST.get('monto_inicial', '0'))
-            fecha_limite = request.POST.get('fecha_limite') or None
             adelanto = crear_adelanto(
                 cliente_id=int(cliente_id),
                 items=items,
-                monto_inicial=monto_inicial,
-                fecha_limite=fecha_limite,
+                monto_inicial=Decimal(request.POST.get('monto_inicial', '0')),
+                fecha_limite=request.POST.get('fecha_limite') or None,
                 vendedor=request.user,
             )
             messages.success(request, f'Apartado #{adelanto.pk} creado.')
             return redirect('detalle_adelanto', pk=adelanto.pk)
 
-        elif tipo == 'credito':
-            plazo_dias = int(request.POST.get('plazo_dias', 30))
+        if tipo == 'credito':
             deuda = crear_venta_credito(
                 cliente_id=int(cliente_id),
                 items=items,
-                plazo_dias=plazo_dias,
+                plazo_dias=int(request.POST.get('plazo_dias', 30)),
                 vendedor=request.user,
             )
             messages.success(request, f'Venta a crédito registrada. Deuda #{deuda.pk} creada.')
             return redirect('detalle_deuda', pk=deuda.pk)
 
-        else:
-            from apps.ventas.models import Venta, ItemVenta
-            from apps.inventario.models import Producto as Prod
-            from django.db import transaction
+        # Default: venta al contado
+        venta = crear_venta_contado(
+            items=items,
+            cliente_id=cliente_id,
+            vendedor=request.user,
+            forma_pago=forma_pago,
+            cfg_gen=cfg_gen,
+        )
 
-            with transaction.atomic():
-                # Validar stock disponible y precio mínimo antes de crear nada
-                for i in items:
-                    prod = Prod.objects.select_related('catalogo').select_for_update().get(pk=i['producto_id'])
-                    if prod.stock_disponible < i['cantidad'] and not cfg_gen.permitir_vender_sin_stock:
-                        raise StockInsuficienteError(
-                            f'"{prod.nombre}" tiene solo {prod.stock_disponible} unidades disponibles '
-                            f'({prod.stock_reservado} reservadas en apartados). '
-                            f'No se puede vender {i["cantidad"]}.'
-                        )
-                    # Usar precio del carrito si viene; si no, el del producto
-                    pu = Decimal(str(i.get('precio_unitario', prod.precio)))
-                    if pu <= 0:
-                        raise ValueError(f'Precio unitario inválido para "{prod.nombre}".')
-                    # Validar rango según preferencia
-                    if cfg_gen.precio_fuera_rango_modo == cfg_gen.PRECIO_RANGO_BLOQUEAR and prod.catalogo:
-                        if prod.catalogo.precio_minimo is not None and pu < prod.catalogo.precio_minimo:
-                            raise ValueError(
-                                f'"{prod.nombre}" no se puede vender por debajo de '
-                                f'${prod.catalogo.precio_minimo} (precio mínimo del producto).'
-                            )
-                        if prod.catalogo.precio_maximo is not None and pu > prod.catalogo.precio_maximo:
-                            raise ValueError(
-                                f'"{prod.nombre}" no se puede vender por encima de '
-                                f'${prod.catalogo.precio_maximo} (precio máximo del producto).'
-                            )
+        respuesta_factura = _emitir_factura_si_corresponde(request, venta)
+        if respuesta_factura is not None:
+            return respuesta_factura
 
-                total = sum(
-                    Decimal(str(i.get('precio_unitario', Prod.objects.get(pk=i['producto_id']).precio))) * i['cantidad']
-                    for i in items
-                )
-                venta = Venta.objects.create(
-                    cliente_id=int(cliente_id) if cliente_id else None,
-                    tipo_pago=Venta.CONTADO,
-                    forma_pago=forma_pago,
-                    total=total,
-                    vendedor=request.user,
-                )
-                for i in items:
-                    prod = Prod.objects.select_for_update().get(pk=i['producto_id'])
-                    pu = Decimal(str(i.get('precio_unitario', prod.precio)))
-                    ItemVenta.objects.create(
-                        venta=venta, producto=prod,
-                        cantidad=i['cantidad'], precio_unitario=pu,
-                    )
-                    prod.stock -= i['cantidad']
-                    prod.save(update_fields=['stock'])
-
-            # Si el cajero marcó "Emitir factura SRI", generarla y enviarla
-            emitir = request.POST.get('emitir_factura') == '1'
-            if emitir and venta.cliente_id:
-                from apps.facturacion.models import ConfiguracionSRI
-                from apps.facturacion.views import _crear_factura_desde_venta, _emitir_factura
-                cfg = ConfiguracionSRI.get_singleton()
-                if not cfg or not cfg.cert_configurado:
-                    messages.warning(
-                        request,
-                        f'Venta #{venta.pk} registrada pero no se pudo facturar al SRI: '
-                        f'configura tus datos y certificado en SRI → Configuración.'
-                    )
-                else:
-                    try:
-                        factura = _crear_factura_desde_venta(venta, request.user, cfg)
-                        return _emitir_factura(request, factura, cfg)
-                    except Exception as e:
-                        messages.warning(
-                            request,
-                            f'Venta #{venta.pk} registrada, pero hubo un problema al emitir factura: {e}'
-                        )
-
-            url = redirect('nota_venta', pk=venta.pk)
-            if cfg_gen.imprimir_auto_nota:
-                url['Location'] += '?print=auto'
-            return url
+        return _redireccion_post_venta(venta, cfg_gen)
 
     except (StockInsuficienteError, SaldoInsuficienteError, ValueError) as e:
         messages.error(request, str(e))
+        return redirect('pos')
+    except json.JSONDecodeError:
+        messages.error(request, 'Carrito inválido. Intenta de nuevo.')
         return redirect('pos')

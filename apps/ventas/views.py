@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from apps.usuarios.decorators import requiere_no_bodeguero
@@ -63,17 +64,22 @@ def lista_ventas(request):
             Q(pk__icontains=q)
         )
 
-    # KPIs del filtro actual
+    # KPIs del filtro actual (sobre el queryset completo, antes de paginar)
     agg = qs.aggregate(total=Sum('total'), n=Count('id'))
     total_filtrado = agg['total'] or 0
     cant_filtrado  = agg['n'] or 0
+
+    # Paginación: 50 ventas por página
+    paginator = Paginator(qs, 50)
+    page_obj  = paginator.get_page(request.GET.get('page'))
 
     # Lista de vendedores para el dropdown (solo dueño)
     vendedores = (Usuario.objects.filter(rol__in=[Usuario.ROL_VENDEDOR, Usuario.ROL_DUENO])
                   .order_by('first_name', 'username')) if request.user.es_dueno() else None
 
     return render(request, 'ventas/lista_ventas.html', {
-        'ventas':         qs[:500],
+        'ventas':         page_obj,           # iterable de 50, también expone .paginator y .number
+        'page_obj':       page_obj,
         'total_filtrado': total_filtrado,
         'cant_filtrado':  cant_filtrado,
         'fecha_desde':    fecha_desde,
