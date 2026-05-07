@@ -68,12 +68,38 @@ def _empleados_seleccionables():
     ).order_by('rol', 'first_name', 'username')
 
 
+def _agrupar_por_forma_pago(ventas_qs):
+    """Devuelve [{forma, label, n, total, pct, icono, color}, ...] para gráficos."""
+    from django.db.models import Sum, Count
+    from decimal import Decimal
+    METAS = {
+        'efectivo':      ('Efectivo',           'bi-cash-coin',    '#10B981'),
+        'tarjeta':       ('Tarjeta',            'bi-credit-card',  '#4F46E5'),
+        'transferencia': ('QR / Transferencia', 'bi-qr-code',      '#0EA5E9'),
+    }
+    raw = ventas_qs.values('forma_pago').annotate(
+        total=Sum('total'), n=Count('id')
+    ).order_by('-total')
+    total_general = sum(r['total'] or 0 for r in raw) or Decimal('1')
+    out = []
+    for r in raw:
+        label, icono, color = METAS.get(r['forma_pago'], (r['forma_pago'].title(), 'bi-currency-dollar', '#94A3B8'))
+        t = r['total'] or Decimal('0')
+        out.append({
+            'forma': r['forma_pago'], 'label': label,
+            'n': r['n'], 'total': t,
+            'pct': int((t / total_general) * 100) if total_general > 0 else 0,
+            'icono': icono, 'color': color,
+        })
+    return out
+
+
 # ── DASHBOARD DUEÑO (vista global) ─────────────────────────────
 
 def _dashboard_dueno(request):
     from datetime import timedelta
     from decimal import Decimal
-    from django.db.models import Sum, F
+    from django.db.models import Sum, Count, F
     from apps.deudores.models import Adelanto, Deuda
     from apps.ventas.models import Venta, ItemVenta
     from apps.inventario.models import Producto
@@ -132,6 +158,9 @@ def _dashboard_dueno(request):
         .select_related('cliente').order_by('-saldo_pendiente')[:5]
     ultimas_ventas = Venta.objects.select_related('cliente', 'vendedor').order_by('-fecha')[:5]
 
+    # Ventas de hoy agrupadas por forma de pago
+    ventas_por_forma = _agrupar_por_forma_pago(ventas_hoy_qs)
+
     return render(request, 'usuarios/dashboard.html', {
         'total_ventas_hoy':   total_ventas_hoy,
         'tickets_hoy':        tickets_hoy,
@@ -151,9 +180,10 @@ def _dashboard_dueno(request):
         'ultimas_ventas':     ultimas_ventas,
         'adelantos_proximos': Adelanto.objects.filter(
             estado=Adelanto.ACTIVO,
-            fecha_limite__lte=hoy,
-        ).select_related('cliente')[:5],
+            fecha_limite__lte=hoy + timedelta(days=cfg.dias_alerta_vencimiento if cfg else 7),
+        ).select_related('cliente').order_by('fecha_limite')[:5],
         'stock_minimo':       stock_minimo,
+        'ventas_por_forma':   ventas_por_forma,
         'empleados_disponibles': _empleados_seleccionables(),
     })
 
@@ -166,6 +196,8 @@ def _dashboard_vendedor(request, vendedor, viendo_como_dueno=False):
     from django.db.models import Sum, F
     from apps.deudores.models import Adelanto, Deuda
     from apps.ventas.models import Venta, ItemVenta
+    from apps.configuracion.models import ConfiguracionGeneral
+    cfg = ConfiguracionGeneral.objects.first()
 
     hoy = timezone.now().date()
     inicio_mes = hoy.replace(day=1)
@@ -218,8 +250,11 @@ def _dashboard_vendedor(request, vendedor, viendo_como_dueno=False):
     sus_top_deudores = sus_deudas.select_related('cliente').order_by('-saldo_pendiente')[:5]
     sus_apartados = Adelanto.objects.filter(
         vendedor=vendedor, estado=Adelanto.ACTIVO,
-        fecha_limite__lte=hoy
-    ).select_related('cliente')[:5]
+        fecha_limite__lte=hoy + timedelta(days=cfg.dias_alerta_vencimiento if cfg else 7)
+    ).select_related('cliente').order_by('fecha_limite')[:5]
+
+    # Ventas de hoy del vendedor por forma de pago
+    ventas_por_forma = _agrupar_por_forma_pago(ventas_hoy_qs)
 
     return render(request, 'usuarios/dashboard_vendedor.html', {
         'empleado':           vendedor,
@@ -237,6 +272,7 @@ def _dashboard_vendedor(request, vendedor, viendo_como_dueno=False):
         'ultimas_ventas':     ultimas_ventas,
         'sus_top_deudores':   sus_top_deudores,
         'sus_apartados':      sus_apartados,
+        'ventas_por_forma':   ventas_por_forma,
         'empleados_disponibles': _empleados_seleccionables() if viendo_como_dueno else None,
     })
 
@@ -299,12 +335,21 @@ def _dashboard_bodeguero(request, bodeguero, viendo_como_dueno=False):
 
 @requiere_dueno
 def lista_empleados(request):
-    empleados = Usuario.objects.exclude(pk=request.user.pk).order_by('rol', 'username')
+    from django.db.models import Sum, Count
+    empleados = (Usuario.objects.exclude(pk=request.user.pk)
+                 .annotate(
+                     cant_ventas=Count('venta', distinct=True),
+                     total_vendido=Sum('venta__total'),
+                 )
+                 .order_by('rol', 'first_name', 'username'))
     return render(request, 'usuarios/empleados/lista.html', {'empleados': empleados})
 
 
 @requiere_dueno
 def crear_empleado(request):
+    from django.contrib.auth.password_validation import validate_password
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         first_name = request.POST.get('first_name', '').strip()
@@ -321,8 +366,12 @@ def crear_empleado(request):
             errores.append(f'El usuario "{username}" ya existe.')
         if not password:
             errores.append('La contraseña es obligatoria.')
-        elif len(password) < 6:
-            errores.append('La contraseña debe tener al menos 6 caracteres.')
+        else:
+            tmp_user = Usuario(username=username, first_name=first_name, last_name=last_name)
+            try:
+                validate_password(password, user=tmp_user)
+            except DjangoValidationError as e:
+                errores.extend(e.messages)
         if errores:
             for e in errores:
                 messages.error(request, e)
@@ -356,17 +405,29 @@ def editar_empleado(request, pk):
         return redirect('lista_empleados')
 
     if request.method == 'POST':
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
         empleado.first_name = request.POST.get('first_name', '').strip()
         empleado.last_name = request.POST.get('last_name', '').strip()
         empleado.rol = request.POST.get('rol', empleado.rol)
         empleado.is_active = 'is_active' in request.POST
-        empleado.save()
 
         nueva_password = request.POST.get('password', '').strip()
         if nueva_password:
+            try:
+                validate_password(nueva_password, user=empleado)
+            except DjangoValidationError as e:
+                for err in e.messages:
+                    messages.error(request, err)
+                return render(request, 'usuarios/empleados/form.html', {
+                    'accion': 'Editar', 'empleado': empleado, 'roles': Usuario.ROLES,
+                    'f_username': empleado.username, 'f_fname': empleado.first_name,
+                    'f_lname': empleado.last_name, 'f_rol': empleado.rol,
+                })
             empleado.set_password(nueva_password)
-            empleado.save()
 
+        empleado.save()
         messages.success(request, f'Empleado "{empleado.username}" actualizado.')
         return redirect('lista_empleados')
 

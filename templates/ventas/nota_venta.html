@@ -41,6 +41,7 @@
 
       <!-- Encabezado -->
       <div class="text-center mb-4">
+        {% if config_general.mostrar_logo_en_nota %}
         <div style="width:48px;height:48px;background:#EEF2FF;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;overflow:hidden">
           {% if config_general.logo %}
             <img src="{{ config_general.logo.url }}" alt="logo" style="width:100%;height:100%;object-fit:contain">
@@ -48,6 +49,7 @@
             <i class="bi bi-shop" style="font-size:22px;color:#4F46E5"></i>
           {% endif %}
         </div>
+        {% endif %}
         <div style="font-size:17px;font-weight:700;color:#0F172A">{{ config_general.nombre_negocio|default:"Sistema Tienda"|upper }}</div>
         {% if config_general.slogan %}<div style="font-size:11px;color:#94A3B8;font-style:italic;margin-bottom:4px">{{ config_general.slogan }}</div>{% endif %}
         {% if config_general.direccion %}<div style="font-size:13px;color:#64748B">{{ config_general.direccion }}</div>{% endif %}
@@ -63,16 +65,27 @@
           <span style="color:#64748B">Fecha</span>
           <span>{{ venta.fecha|date:"d/m/Y H:i" }}</span>
         </div>
+        {% if config_general.mostrar_vendedor_en_nota %}
         <div class="d-flex justify-content-between mb-1">
           <span style="color:#64748B">Vendedor</span>
           <span>{{ venta.vendedor.get_full_name|default:venta.vendedor.username }}</span>
         </div>
+        {% endif %}
         {% if venta.cliente %}
-        <div class="d-flex justify-content-between">
+        <div class="d-flex justify-content-between mb-1">
           <span style="color:#64748B">Cliente</span>
           <span>{{ venta.cliente.nombre }}</span>
         </div>
         {% endif %}
+        <div class="d-flex justify-content-between">
+          <span style="color:#64748B">Forma de pago</span>
+          <span style="font-weight:600">
+            {% if venta.forma_pago == 'efectivo' %}<i class="bi bi-cash-coin text-success me-1"></i>Efectivo
+            {% elif venta.forma_pago == 'tarjeta' %}<i class="bi bi-credit-card text-primary me-1"></i>Tarjeta
+            {% elif venta.forma_pago == 'transferencia' %}<i class="bi bi-qr-code text-info me-1"></i>QR / Transferencia
+            {% else %}{{ venta.get_forma_pago_display }}{% endif %}
+          </span>
+        </div>
       </div>
 
       <!-- Productos -->
@@ -135,4 +148,18 @@
   .sidebar, .main-wrap > header, .page-header, .d-flex.gap-2 { display: none !important; }
 }
 </style>
+
+{% if config_general.imprimir_auto_nota %}
+<script>
+  // Solo auto-imprimir si venimos del POS (querystring ?print=auto)
+  // y para evitar bucles si el usuario navega de vuelta.
+  window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('print') === 'auto') {
+      // Pequeño delay para que renderice estilos antes de imprimir
+      setTimeout(() => window.print(), 350);
+    }
+  });
+</script>
+{% endif %}
 {% endblock %}

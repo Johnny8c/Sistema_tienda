@@ -183,31 +183,107 @@
 
 {% if user.es_dueno %}
 <div class="modal fade" id="modalCancelar" tabindex="-1">
-  <div class="modal-dialog modal-sm">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="post" action="{% url 'cancelar_adelanto' adelanto.pk %}">
         {% csrf_token %}
         <div class="modal-header">
-          <h5 class="modal-title">Cancelar apartado</h5>
+          <h5 class="modal-title"><i class="bi bi-x-circle text-danger me-2"></i>Cancelar apartado</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="alert alert-warning" style="font-size:13px">
-            Lo pagado quedará como <strong>saldo a favor</strong> del cliente para futuras compras.
+          {% with monto_pagado=adelanto.total|add:0|floatformat:2 %}
+          <div style="background:#F8FAFC;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13.5px">
+            <div class="d-flex justify-content-between mb-1">
+              <span style="color:#64748B">Cliente</span>
+              <span class="fw-semibold">{{ adelanto.cliente.nombre }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span style="color:#64748B">Monto pagado a devolver</span>
+              <span class="fw-bold text-money" style="color:#E11D48">
+                ${% widthratio adelanto.total 1 1 %}
+                {# fallback: usamos total - saldo_pendiente #}
+              </span>
+            </div>
           </div>
+          {% endwith %}
+
+          <label class="form-label fw-semibold">¿Qué hacer con lo ya pagado? <span class="text-danger">*</span></label>
+          <div class="d-flex gap-2 mb-3">
+            <label class="flex-fill" style="cursor:pointer">
+              <input type="radio" name="tipo_devolucion" value="saldo_favor" class="d-none tipo-dev" checked>
+              <div class="tipo-dev-card" style="border:2px solid #E2E8F0;border-radius:10px;padding:12px;text-align:center;transition:all .15s">
+                <i class="bi bi-piggy-bank d-block mb-1" style="font-size:22px;color:#10B981"></i>
+                <div style="font-weight:600;font-size:13px">Saldo a favor</div>
+                <div style="font-size:11px;color:#64748B">Crédito para futuras compras</div>
+              </div>
+            </label>
+            <label class="flex-fill" style="cursor:pointer">
+              <input type="radio" name="tipo_devolucion" value="reembolso" class="d-none tipo-dev">
+              <div class="tipo-dev-card" style="border:2px solid #E2E8F0;border-radius:10px;padding:12px;text-align:center;transition:all .15s">
+                <i class="bi bi-cash-stack d-block mb-1" style="font-size:22px;color:#4F46E5"></i>
+                <div style="font-weight:600;font-size:13px">Reembolso</div>
+                <div style="font-size:11px;color:#64748B">Devolver el dinero al cliente</div>
+              </div>
+            </label>
+          </div>
+
+          <div id="forma-pago-reembolso" class="mb-3" style="display:none">
+            <label class="form-label fw-semibold" style="font-size:13px">Forma del reembolso</label>
+            <select name="forma_pago" class="form-select form-select-sm">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta (reverso)</option>
+              <option value="transferencia">Transferencia / QR</option>
+            </select>
+            <div class="form-text">Quedará registrado como <strong>salida</strong> en el cierre de caja.</div>
+          </div>
+
           <div>
-            <label class="form-label">Motivo <span class="text-danger">*</span></label>
-            <textarea name="motivo" class="form-control" rows="2" required></textarea>
+            <label class="form-label fw-semibold">Motivo <span class="text-danger">*</span></label>
+            <textarea name="motivo" class="form-control" rows="2" required
+                      placeholder="Ej: cliente cambió de opinión, producto descontinuado…"></textarea>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Volver</button>
-          <button type="submit" class="btn btn-danger btn-sm">Confirmar cancelación</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button>
+          <button type="submit" class="btn btn-danger">Confirmar cancelación</button>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<style>
+  .tipo-dev:checked ~ .tipo-dev-card,
+  label:has(.tipo-dev:checked) .tipo-dev-card {
+    border-color: #4F46E5;
+    background: #EEF2FF;
+  }
+</style>
+<script>
+  document.querySelectorAll('input.tipo-dev').forEach(r => {
+    r.addEventListener('change', () => {
+      // Toggle visual
+      document.querySelectorAll('.tipo-dev-card').forEach(c => {
+        c.style.borderColor = '#E2E8F0';
+        c.style.background = '#fff';
+      });
+      const card = r.closest('label').querySelector('.tipo-dev-card');
+      card.style.borderColor = '#4F46E5';
+      card.style.background = '#EEF2FF';
+      // Mostrar/ocultar selector de forma de pago
+      document.getElementById('forma-pago-reembolso').style.display =
+        (r.value === 'reembolso') ? '' : 'none';
+    });
+  });
+  // Estado inicial
+  const checked = document.querySelector('input.tipo-dev:checked');
+  if (checked) {
+    const card = checked.closest('label').querySelector('.tipo-dev-card');
+    card.style.borderColor = '#4F46E5';
+    card.style.background = '#EEF2FF';
+  }
+</script>
 {% endif %}
 {% endif %}
 {% endblock %}

@@ -11,8 +11,15 @@ from .services import validar_cedula_o_ruc
 @login_required
 @requiere_no_bodeguero
 def lista_clientes(request):
+    from django.db.models import Sum, Count, Q
     q = request.GET.get('q', '')
-    clientes = Cliente.objects.filter(activo=True)
+    clientes = Cliente.objects.filter(activo=True).annotate(
+        cant_ventas=Count('venta', distinct=True),
+        total_comprado=Sum('venta__total'),
+        adelantos_activos=Count('adelantos', filter=Q(adelantos__estado='activo'), distinct=True),
+        deudas_pendientes=Count('deudas', filter=Q(deudas__estado='pendiente'), distinct=True),
+        deuda_total=Sum('deudas__saldo_pendiente', filter=Q(deudas__estado='pendiente')),
+    ).order_by('nombre')
     if q:
         clientes = clientes.filter(nombre__icontains=q) | clientes.filter(cedula_ruc__icontains=q)
     return render(request, 'clientes/lista.html', {'clientes': clientes, 'q': q})

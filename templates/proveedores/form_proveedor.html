@@ -1,48 +1,162 @@
 {% extends 'base.html' %}
 {% block title %}{{ accion }} proveedor{% endblock %}
 {% block nav_proveedores %}active{% endblock %}
+{% block page_title %}{{ accion }} proveedor{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 mb-4">
-  <a href="{% url 'lista_proveedores' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
-  <h4 class="fw-bold mb-0">{{ accion }} proveedor</h4>
+<div class="page-header">
+  <div class="d-flex align-items-center gap-3">
+    <a href="{% url 'lista_proveedores' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
+    <h1 class="page-header-title">{{ accion }} proveedor</h1>
+  </div>
 </div>
 
-<div class="card border-0 shadow-sm" style="max-width:520px">
-  <div class="card-body">
-    <form method="post">
-      {% csrf_token %}
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
-        <input type="text" name="nombre" class="form-control" value="{{ proveedor.nombre|default:'' }}" required autofocus>
+<div class="row g-3">
+  <!-- Formulario principal -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-truck me-2 text-primary"></i>Información del proveedor
       </div>
-      <div class="row g-2 mb-3">
-        <div class="col">
-          <label class="form-label fw-semibold">RUC</label>
-          <input type="text" name="ruc" class="form-control" value="{{ proveedor.ruc|default:'' }}">
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-building me-1 text-muted"></i>Razón social / Nombre <span class="text-danger">*</span>
+            </label>
+            <input type="text" name="nombre" class="form-control"
+                   value="{{ proveedor.nombre|default:'' }}"
+                   placeholder="Ej. Confecciones Quito Ltda." required autofocus>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-card-text me-1 text-muted"></i>RUC
+              </label>
+              <input type="text" name="ruc" class="form-control" maxlength="13"
+                     value="{{ proveedor.ruc|default:'' }}"
+                     placeholder="13 dígitos">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-telephone me-1 text-muted"></i>Teléfono
+              </label>
+              <input type="text" name="telefono" class="form-control"
+                     value="{{ proveedor.telefono|default:'' }}"
+                     placeholder="022987654 / 0991234567">
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-person me-1 text-muted"></i>Persona de contacto
+            </label>
+            <input type="text" name="contacto" class="form-control"
+                   value="{{ proveedor.contacto|default:'' }}"
+                   placeholder="Nombre del vendedor o representante">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-envelope me-1 text-muted"></i>Email
+            </label>
+            <input type="email" name="email" class="form-control"
+                   value="{{ proveedor.email|default:'' }}"
+                   placeholder="ventas@proveedor.com">
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-geo-alt me-1 text-muted"></i>Dirección
+            </label>
+            <textarea name="direccion" class="form-control" rows="3"
+                      placeholder="Calle, barrio, ciudad…">{{ proveedor.direccion|default:'' }}</textarea>
+          </div>
+
+          <div class="d-flex gap-2 pt-2" style="border-top:1px solid var(--border)">
+            <button type="submit" class="btn btn-primary mt-3">
+              <i class="bi bi-{% if proveedor %}check2{% else %}plus-lg{% endif %} me-1"></i>
+              {% if proveedor %}Guardar cambios{% else %}Crear proveedor{% endif %}
+            </button>
+            <a href="{% url 'lista_proveedores' %}" class="btn btn-outline-secondary mt-3">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel lateral -->
+  <div class="col-lg-4">
+    {% if proveedor %}
+    <!-- Resumen del proveedor existente -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-graph-up me-2"></i>Resumen del proveedor
+      </div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 mb-3 pb-3" style="border-bottom:1px solid var(--border)">
+          <div style="width:48px;height:48px;border-radius:12px;
+                      background:linear-gradient(135deg,#4F46E5 0%,#7C3AED 100%);
+                      color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;
+                      box-shadow:0 4px 12px rgba(79,70,229,.25)">
+            {{ proveedor.nombre|slice:":2"|upper }}
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="fw-bold" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              {{ proveedor.nombre }}
+            </div>
+            <div style="font-size:12px;color:var(--text-muted)">
+              {% if proveedor.ruc %}RUC {{ proveedor.ruc }}{% else %}Sin RUC registrado{% endif %}
+            </div>
+          </div>
         </div>
-        <div class="col">
-          <label class="form-label fw-semibold">Teléfono</label>
-          <input type="text" name="telefono" class="form-control" value="{{ proveedor.telefono|default:'' }}">
+
+        <div class="d-flex flex-column gap-3">
+          <div>
+            <div style="font-size:12px;color:var(--text-muted)">
+              <i class="bi bi-calendar-plus me-1"></i>Registrado desde
+            </div>
+            <div class="fw-semibold">{{ proveedor.creado_en|date:"d/m/Y" }}</div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--text-muted)">
+              <i class="bi bi-basket3 me-1"></i>Compras realizadas
+            </div>
+            <div class="fw-semibold">{{ proveedor.compras.count }} compra{{ proveedor.compras.count|pluralize }}</div>
+          </div>
+          {% if proveedor.compras.count %}
+          <a href="{% url 'lista_compras' %}?proveedor={{ proveedor.pk }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-list-ul me-1"></i>Ver historial de compras
+          </a>
+          {% endif %}
+          {% if user.puede_registrar_compras %}
+          <a href="{% url 'crear_compra' %}?proveedor={{ proveedor.pk }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Nueva compra a este proveedor
+          </a>
+          {% endif %}
         </div>
       </div>
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Persona de contacto</label>
-        <input type="text" name="contacto" class="form-control" value="{{ proveedor.contacto|default:'' }}">
+    </div>
+    {% endif %}
+
+    <!-- Tips -->
+    <div class="card" style="background:rgba(79,70,229,.06);border-color:rgba(79,70,229,.25) !important">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <i class="bi bi-lightbulb-fill" style="color:#4F46E5;font-size:18px"></i>
+          <strong style="color:#4F46E5">Tips útiles</strong>
+        </div>
+        <ul style="font-size:13px;color:var(--text-2);padding-left:20px;margin-bottom:0;line-height:1.7">
+          <li>El <strong>RUC</strong> es obligatorio si vas a registrar facturas de compra.</li>
+          <li>Guarda el contacto directo del vendedor para agilizar pedidos.</li>
+          <li>Las compras a este proveedor actualizan el stock automáticamente.</li>
+          <li>Puedes ver el total comprado y la última compra desde la lista de proveedores.</li>
+        </ul>
       </div>
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Email</label>
-        <input type="email" name="email" class="form-control" value="{{ proveedor.email|default:'' }}">
-      </div>
-      <div class="mb-4">
-        <label class="form-label fw-semibold">Dirección</label>
-        <textarea name="direccion" class="form-control" rows="2">{{ proveedor.direccion|default:'' }}</textarea>
-      </div>
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-dark">{{ accion }}</button>
-        <a href="{% url 'lista_proveedores' %}" class="btn btn-outline-secondary">Cancelar</a>
-      </div>
-    </form>
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -14,8 +14,20 @@ class Venta(models.Model):
         (ADELANTO_COMPLETADO, 'Apartado completado'),
     ]
 
+    EFECTIVO       = 'efectivo'
+    TARJETA        = 'tarjeta'
+    TRANSFERENCIA  = 'transferencia'
+
+    FORMAS_PAGO = [
+        (EFECTIVO,      'Efectivo'),
+        (TARJETA,       'Tarjeta'),
+        (TRANSFERENCIA, 'QR / Transferencia'),
+    ]
+
     cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, null=True, blank=True)
-    tipo_pago = models.CharField(max_length=25, choices=TIPOS_PAGO, default=CONTADO)
+    tipo_pago   = models.CharField(max_length=25, choices=TIPOS_PAGO, default=CONTADO)
+    forma_pago  = models.CharField(max_length=15, choices=FORMAS_PAGO, default=EFECTIVO,
+                                   help_text='Cómo cobró el vendedor (efectivo / tarjeta / QR)')
     deuda_id = models.PositiveIntegerField(null=True, blank=True)
     total = models.DecimalField(max_digits=10, decimal_places=2)
     vendedor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)

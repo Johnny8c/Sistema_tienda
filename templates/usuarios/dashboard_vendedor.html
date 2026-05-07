@@ -145,6 +145,49 @@
   </div>
 </div>
 
+<!-- Cobros de hoy por forma de pago -->
+<div class="row g-3 mb-3">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-wallet2 text-success me-2"></i>Mis cobros de hoy por forma de pago</span>
+        <span style="font-size:12px;color:var(--text-muted)">{{ tickets_hoy }} venta{{ tickets_hoy|pluralize }} · ${{ total_ventas_hoy|floatformat:2 }}</span>
+      </div>
+      <div class="card-body">
+        {% if ventas_por_forma %}
+        <div class="row g-3">
+          {% for f in ventas_por_forma %}
+          <div class="col-md-4">
+            <div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--card-bg)">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <div style="width:36px;height:36px;border-radius:8px;background:{{ f.color }}22;color:{{ f.color }};display:flex;align-items:center;justify-content:center;font-size:18px">
+                  <i class="bi {{ f.icono }}"></i>
+                </div>
+                <div>
+                  <div style="font-weight:600;font-size:14px">{{ f.label }}</div>
+                  <div style="font-size:12px;color:var(--text-muted)">{{ f.n }} venta{{ f.n|pluralize }}</div>
+                </div>
+                <div class="ms-auto fw-bold text-money" style="font-size:16px">${{ f.total|floatformat:2 }}</div>
+              </div>
+              <div style="background:var(--table-head-bg);height:6px;border-radius:3px;overflow:hidden">
+                <div style="background:{{ f.color }};height:100%;width:{{ f.pct }}%;transition:width .3s"></div>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:4px;text-align:right">{{ f.pct }}% del total</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-4" style="color:var(--text-muted);font-size:13px">
+          <i class="bi bi-cash" style="font-size:28px;display:block;margin-bottom:6px"></i>
+          Aún no hay ventas hoy
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- 3 columnas: deudas / apartados / últimas ventas -->
 <div class="row g-3">
   <div class="col-lg-4">

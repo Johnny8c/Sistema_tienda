@@ -47,11 +47,61 @@
   <div class="col-6 col-md-3">
     <div class="kpi-card" style="background:#0F172A;border-color:#1E293B !important">
       <div class="kpi-icon" style="background:rgba(255,255,255,.1);color:#fff"><i class="bi bi-safe2"></i></div>
-      <div class="kpi-label" style="color:#94A3B8">TOTAL INGRESOS</div>
+      <div class="kpi-label" style="color:#94A3B8">TOTAL NETO DEL DÍA</div>
       <div class="kpi-value text-money" style="color:#fff">${{ total_dia|floatformat:2 }}</div>
+      {% if total_reembolsos %}
+      <div style="font-size:11px;color:#FCA5A5;margin-top:4px">
+        Reembolsos: ${{ total_reembolsos|floatformat:2 }}
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
+
+{% if reembolsos %}
+<!-- Reembolsos (salidas de dinero) -->
+<div class="card mb-3" style="border-left:4px solid #E11D48">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-arrow-up-right text-danger me-2"></i>Reembolsos del día (salidas)</span>
+    <span class="fw-bold text-money" style="color:#E11D48">${{ total_reembolsos|floatformat:2 }}</span>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Hora</th><th>Tipo</th><th>Concepto</th>
+          <th>Forma</th><th>Vendedor</th>
+          <th class="text-end">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reembolsos %}
+        <tr>
+          <td data-label="Hora">{{ r.fecha|date:"H:i" }}</td>
+          <td data-label="Tipo">
+            <span class="badge" style="background:#FEE2E2;color:#991B1B">
+              {% if r.tipo == 'adelanto' %}Apartado{% else %}Deuda{% endif %} #{{ r.referencia_id }}
+            </span>
+          </td>
+          <td data-label="Concepto" style="font-size:12px;color:#64748B">
+            {{ r.notas|default:"—"|truncatechars:60 }}
+          </td>
+          <td data-label="Forma">
+            {% if r.forma_pago == 'efectivo' %}<i class="bi bi-cash-coin text-success me-1"></i>Efectivo
+            {% elif r.forma_pago == 'tarjeta' %}<i class="bi bi-credit-card text-primary me-1"></i>Tarjeta
+            {% else %}<i class="bi bi-qr-code text-info me-1"></i>QR / Transf.{% endif %}
+          </td>
+          <td data-label="Vendedor">{{ r.vendedor.get_full_name|default:r.vendedor.username }}</td>
+          <td data-label="Monto" class="text-end fw-bold text-money" style="color:#E11D48">
+            ${{ r.monto|floatformat:2 }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <div class="row g-3">
   <!-- Ventas contado -->

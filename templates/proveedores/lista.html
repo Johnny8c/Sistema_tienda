@@ -3,10 +3,77 @@
 {% block nav_proveedores %}active{% endblock %}
 {% block page_title %}Proveedores{% endblock %}
 
+{% block extra_head %}
+<style>
+  .prov-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    transition: box-shadow .2s, transform .2s, border-color .2s;
+    height: 100%;
+    display: flex; flex-direction: column;
+  }
+  .prov-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+    border-color: var(--primary);
+  }
+  [data-theme="dark"] .prov-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+
+  .prov-avatar {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    color: #fff; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(79,70,229,.25);
+  }
+  .prov-name { font-weight: 700; font-size: 15px; color: var(--text-1); margin-bottom: 2px; }
+  .prov-ruc {
+    font-family: monospace; font-size: 11px;
+    background: var(--table-head-bg); color: var(--text-muted);
+    padding: 2px 8px; border-radius: 4px;
+    display: inline-block;
+  }
+
+  .prov-info {
+    display: flex; flex-direction: column; gap: 6px;
+    margin: 12px 0;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .prov-info-row { display: flex; align-items: center; gap: 8px; color: var(--text-2); }
+  .prov-info-row i { width: 16px; flex-shrink: 0; color: var(--text-muted); }
+  .prov-info-row a { color: inherit; text-decoration: none; }
+  .prov-info-row a:hover { color: var(--primary); }
+
+  .prov-stats {
+    display: flex; gap: 16px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .prov-stats > div { flex: 1; }
+  .prov-stats-label { color: var(--text-muted); margin-bottom: 2px; }
+  .prov-stats-value { font-weight: 700; color: var(--text-1); font-size: 14px; }
+
+  .prov-actions {
+    margin-top: auto;
+    display: flex; gap: 6px;
+  }
+  .prov-actions .btn { flex: 1; font-size: 12px; padding: 6px 8px; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1 class="page-header-title">Proveedores</h1>
-  <div class="d-flex gap-2">
+  <div>
+    <h1 class="page-header-title">Proveedores</h1>
+    <p class="page-header-sub">{{ proveedores|length }} proveedor{{ proveedores|length|pluralize:"es" }} activo{{ proveedores|length|pluralize }}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
     <a href="{% url 'lista_compras' %}" class="btn btn-outline-secondary">
       <i class="bi bi-basket3 me-1"></i>Ver compras
     </a>
@@ -18,41 +85,92 @@
   </div>
 </div>
 
+{% if proveedores %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px">
+  {% for p in proveedores %}
+  <div class="prov-card">
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-2">
+      <div class="prov-avatar">{{ p.nombre|slice:":2"|upper }}</div>
+      <div style="flex:1;min-width:0">
+        <div class="prov-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ p.nombre }}
+        </div>
+        {% if p.ruc %}<span class="prov-ruc">{{ p.ruc }}</span>{% endif %}
+      </div>
+    </div>
+
+    <!-- Info de contacto -->
+    <div class="prov-info">
+      {% if p.contacto %}
+      <div class="prov-info-row">
+        <i class="bi bi-person"></i>
+        <span>{{ p.contacto }}</span>
+      </div>
+      {% endif %}
+      {% if p.telefono %}
+      <div class="prov-info-row">
+        <i class="bi bi-telephone"></i>
+        <a href="tel:{{ p.telefono }}">{{ p.telefono }}</a>
+      </div>
+      {% endif %}
+      {% if p.email %}
+      <div class="prov-info-row">
+        <i class="bi bi-envelope"></i>
+        <a href="mailto:{{ p.email }}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.email }}</a>
+      </div>
+      {% endif %}
+      {% if not p.contacto and not p.telefono and not p.email %}
+      <div style="font-size:12px;color:var(--text-muted);text-align:center">Sin datos de contacto</div>
+      {% endif %}
+    </div>
+
+    <!-- Stats -->
+    <div class="prov-stats">
+      <div>
+        <div class="prov-stats-label">Compras</div>
+        <div class="prov-stats-value">{{ p.total_compras_cnt|default:0 }}</div>
+      </div>
+      <div>
+        <div class="prov-stats-label">Total comprado</div>
+        <div class="prov-stats-value text-money">${{ p.total_comprado|default:0|floatformat:2 }}</div>
+      </div>
+    </div>
+
+    {% if p.ultima_compra %}
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
+      <i class="bi bi-clock me-1"></i>Última compra: {{ p.ultima_compra|date:"d/m/Y" }}
+    </div>
+    {% endif %}
+
+    <!-- Acciones -->
+    <div class="prov-actions">
+      {% if user.puede_registrar_compras %}
+      <a href="{% url 'crear_compra' %}?proveedor={{ p.pk }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Nueva compra
+      </a>
+      {% endif %}
+      {% if user.es_dueno %}
+      <a href="{% url 'editar_proveedor' p.pk %}" class="btn btn-outline-secondary" title="Editar">
+        <i class="bi bi-pencil"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
 <div class="card">
-  <div style="overflow-x:auto">
-    <table class="table table-hover mb-0">
-      <thead>
-        <tr>
-          <th>Nombre</th><th>RUC</th><th>Contacto</th><th>Teléfono</th><th>Email</th>
-          {% if user.es_dueno %}<th></th>{% endif %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for p in proveedores %}
-        <tr>
-          <td class="fw-semibold">{{ p.nombre }}</td>
-          <td><code style="background:#F1F5F9;padding:2px 7px;border-radius:5px;font-size:12px">{{ p.ruc|default:"—" }}</code></td>
-          <td style="color:#64748B">{{ p.contacto|default:"—" }}</td>
-          <td style="color:#64748B">{{ p.telefono|default:"—" }}</td>
-          <td style="color:#64748B">{{ p.email|default:"—" }}</td>
-          {% if user.es_dueno %}
-          <td>
-            <a href="{% url 'editar_proveedor' p.pk %}" class="btn btn-sm btn-outline-secondary btn-icon">
-              <i class="bi bi-pencil"></i>
-            </a>
-          </td>
-          {% endif %}
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="6" class="text-center py-5" style="color:#94A3B8">
-            <i class="bi bi-truck" style="font-size:32px;display:block;margin-bottom:8px"></i>
-            No hay proveedores registrados.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card-body text-center py-5" style="color:var(--text-muted)">
+    <i class="bi bi-truck" style="font-size:40px;display:block;margin-bottom:10px"></i>
+    <div class="fw-semibold mb-1">Sin proveedores</div>
+    <div class="small">Agrega tu primer proveedor para empezar a registrar compras.</div>
+    {% if user.es_dueno %}
+    <a href="{% url 'crear_proveedor' %}" class="btn btn-primary btn-sm mt-3">
+      <i class="bi bi-plus-lg me-1"></i>Nuevo proveedor
+    </a>
+    {% endif %}
   </div>
 </div>
+{% endif %}
 {% endblock %}

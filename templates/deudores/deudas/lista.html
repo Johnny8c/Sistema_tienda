@@ -3,9 +3,125 @@
 {% block nav_deudas %}active{% endblock %}
 {% block page_title %}Deudores{% endblock %}
 
+{% block extra_head %}
+<style>
+  .deuda-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    transition: box-shadow .2s, transform .2s, border-color .2s;
+    height: 100%;
+    display: flex; flex-direction: column;
+    position: relative;
+    border-left: 4px solid var(--border);
+  }
+  .deuda-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+  }
+  [data-theme="dark"] .deuda-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+  .deuda-card.b-0-30  { border-left-color: #10B981; }
+  .deuda-card.b-31-60 { border-left-color: #F59E0B; }
+  .deuda-card.b-61-90 { border-left-color: #EA580C; }
+  .deuda-card.b-90    { border-left-color: #E11D48; }
+  .deuda-card.saldada    { opacity: .65; border-left-color: #10B981; }
+  .deuda-card.condonada  { opacity: .55; border-left-color: var(--border); }
+
+  .deuda-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, #DC2626 0%, #F43F5E 100%);
+    color: #fff; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(220,38,38,.25);
+  }
+  .deuda-card.saldada .deuda-avatar {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    box-shadow: 0 4px 12px rgba(16,185,129,.25);
+  }
+
+  .deuda-cliente { font-weight: 700; font-size: 15px; color: var(--text-1); margin-bottom: 2px; }
+  .deuda-cedula {
+    font-family: monospace; font-size: 11px;
+    background: var(--table-head-bg); color: var(--text-muted);
+    padding: 2px 8px; border-radius: 4px;
+    display: inline-block;
+  }
+  .deuda-id {
+    position: absolute; top: 14px; right: 14px;
+    font-family: monospace; font-size: 11px;
+    color: var(--text-muted);
+    background: var(--table-head-bg);
+    padding: 2px 8px; border-radius: 4px;
+  }
+
+  .deuda-saldo-box {
+    text-align: center;
+    padding: 14px 0;
+    margin: 12px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .deuda-saldo-label {
+    font-size: 11px; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .05em;
+    margin-bottom: 4px;
+  }
+  .deuda-saldo-value {
+    font-size: 26px; font-weight: 800;
+    color: #B91C1C;
+  }
+  .deuda-card.saldada .deuda-saldo-value { color: #15803D; }
+
+  .deuda-progress-bar {
+    height: 6px; background: var(--table-head-bg);
+    border-radius: 3px; overflow: hidden;
+    margin-top: 8px;
+  }
+  .deuda-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #DC2626, #F43F5E);
+    border-radius: 3px;
+  }
+  .deuda-progress-fill.completed {
+    background: linear-gradient(90deg, #10B981, #059669);
+  }
+
+  .deuda-meta {
+    display: flex; gap: 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .deuda-meta > div { flex: 1; }
+  .deuda-meta-label { color: var(--text-muted); margin-bottom: 2px; font-size: 11px; }
+  .deuda-meta-value { font-weight: 600; color: var(--text-1); font-size: 13px; }
+
+  .deuda-actions {
+    margin-top: auto;
+    display: flex; gap: 6px;
+  }
+  .deuda-actions .btn { font-size: 12px; padding: 6px 8px; }
+  .deuda-actions .btn-flex { flex: 1; }
+
+  .antig-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700;
+    padding: 3px 10px; border-radius: 12px;
+  }
+  .antig-chip.b-0-30  { background: rgba(16,185,129,.15); color: #15803D; }
+  .antig-chip.b-31-60 { background: rgba(245,158,11,.15); color: #D97706; }
+  .antig-chip.b-61-90 { background: rgba(234,88,12,.15);  color: #EA580C; }
+  .antig-chip.b-90    { background: rgba(225,29,72,.15);  color: #B91C1C; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1 class="page-header-title">Deudores</h1>
+  <div>
+    <h1 class="page-header-title">Deudores</h1>
+    <p class="page-header-sub">{{ deudas|length }} deuda{{ deudas|length|pluralize }}</p>
+  </div>
 </div>
 
 <!-- Buckets de antigüedad -->
@@ -40,11 +156,12 @@
   </div>
 </div>
 
-<div class="card">
+<!-- Filtros -->
+<div class="card mb-4">
   <div class="card-body" style="padding:14px 16px !important">
-    <form method="get" class="d-flex flex-wrap gap-2">
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
       <div style="position:relative;flex:1;min-width:200px;max-width:360px">
-        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8"></i>
+        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
         <input type="text" name="q" value="{{ q }}" class="form-control" style="padding-left:36px"
                placeholder="Buscar cliente o cédula…">
       </div>
@@ -52,66 +169,186 @@
         <option value="pendiente" {% if estado == 'pendiente' %}selected{% endif %}>Pendientes</option>
         <option value="saldada"   {% if estado == 'saldada' %}selected{% endif %}>Saldadas</option>
         <option value="condonada" {% if estado == 'condonada' %}selected{% endif %}>Condonadas</option>
-        <option value="">Todas</option>
+        <option value=""          {% if estado == '' %}selected{% endif %}>Todas</option>
       </select>
-      <button class="btn btn-outline-secondary">Filtrar</button>
+      <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtrar</button>
     </form>
   </div>
-  <div style="overflow-x:auto">
-    <table class="table table-hover mb-0">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Cliente</th>
-          <th class="text-end">Monto original</th>
-          <th class="text-end">Saldo</th>
-          <th>Antigüedad</th>
-          <th>Estado</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for d in deudas %}
-        <tr>
-          <td data-label="#" style="color:#94A3B8;font-size:12px">#{{ d.pk }}</td>
-          <td data-label="Cliente">
-            <a href="{% url 'detalle_cliente' d.cliente.pk %}" style="font-weight:600;color:#1E293B;text-decoration:none">
-              {{ d.cliente.nombre }}
-            </a>
-            <div style="font-size:12px;color:#94A3B8">{{ d.cliente.cedula_ruc }}</div>
-          </td>
-          <td data-label="Monto original" class="text-end text-money">${{ d.monto_original|floatformat:2 }}</td>
-          <td data-label="Saldo" class="text-end fw-semibold text-money">${{ d.saldo_pendiente|floatformat:2 }}</td>
-          <td data-label="Antigüedad">
-            {% with bucket=d.bucket_antiguedad %}
-            <span class="badge
-              {% if bucket == '0-30' %}bg-success
-              {% elif bucket == '31-60' %}bg-warning text-dark
-              {% elif bucket == '61-90' %}{% else %}bg-danger{% endif %}"
-              {% if bucket == '61-90' %}style="background:#FED7AA;color:#92400E"{% endif %}>
-              {{ bucket }} días
-            </span>
-            {% endwith %}
-          </td>
-          <td data-label="Estado">
-            {% if d.estado == 'pendiente' %}<span class="badge badge-pendiente">Pendiente</span>
-            {% elif d.estado == 'saldada' %}<span class="badge badge-saldada">Saldada</span>
-            {% else %}<span class="badge badge-condonada">Condonada</span>{% endif %}
-          </td>
-          <td>
-            <a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-sm btn-outline-secondary w-100">Ver detalle</a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="7" class="text-center py-5" style="color:#94A3B8">
-            <i class="bi bi-people" style="font-size:32px;display:block;margin-bottom:8px"></i>
-            Sin deudas registradas.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+</div>
+
+{% if deudas %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px">
+  {% for d in deudas %}
+  {% with bucket=d.bucket_antiguedad %}
+  <div class="deuda-card {% if d.estado == 'saldada' %}saldada{% elif d.estado == 'condonada' %}condonada{% else %}b-{{ bucket }}{% endif %}">
+    <span class="deuda-id">#{{ d.pk }}</span>
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-2" style="padding-right:48px">
+      <div class="deuda-avatar">{{ d.cliente.nombre|slice:":2"|upper }}</div>
+      <div style="flex:1;min-width:0">
+        <a href="{% url 'detalle_cliente' d.cliente.pk %}"
+           class="deuda-cliente d-block text-decoration-none"
+           style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-1)">
+          {{ d.cliente.nombre }}
+        </a>
+        <span class="deuda-cedula">{{ d.cliente.cedula_ruc }}</span>
+      </div>
+    </div>
+
+    <!-- Estado + antigüedad -->
+    <div class="d-flex flex-wrap gap-2 mb-1">
+      {% if d.estado == 'pendiente' %}<span class="badge badge-pendiente">Pendiente</span>
+      {% elif d.estado == 'saldada' %}<span class="badge badge-saldada">Saldada</span>
+      {% else %}<span class="badge badge-condonada">Condonada</span>{% endif %}
+
+      {% if d.estado == 'pendiente' %}
+      <span class="antig-chip b-{{ bucket }}">
+        <i class="bi bi-clock-history"></i>{{ bucket }} días
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Saldo grande -->
+    <div class="deuda-saldo-box">
+      <div class="deuda-saldo-label">
+        {% if d.estado == 'saldada' %}Saldada por{% else %}Saldo pendiente{% endif %}
+      </div>
+      <div class="deuda-saldo-value text-money">
+        {% if d.estado == 'saldada' %}${{ d.monto_original|floatformat:2 }}{% else %}${{ d.saldo_pendiente|floatformat:2 }}{% endif %}
+      </div>
+      {% if d.estado == 'pendiente' and d.abonado > 0 %}
+      <div class="deuda-progress-bar">
+        <div class="deuda-progress-fill" style="width: {{ d.pct_pagado }}%"></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px">
+        Abonado <b style="color:#15803D">${{ d.abonado|floatformat:2 }}</b> de ${{ d.monto_original|floatformat:2 }} ({{ d.pct_pagado }}%)
+      </div>
+      {% elif d.estado == 'saldada' %}
+      <div class="deuda-progress-bar">
+        <div class="deuda-progress-fill completed" style="width: 100%"></div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Meta: fecha creación + vencimiento -->
+    <div class="deuda-meta">
+      <div>
+        <div class="deuda-meta-label"><i class="bi bi-calendar-plus me-1"></i>Creada</div>
+        <div class="deuda-meta-value">{{ d.fecha_creacion|date:"d/m/Y" }}</div>
+      </div>
+      <div>
+        <div class="deuda-meta-label"><i class="bi bi-calendar-x me-1"></i>Vence</div>
+        <div class="deuda-meta-value {% if d.fecha_vencimiento and d.fecha_vencimiento < hoy and d.estado == 'pendiente' %}text-danger{% endif %}">
+          {% if d.fecha_vencimiento %}{{ d.fecha_vencimiento|date:"d/m/Y" }}{% else %}Sin fecha{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="deuda-actions">
+      {% if d.estado == 'pendiente' %}
+      <button class="btn btn-primary btn-flex btn-abonar"
+              data-pk="{{ d.pk }}" data-cliente="{{ d.cliente.nombre }}"
+              data-saldo="{{ d.saldo_pendiente }}" data-tipo="deuda">
+        <i class="bi bi-cash-coin me-1"></i>Abonar
+      </button>
+      <a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-outline-secondary" title="Ver detalle">
+        <i class="bi bi-eye"></i>
+      </a>
+      {% else %}
+      <a href="{% url 'detalle_deuda' d.pk %}" class="btn btn-outline-secondary btn-flex">
+        <i class="bi bi-eye me-1"></i>Ver detalle
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5" style="color:var(--text-muted)">
+    <i class="bi bi-people" style="font-size:40px;display:block;margin-bottom:10px"></i>
+    <div class="fw-semibold mb-1">
+      {% if q %}Sin resultados{% else %}No hay deudas {% if estado %}{{ estado }}s{% else %}registradas{% endif %}{% endif %}
+    </div>
+    <div class="small">
+      {% if q %}Ajusta la búsqueda para ver más deudas.{% else %}Las deudas se generan al registrar ventas a crédito desde el POS.{% endif %}
+    </div>
   </div>
 </div>
+{% endif %}
+
+<!-- Modal abono rápido -->
+<div class="modal fade" id="modalAbonoRapido" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" id="form-abono-rapido">
+      {% csrf_token %}
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Registrar abono</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3" style="background:var(--table-head-bg);border-radius:8px;padding:10px 12px;font-size:13.5px">
+            <div style="color:var(--text-muted)">Cliente</div>
+            <div class="fw-semibold" id="ar-cliente">—</div>
+            <div class="d-flex justify-content-between mt-2">
+              <span style="color:var(--text-muted)">Saldo pendiente</span>
+              <span class="fw-bold text-money" id="ar-saldo">$0.00</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Monto del abono <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" name="monto" id="ar-monto" class="form-control"
+                     step="0.01" min="0.01" required autofocus>
+            </div>
+            <div class="form-text">No puede exceder el saldo pendiente.</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Forma de pago</label>
+            <select name="forma_pago" class="form-select">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">QR / Transferencia</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>Registrar abono
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const modalAbono = new bootstrap.Modal(document.getElementById('modalAbonoRapido'));
+const formAbono  = document.getElementById('form-abono-rapido');
+
+document.querySelectorAll('.btn-abonar').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pk     = btn.dataset.pk;
+    const cliente = btn.dataset.cliente;
+    const saldo  = parseFloat(btn.dataset.saldo);
+    const tipo   = btn.dataset.tipo;
+    formAbono.action = (tipo === 'adelanto')
+      ? `/deudores/adelantos/${pk}/abonar/`
+      : `/deudores/deudas/${pk}/abonar/`;
+    document.getElementById('ar-cliente').textContent = cliente;
+    document.getElementById('ar-saldo').textContent = '$' + saldo.toFixed(2);
+    document.getElementById('ar-monto').value = '';
+    document.getElementById('ar-monto').max = saldo;
+    modalAbono.show();
+  });
+});
+</script>
 {% endblock %}

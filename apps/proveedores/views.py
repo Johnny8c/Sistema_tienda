@@ -13,7 +13,12 @@ from .models import Proveedor, Compra, ItemCompra
 
 @requiere_no_vendedor
 def lista_proveedores(request):
-    proveedores = Proveedor.objects.filter(activo=True)
+    from django.db.models import Sum, Count, Max
+    proveedores = Proveedor.objects.filter(activo=True).annotate(
+        total_compras_cnt=Count('compras'),
+        total_comprado=Sum('compras__total'),
+        ultima_compra=Max('compras__fecha'),
+    ).order_by('nombre')
     return render(request, 'proveedores/lista.html', {'proveedores': proveedores})
 
 
@@ -57,8 +62,18 @@ def editar_proveedor(request, pk):
 
 @requiere_no_vendedor
 def lista_compras(request):
-    compras = Compra.objects.select_related('proveedor', 'registrado_por').all()
-    return render(request, 'proveedores/lista_compras.html', {'compras': compras})
+    from django.db.models import Count
+    estado = request.GET.get('estado', '')
+    compras = (Compra.objects
+               .select_related('proveedor', 'registrado_por')
+               .annotate(items_cnt=Count('items'))
+               .order_by('-fecha', '-id'))
+    if estado in (Compra.PAGADA, Compra.PENDIENTE):
+        compras = compras.filter(estado=estado)
+    return render(request, 'proveedores/lista_compras.html', {
+        'compras': compras,
+        'estado': estado,
+    })
 
 
 @requiere_no_vendedor

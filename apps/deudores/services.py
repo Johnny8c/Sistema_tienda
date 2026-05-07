@@ -138,7 +138,14 @@ def completar_adelanto(adelanto_id: int, vendedor: Usuario) -> Venta:
 
 
 @transaction.atomic
-def cancelar_adelanto(adelanto_id: int, motivo: str, vendedor: Usuario) -> Adelanto:
+def cancelar_adelanto(adelanto_id: int, motivo: str, vendedor: Usuario,
+                      tipo_devolucion: str = 'saldo_favor',
+                      forma_pago: str = 'efectivo') -> Adelanto:
+    """
+    Cancela un adelanto y maneja el dinero ya pagado según tipo_devolucion:
+      - 'saldo_favor': se acredita al saldo a favor del cliente (default)
+      - 'reembolso':   se devuelve el dinero (se registra como pago de salida)
+    """
     if not vendedor.es_dueno():
         raise PermisoInsuficienteError('Solo el dueño puede cancelar apartados.')
 
@@ -151,18 +158,35 @@ def cancelar_adelanto(adelanto_id: int, motivo: str, vendedor: Usuario) -> Adela
 
     monto_pagado = adelanto.total - adelanto.saldo_pendiente
 
+    # Liberar stock reservado
     for item in adelanto.items.select_related('producto').all():
         producto = Producto.objects.select_for_update().get(pk=item.producto_id)
         producto.stock_reservado -= item.cantidad
         producto.save(update_fields=['stock_reservado'])
 
+    # Manejar el dinero ya pagado
+    nota_devolucion = ''
     if monto_pagado > 0:
-        cliente = Cliente.objects.select_for_update().get(pk=adelanto.cliente_id)
-        cliente.saldo_a_favor += monto_pagado
-        cliente.save(update_fields=['saldo_a_favor'])
+        if tipo_devolucion == 'reembolso':
+            # Registrar como movimiento de SALIDA en Pago (monto negativo)
+            Pago.objects.create(
+                tipo=Pago.TIPO_ADELANTO,
+                referencia_id=adelanto.pk,
+                monto=-monto_pagado,
+                forma_pago=forma_pago,
+                vendedor=vendedor,
+                notas=f'REEMBOLSO por cancelación de apartado #{adelanto.pk}: {motivo}',
+            )
+            nota_devolucion = f'Reembolso de ${monto_pagado} ({forma_pago}).'
+        else:
+            # saldo a favor
+            cliente = Cliente.objects.select_for_update().get(pk=adelanto.cliente_id)
+            cliente.saldo_a_favor += monto_pagado
+            cliente.save(update_fields=['saldo_a_favor'])
+            nota_devolucion = f'${monto_pagado} acreditado como saldo a favor.'
 
     adelanto.estado = Adelanto.CANCELADO
-    adelanto.notas = f'Cancelado: {motivo}'
+    adelanto.notas = f'Cancelado: {motivo}. {nota_devolucion}'.strip()
     adelanto.save(update_fields=['estado', 'notas'])
 
     return adelanto

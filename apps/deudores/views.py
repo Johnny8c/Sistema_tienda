@@ -26,8 +26,10 @@ def _productos_json():
             'id': p.pk, 'nombre': p.nombre, 'talla': p.talla, 'color': p.color,
             'precio': str(p.precio), 'stock_disponible': p.stock_disponible,
             'codigo_barras': p.codigo_barras or '',
+            'precio_min': str(p.catalogo.precio_minimo) if (p.catalogo and p.catalogo.precio_minimo is not None) else None,
+            'precio_max': str(p.catalogo.precio_maximo) if (p.catalogo and p.catalogo.precio_maximo is not None) else None,
         }
-        for p in Producto.objects.filter(activo=True)
+        for p in Producto.objects.select_related('catalogo').filter(activo=True)
     ])
 
 
@@ -43,8 +45,14 @@ def lista_adelantos(request):
         qs = qs.filter(estado=estado)
     if q:
         qs = qs.filter(Q(cliente__nombre__icontains=q) | Q(cliente__cedula_ruc__icontains=q))
+
+    adelantos = list(qs)
+    for a in adelantos:
+        a.abonado = a.total - a.saldo_pendiente
+        a.pct_pagado = int((a.abonado / a.total) * 100) if a.total else 0
+
     return render(request, 'deudores/adelantos/lista.html', {
-        'adelantos': qs, 'q': q, 'estado': estado, 'hoy': timezone.now().date(),
+        'adelantos': adelantos, 'q': q, 'estado': estado, 'hoy': timezone.now().date(),
     })
 
 
@@ -130,9 +138,19 @@ def cancelar_adelanto_view(request, pk):
     if request.method != 'POST':
         return redirect('detalle_adelanto', pk=pk)
     motivo = request.POST.get('motivo', '')
+    tipo_dev = request.POST.get('tipo_devolucion', 'saldo_favor')
+    forma_pago = request.POST.get('forma_pago', 'efectivo')
+    if tipo_dev not in ('saldo_favor', 'reembolso'):
+        tipo_dev = 'saldo_favor'
+    if forma_pago not in ('efectivo', 'tarjeta', 'transferencia'):
+        forma_pago = 'efectivo'
     try:
-        cancelar_adelanto(pk, motivo, request.user)
-        messages.success(request, 'Apartado cancelado. Saldo transferido como crédito a favor del cliente.')
+        cancelar_adelanto(pk, motivo, request.user,
+                          tipo_devolucion=tipo_dev, forma_pago=forma_pago)
+        if tipo_dev == 'reembolso':
+            messages.success(request, 'Apartado cancelado. Reembolso registrado en el cierre de caja.')
+        else:
+            messages.success(request, 'Apartado cancelado. Saldo transferido como crédito a favor del cliente.')
     except (EstadoInvalidoError, PermisoInsuficienteError) as e:
         messages.error(request, str(e))
     return redirect('detalle_adelanto', pk=pk)
@@ -163,8 +181,14 @@ def lista_deudas(request):
                 total += d.saldo_pendiente
         return total
 
+    deudas = list(qs)
+    for d in deudas:
+        d.abonado = d.monto_original - d.saldo_pendiente
+        d.pct_pagado = int((d.abonado / d.monto_original) * 100) if d.monto_original else 0
+
     return render(request, 'deudores/deudas/lista.html', {
-        'deudas': qs, 'q': q, 'estado': estado,
+        'deudas': deudas, 'q': q, 'estado': estado,
+        'hoy': timezone.now().date(),
         'bucket_0_30': bucket_sum(0, 30),
         'bucket_31_60': bucket_sum(31, 60),
         'bucket_61_90': bucket_sum(61, 90),
@@ -228,8 +252,14 @@ def condonar_deuda_view(request, pk):
 @requiere_no_bodeguero
 def pos(request):
     clientes = Cliente.objects.filter(activo=True).order_by('nombre')
+    clientes_json = json.dumps([
+        {'id': c.pk, 'nombre': c.nombre, 'cedula_ruc': c.cedula_ruc,
+         'telefono': c.telefono or ''}
+        for c in clientes
+    ])
     return render(request, 'pos/index.html', {
         'clientes': clientes,
+        'clientes_json': clientes_json,
         'productos_json': _productos_json(),
     })
 
@@ -240,9 +270,20 @@ def procesar_venta(request):
     if request.method != 'POST':
         return redirect('pos')
 
+    from apps.configuracion.models import ConfiguracionGeneral
+    cfg_gen = ConfiguracionGeneral.get_singleton()
+
     tipo = request.POST.get('tipo_venta', 'contado')
     cliente_id = request.POST.get('cliente_id') or None
     items_json = request.POST.get('items_json', '[]')
+    forma_pago = request.POST.get('forma_pago', 'efectivo')
+    if forma_pago not in ('efectivo', 'tarjeta', 'transferencia'):
+        forma_pago = 'efectivo'
+
+    # Preferencia: cliente obligatorio en venta al contado
+    if tipo == 'contado' and not cliente_id and cfg_gen.cliente_obligatorio_venta:
+        messages.error(request, 'La configuración del sistema exige cliente en cada venta.')
+        return redirect('pos')
 
     try:
         items = json.loads(items_json)
@@ -280,36 +321,79 @@ def procesar_venta(request):
             from django.db import transaction
 
             with transaction.atomic():
-                # Validar stock disponible (descontando reservados) antes de crear nada
+                # Validar stock disponible y precio mínimo antes de crear nada
                 for i in items:
-                    prod = Prod.objects.select_for_update().get(pk=i['producto_id'])
-                    if prod.stock_disponible < i['cantidad']:
+                    prod = Prod.objects.select_related('catalogo').select_for_update().get(pk=i['producto_id'])
+                    if prod.stock_disponible < i['cantidad'] and not cfg_gen.permitir_vender_sin_stock:
                         raise StockInsuficienteError(
                             f'"{prod.nombre}" tiene solo {prod.stock_disponible} unidades disponibles '
                             f'({prod.stock_reservado} reservadas en apartados). '
                             f'No se puede vender {i["cantidad"]}.'
                         )
+                    # Usar precio del carrito si viene; si no, el del producto
+                    pu = Decimal(str(i.get('precio_unitario', prod.precio)))
+                    if pu <= 0:
+                        raise ValueError(f'Precio unitario inválido para "{prod.nombre}".')
+                    # Validar rango según preferencia
+                    if cfg_gen.precio_fuera_rango_modo == cfg_gen.PRECIO_RANGO_BLOQUEAR and prod.catalogo:
+                        if prod.catalogo.precio_minimo is not None and pu < prod.catalogo.precio_minimo:
+                            raise ValueError(
+                                f'"{prod.nombre}" no se puede vender por debajo de '
+                                f'${prod.catalogo.precio_minimo} (precio mínimo del producto).'
+                            )
+                        if prod.catalogo.precio_maximo is not None and pu > prod.catalogo.precio_maximo:
+                            raise ValueError(
+                                f'"{prod.nombre}" no se puede vender por encima de '
+                                f'${prod.catalogo.precio_maximo} (precio máximo del producto).'
+                            )
 
                 total = sum(
-                    Prod.objects.get(pk=i['producto_id']).precio * i['cantidad']
+                    Decimal(str(i.get('precio_unitario', Prod.objects.get(pk=i['producto_id']).precio))) * i['cantidad']
                     for i in items
                 )
                 venta = Venta.objects.create(
                     cliente_id=int(cliente_id) if cliente_id else None,
                     tipo_pago=Venta.CONTADO,
+                    forma_pago=forma_pago,
                     total=total,
                     vendedor=request.user,
                 )
                 for i in items:
                     prod = Prod.objects.select_for_update().get(pk=i['producto_id'])
+                    pu = Decimal(str(i.get('precio_unitario', prod.precio)))
                     ItemVenta.objects.create(
                         venta=venta, producto=prod,
-                        cantidad=i['cantidad'], precio_unitario=prod.precio,
+                        cantidad=i['cantidad'], precio_unitario=pu,
                     )
                     prod.stock -= i['cantidad']
                     prod.save(update_fields=['stock'])
 
-            return redirect('nota_venta', pk=venta.pk)
+            # Si el cajero marcó "Emitir factura SRI", generarla y enviarla
+            emitir = request.POST.get('emitir_factura') == '1'
+            if emitir and venta.cliente_id:
+                from apps.facturacion.models import ConfiguracionSRI
+                from apps.facturacion.views import _crear_factura_desde_venta, _emitir_factura
+                cfg = ConfiguracionSRI.get_singleton()
+                if not cfg or not cfg.cert_configurado:
+                    messages.warning(
+                        request,
+                        f'Venta #{venta.pk} registrada pero no se pudo facturar al SRI: '
+                        f'configura tus datos y certificado en SRI → Configuración.'
+                    )
+                else:
+                    try:
+                        factura = _crear_factura_desde_venta(venta, request.user, cfg)
+                        return _emitir_factura(request, factura, cfg)
+                    except Exception as e:
+                        messages.warning(
+                            request,
+                            f'Venta #{venta.pk} registrada, pero hubo un problema al emitir factura: {e}'
+                        )
+
+            url = redirect('nota_venta', pk=venta.pk)
+            if cfg_gen.imprimir_auto_nota:
+                url['Location'] += '?print=auto'
+            return url
 
     except (StockInsuficienteError, SaldoInsuficienteError, ValueError) as e:
         messages.error(request, str(e))

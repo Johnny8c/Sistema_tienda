@@ -37,10 +37,15 @@
   }
   .cart-item {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 0;
-    border-bottom: 1px solid #F1F5F9;
+    padding: 12px 14px;
+    border-radius: 6px;
+    transition: background .15s;
   }
-  .cart-item:last-child { border-bottom: none; }
+  /* Filas zebra: blanco / gris claro */
+  .cart-item:nth-child(even) { background: #EEF2F7; }
+  .cart-item:hover           { background: #DBE3EE; }
+  [data-theme="dark"] .cart-item:nth-child(even) { background: rgba(255,255,255,.06); }
+  [data-theme="dark"] .cart-item:hover           { background: rgba(255,255,255,.10); }
   .cart-item-info { flex: 1; min-width: 0; }
   .cart-qty-btn {
     width: 28px; height: 28px; border-radius: 6px;
@@ -62,14 +67,14 @@
   }
   .cart-remove:hover { background: #FEE2E2; color: #EF4444; }
 
-  .sale-type-btn {
+  .sale-type-btn, .pay-type-btn {
     flex: 1; padding: 10px; border-radius: 8px;
     border: 1.5px solid #E2E8F0; background: #fff;
     cursor: pointer; font-size: 13px; font-weight: 500;
     color: #64748B; transition: all .15s; text-align: center;
   }
-  .sale-type-btn:hover { border-color: #4F46E5; color: #4F46E5; }
-  .sale-type-btn.selected {
+  .sale-type-btn:hover, .pay-type-btn:hover { border-color: #4F46E5; color: #4F46E5; }
+  .sale-type-btn.selected, .pay-type-btn.selected {
     border-color: #4F46E5; background: #EEF2FF; color: #4F46E5; font-weight: 600;
   }
 
@@ -127,7 +132,7 @@
           <i class="bi bi-cart3" style="font-size:32px;display:block;margin-bottom:8px;color:#CBD5E1"></i>
           Busca y agrega productos arriba
         </div>
-        <div id="cart-items" style="padding:0 20px"></div>
+        <div id="cart-items" style="padding:8px 12px"></div>
       </div>
     </div>
   </div>
@@ -153,22 +158,43 @@
         </div>
       </div>
 
+      <!-- Emitir factura SRI -->
+      <div class="mb-3" style="background:var(--table-head-bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="emitir-factura">
+          <label class="form-check-label" for="emitir-factura" style="font-size:13.5px;font-weight:600;cursor:pointer">
+            <i class="bi bi-file-earmark-text text-primary me-1"></i>Emitir factura electrónica al SRI
+          </label>
+          <div id="emitir-factura-hint" style="font-size:11px;color:var(--text-muted);margin-top:2px;margin-left:24px">
+            Selecciona un cliente con cédula/RUC válido.
+          </div>
+        </div>
+      </div>
+
       <!-- Cliente (siempre visible — requerido para apartado/crédito y para emitir factura SRI) -->
       <div id="seccion-cliente" class="mb-3">
         <label class="form-label">
           Cliente <span id="cliente-required" style="color:#94A3B8;font-size:11px">(opcional al contado · requerido para factura SRI)</span>
         </label>
-        <select id="sel-cliente" class="form-select">
-          <option value="">— Consumidor final —</option>
-          {% for c in clientes %}
-          <option value="{{ c.pk }}">{{ c.nombre }} ({{ c.cedula_ruc }})</option>
-          {% endfor %}
-        </select>
-        <div style="font-size:12px;color:#64748B;margin-top:4px">
-          <a href="#" id="btn-nuevo-cliente" style="color:#4F46E5;text-decoration:none">
-            <i class="bi bi-plus-circle me-1"></i>Nuevo cliente rápido
-          </a>
+        <div class="cliente-search-wrap" style="position:relative">
+          <div class="input-group">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="text" id="cliente-buscar" class="form-control"
+                   placeholder="Buscar por nombre o cédula… (vacío = consumidor final)"
+                   autocomplete="off">
+            <button type="button" class="btn btn-outline-secondary" id="cliente-clear" title="Limpiar selección">
+              <i class="bi bi-x-lg"></i>
+            </button>
+            <button type="button" class="btn btn-primary" id="btn-nuevo-cliente" title="Crear nuevo cliente">
+              <i class="bi bi-person-plus"></i>
+            </button>
+          </div>
+          <div id="cliente-resultados" class="search-results" style="position:absolute;top:100%;left:0;right:0;z-index:50"></div>
+          <div id="cliente-seleccionado" style="display:none;font-size:12px;color:#15803D;margin-top:4px;font-weight:500">
+            <i class="bi bi-check-circle-fill me-1"></i><span></span>
+          </div>
         </div>
+        <input type="hidden" id="sel-cliente" value="">
       </div>
 
       <!-- Adelanto (apartado) -->
@@ -192,27 +218,17 @@
       <div id="seccion-forma-pago" class="mb-3">
         <label class="form-label">Forma de pago</label>
         <div class="d-flex gap-2">
-          {% for valor, label in formas %}
-          <div class="form-check mb-0">
-            <input class="form-check-input" type="radio" name="forma_pago"
-                   id="fp-{{ valor }}" value="{{ valor }}" {% if forloop.first %}checked{% endif %}>
-            <label class="form-check-label" for="fp-{{ valor }}" style="font-size:13px">{{ label }}</label>
-          </div>
-          {% empty %}
-          <div class="form-check mb-0">
-            <input class="form-check-input" type="radio" name="forma_pago" id="fp-efectivo" value="efectivo" checked>
-            <label class="form-check-label" for="fp-efectivo" style="font-size:13px">Efectivo</label>
-          </div>
-          <div class="form-check mb-0">
-            <input class="form-check-input" type="radio" name="forma_pago" id="fp-tarjeta" value="tarjeta">
-            <label class="form-check-label" for="fp-tarjeta" style="font-size:13px">Tarjeta</label>
-          </div>
-          <div class="form-check mb-0">
-            <input class="form-check-input" type="radio" name="forma_pago" id="fp-qr" value="transferencia">
-            <label class="form-check-label" for="fp-qr" style="font-size:13px">QR</label>
-          </div>
-          {% endfor %}
+          <button type="button" class="pay-type-btn selected" data-forma="efectivo">
+            <i class="bi bi-cash-coin d-block mb-1" style="font-size:18px"></i>Efectivo
+          </button>
+          <button type="button" class="pay-type-btn" data-forma="tarjeta">
+            <i class="bi bi-credit-card d-block mb-1" style="font-size:18px"></i>Tarjeta
+          </button>
+          <button type="button" class="pay-type-btn" data-forma="transferencia">
+            <i class="bi bi-qr-code d-block mb-1" style="font-size:18px"></i>QR
+          </button>
         </div>
+        <input type="hidden" id="forma-pago-valor" value="efectivo">
         <div class="mt-2" id="campo-recibido">
           <label class="form-label" style="font-size:12px">Monto recibido</label>
           <div class="input-group input-group-sm">
@@ -248,6 +264,7 @@
   <input type="hidden" name="plazo_dias"    id="hidden-plazo">
   <input type="hidden" name="forma_pago"    id="hidden-forma-pago">
   <input type="hidden" name="items_json"    id="hidden-items">
+  <input type="hidden" name="emitir_factura" id="hidden-emitir-factura" value="0">
 </form>
 
 <!-- Modal nuevo cliente rápido -->
@@ -294,6 +311,33 @@
 {% block extra_js %}
 <script>
 const productos = {{ productos_json|safe }};
+const PREFS = {
+  clienteObligatorio: {{ config_general.cliente_obligatorio_venta|yesno:"true,false" }},
+  permitirSinStock:   {{ config_general.permitir_vender_sin_stock|yesno:"true,false" }},
+  modoPrecioRango:    "{{ config_general.precio_fuera_rango_modo|default:'advertir' }}",
+  sonidoEscaneo:      {{ config_general.sonido_escaneo|yesno:"true,false" }},
+  stockMinimoAlerta:  {{ config_general.stock_minimo_alerta|default:5 }},
+};
+
+/* ─── BEEP ────────────────────────────────────────── */
+let _audioCtx = null;
+function beep(ok = true) {
+  if (!PREFS.sonidoEscaneo) return;
+  try {
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = _audioCtx.createOscillator();
+    const g = _audioCtx.createGain();
+    o.connect(g); g.connect(_audioCtx.destination);
+    o.type = 'square';
+    o.frequency.value = ok ? 1200 : 350;
+    g.gain.setValueAtTime(0.0001, _audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.18, _audioCtx.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, _audioCtx.currentTime + 0.12);
+    o.start();
+    o.stop(_audioCtx.currentTime + 0.13);
+  } catch(e) { /* sin audio, sin drama */ }
+}
+
 let carrito = [];
 let tipoActual = 'contado';
 
@@ -349,21 +393,82 @@ document.addEventListener('click', e => {
    1) Buscar match EXACTO por codigo_barras → agregar al carrito
    2) Si hay 1 sola coincidencia por nombre, también agregar
 */
+/**
+ * Normaliza un código de barras para tolerar desfases de layout de teclado
+ * en lectores USB (ES vs US): apóstrofes/comillas se convierten a guion.
+ */
+function normalizarCodigo(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/[''`´]/g, '-')   // varias formas de apóstrofe → guion
+    .toUpperCase()
+    .trim();
+}
+
 buscador.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   e.preventDefault();
   const q = buscador.value.trim();
   if (!q) return;
 
+  const qNorm = normalizarCodigo(q);
+
   // 1. Match exacto por código de barras (lo típico al escanear)
-  const exacto = productos.find(p => p.codigo_barras === q);
+  // Comparación normalizada para tolerar layouts de teclado distintos.
+  const exacto = productos.find(p =>
+    p.codigo_barras === q ||
+    normalizarCodigo(p.codigo_barras) === qNorm
+  );
   if (exacto) {
-    if (exacto.stock_disponible <= 0) {
-      window.showToast && showToast(`"${exacto.nombre}" sin stock disponible`, 'warning');
-    } else {
-      agregarItem(exacto);
-      window.showToast && showToast(`+ ${exacto.nombre}`, 'success', 1500);
+    // Construir descripción de variante (talla / color)
+    const variantInfo = (exacto.talla || exacto.color)
+      ? ` · ${[exacto.talla ? 'T '+exacto.talla : '', exacto.color || ''].filter(Boolean).join(' / ')}`
+      : '';
+    const labelCompleto = `${exacto.nombre}${variantInfo}`;
+
+    if (exacto.stock_disponible <= 0 && !PREFS.permitirSinStock) {
+      beep(false);
+      window.showToast && showToast(`✗ ${labelCompleto} — sin stock disponible`, 'danger', 3500);
+      buscador.value = '';
+      resultados.classList.remove('open');
+      return;
     }
+
+    const result = agregarItem(exacto);
+
+    if (result.stockMaximo) {
+      // No se agregó porque ya está al máximo del stock
+      beep(false);
+      window.showToast && showToast(
+        `⚠ ${labelCompleto} — ya tienes las ${exacto.stock_disponible} uds. en stock`,
+        'warning', 3500
+      );
+      buscador.value = '';
+      resultados.classList.remove('open');
+      return;
+    }
+
+    beep(true);
+    const enCarrito = (carrito.find(i => i.id === exacto.id) || {}).cantidad || 0;
+    const restantes = Math.max(0, exacto.stock_disponible - enCarrito);
+    let msg, tipo;
+    if (exacto.stock_disponible <= 0) {
+      msg = `⚠ ${labelCompleto} — sin stock, bajo pedido (×${enCarrito})`;
+      tipo = 'warning';
+    } else if (restantes === 0) {
+      msg = `✓ ${labelCompleto} — ¡última unidad! (×${enCarrito})`;
+      tipo = 'warning';
+    } else if (restantes <= 2) {
+      msg = `⚠ ${labelCompleto} — stock bajo, solo ${restantes} más (×${enCarrito})`;
+      tipo = 'warning';
+    } else if (exacto.stock_disponible <= PREFS.stockMinimoAlerta) {
+      msg = `+ ${labelCompleto} — ${restantes} más en stock (×${enCarrito})`;
+      tipo = 'warning';
+    } else {
+      msg = `+ ${labelCompleto} — ${restantes} disponibles (×${enCarrito})`;
+      tipo = 'success';
+    }
+    window.showToast && showToast(msg, tipo, 2500);
     buscador.value = '';
     resultados.classList.remove('open');
     return;
@@ -371,10 +476,28 @@ buscador.addEventListener('keydown', (e) => {
 
   // 2. Una sola coincidencia por nombre/código → agregar
   const hits = productos.filter(p =>
-    p.nombre.toLowerCase().includes(q.toLowerCase()) || (p.codigo_barras || '').includes(q)
+    p.nombre.toLowerCase().includes(q.toLowerCase()) ||
+    (p.codigo_barras || '').includes(q) ||
+    normalizarCodigo(p.codigo_barras).includes(qNorm)
   );
-  if (hits.length === 1 && hits[0].stock_disponible > 0) {
-    agregarItem(hits[0]);
+  if (hits.length === 1 && (hits[0].stock_disponible > 0 || PREFS.permitirSinStock)) {
+    const h = hits[0];
+    const variantInfo = (h.talla || h.color)
+      ? ` · ${[h.talla ? 'T '+h.talla : '', h.color || ''].filter(Boolean).join(' / ')}`
+      : '';
+    const labelCompleto = `${h.nombre}${variantInfo}`;
+    const result = agregarItem(h);
+    if (result.stockMaximo) {
+      beep(false);
+      window.showToast && showToast(
+        `⚠ ${labelCompleto} — ya tienes las ${h.stock_disponible} uds. en stock`,
+        'warning', 3500
+      );
+    } else {
+      beep(true);
+      const enCarrito = (carrito.find(i => i.id === h.id) || {}).cantidad || 0;
+      window.showToast && showToast(`+ ${labelCompleto} (×${enCarrito})`, 'success', 2000);
+    }
     buscador.value = '';
     resultados.classList.remove('open');
     return;
@@ -382,19 +505,61 @@ buscador.addEventListener('keydown', (e) => {
 
   // Si no hubo match exacto, mostrar aviso
   if (!hits.length) {
+    beep(false);
     window.showToast && showToast(`No se encontró el código "${q}"`, 'danger');
     buscador.value = '';
     resultados.classList.remove('open');
   }
 });
 
+/* ─── TRADUCTOR DE COLORES ES → CSS ───────────────── */
+const COLORES_ES = {
+  'blanco':'#FFFFFF', 'negro':'#000000', 'gris':'#9CA3AF', 'plata':'#C0C0C0',
+  'rojo':'#DC2626', 'rosa':'#F472B6', 'rosado':'#F9A8D4',
+  'naranja':'#F97316', 'naranjado':'#F97316', 'durazno':'#FBBF24',
+  'amarillo':'#FACC15', 'mostaza':'#CA8A04',
+  'verde':'#16A34A', 'verde menta':'#86EFAC', 'verde militar':'#4D7C0F', 'verde oliva':'#65A30D', 'turquesa':'#06B6D4',
+  'azul':'#2563EB', 'azul oscuro':'#1E40AF', 'azul claro':'#60A5FA', 'azul desgastado':'#3B82F6', 'celeste':'#7DD3FC', 'marino':'#172554',
+  'morado':'#9333EA', 'violeta':'#8B5CF6', 'lila':'#C4B5FD', 'purpura':'#7C3AED', 'púrpura':'#7C3AED',
+  'cafe':'#92400E', 'café':'#92400E', 'marron':'#78350F', 'marrón':'#78350F', 'chocolate':'#5C3317',
+  'beige':'#E7DCC0', 'crema':'#FFFDD0', 'hueso':'#F5F5DC', 'arena':'#D4B996',
+  'coral':'#FB7185', 'salmon':'#FCA5A5', 'salmón':'#FCA5A5',
+  'dorado':'#FBBF24', 'oro':'#D4AF37', 'bronce':'#CD7F32',
+};
+function colorEspanolACss(nombre) {
+  if (!nombre) return '#94A3B8';
+  const k = nombre.toLowerCase().trim();
+  if (COLORES_ES[k]) return COLORES_ES[k];
+  // Si es un color CSS válido (ej. "coral", "beige"), lo deja pasar
+  return k;
+}
+
 /* ─── CARRITO ─────────────────────────────────────── */
 function agregarItem(p) {
   const ex = carrito.find(i => i.id === p.id);
-  if (ex) { ex.cantidad = Math.min(ex.cantidad + 1, p.stock_disponible); }
-  else     { carrito.push({id:p.id, nombre:p.nombre, talla:p.talla, color:p.color,
-                            precio:parseFloat(p.precio), cantidad:1, stock:p.stock_disponible}); }
+  let resultado = { agregado: false, nuevoEnCarrito: false, stockMaximo: false };
+  if (ex) {
+    if (PREFS.permitirSinStock) {
+      ex.cantidad = ex.cantidad + 1;
+      resultado.agregado = true;
+    } else if (ex.cantidad < p.stock_disponible) {
+      ex.cantidad += 1;
+      resultado.agregado = true;
+    } else {
+      // Ya alcanzó el stock máximo, no se incrementa
+      resultado.stockMaximo = true;
+    }
+  } else {
+    carrito.push({id:p.id, nombre:p.nombre, talla:p.talla, color:p.color,
+                  precio:parseFloat(p.precio), precio_original:parseFloat(p.precio),
+                  precio_min: p.precio_min !== null ? parseFloat(p.precio_min) : null,
+                  precio_max: p.precio_max !== null ? parseFloat(p.precio_max) : null,
+                  cantidad:1, stock:p.stock_disponible});
+    resultado.agregado = true;
+    resultado.nuevoEnCarrito = true;
+  }
   renderCarrito();
+  return resultado;
 }
 
 function renderCarrito() {
@@ -411,15 +576,67 @@ function renderCarrito() {
     return;
   }
   empty.style.display = 'none';
-  items.innerHTML = carrito.map((item, i) => `
+  items.innerHTML = carrito.map((item, i) => {
+    const rangoTxt = (item.precio_min !== null || item.precio_max !== null)
+      ? `<span style="font-size:11px;color:#94A3B8;margin-left:4px">
+           (${item.precio_min !== null ? '$'+item.precio_min.toFixed(2) : '—'}
+            → ${item.precio_max !== null ? '$'+item.precio_max.toFixed(2) : '—'})
+         </span>`
+      : '';
+    const fueraDeRango = (item.precio_min !== null && item.precio < item.precio_min) ||
+                        (item.precio_max !== null && item.precio > item.precio_max);
+    const colorPrecio = fueraDeRango ? '#E11D48' : 'inherit';
+    // Etiquetas visuales de variante
+    const tallaTag = item.talla
+      ? `<span style="display:inline-flex;align-items:center;background:#EEF2FF;color:#4338CA;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;letter-spacing:.05em">${item.talla}</span>`
+      : '';
+    const colorCss = colorEspanolACss(item.color);
+    const colorTag = item.color
+      ? `<span style="display:inline-flex;align-items:center;gap:5px;background:#F1F5F9;color:#334155;font-size:11px;font-weight:500;padding:2px 8px;border-radius:4px">
+           <span style="width:10px;height:10px;border-radius:50%;background:${colorCss};border:1px solid rgba(0,0,0,.15);flex-shrink:0"></span>
+           ${item.color}
+         </span>`
+      : '';
+    // Chip visual de stock (vs cantidad en carrito)
+    const restantes = item.stock - item.cantidad;
+    let stockChip;
+    if (item.stock <= 0) {
+      stockChip = `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(239,68,68,.12);color:#B91C1C">
+        <i class="bi bi-exclamation-triangle-fill"></i> Sin stock
+      </span>`;
+    } else if (restantes < 0) {
+      stockChip = `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(239,68,68,.12);color:#B91C1C">
+        <i class="bi bi-exclamation-triangle-fill"></i> Excede en ${Math.abs(restantes)} (stock: ${item.stock})
+      </span>`;
+    } else if (restantes === 0) {
+      stockChip = `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(245,158,11,.15);color:#B45309">
+        <i class="bi bi-exclamation-circle-fill"></i> Stock al máximo (${item.stock} uds)
+      </span>`;
+    } else if (restantes <= 2) {
+      stockChip = `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:8px;background:rgba(245,158,11,.15);color:#B45309">
+        <i class="bi bi-exclamation-circle-fill"></i> Solo ${restantes} más en stock
+      </span>`;
+    } else {
+      stockChip = `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:8px;background:rgba(16,185,129,.12);color:#15803D">
+        <i class="bi bi-box-seam"></i> ${restantes} más disponibles
+      </span>`;
+    }
+    return `
     <div class="cart-item">
-      <div class="cart-item-info">
-        <div style="font-weight:600;font-size:13.5px">${item.nombre}</div>
-        <div style="font-size:12px;color:#94A3B8">${[item.talla,item.color].filter(Boolean).join(' · ')} · $${item.precio.toFixed(2)}</div>
+      <div class="cart-item-info" style="min-width:0">
+        <div style="font-weight:600;font-size:13.5px;margin-bottom:4px">${item.nombre}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px;align-items:center">${tallaTag}${colorTag}${stockChip}</div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:11px;color:#64748B">P/U:</span>
+          <input type="number" step="0.01" min="0" value="${item.precio.toFixed(2)}"
+                 onchange="cambiarPrecio(${i}, this.value)"
+                 style="width:80px;padding:2px 6px;font-size:12px;border:1px solid var(--border);border-radius:4px;background:var(--input-bg);color:${colorPrecio};font-weight:600">
+          ${rangoTxt}
+        </div>
       </div>
       <div class="d-flex align-items-center gap-1">
         <button class="cart-qty-btn" onclick="cambiarCantidad(${i},-1)">−</button>
-        <input class="cart-qty-input" type="number" value="${item.cantidad}" min="1" max="${item.stock}"
+        <input class="cart-qty-input" type="number" value="${item.cantidad}" min="1" ${PREFS.permitirSinStock ? '' : `max="${item.stock}"`}
                onchange="setCantidad(${i},this.value)">
         <button class="cart-qty-btn" onclick="cambiarCantidad(${i},1)">+</button>
       </div>
@@ -429,19 +646,65 @@ function renderCarrito() {
       <button class="cart-remove" onclick="quitarItem(${i})">
         <i class="bi bi-x" style="font-size:16px"></i>
       </button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   actualizarTotal();
+}
+
+function cambiarPrecio(i, val) {
+  const nuevo = parseFloat(val);
+  const item = carrito[i];
+  if (isNaN(nuevo) || nuevo <= 0) {
+    if (window.showToast) showToast('Precio inválido', 'danger');
+    renderCarrito();
+    return;
+  }
+  const modo = PREFS.modoPrecioRango; // 'bloquear' | 'advertir' | 'permitir'
+  const bajoMin = item.precio_min !== null && nuevo < item.precio_min;
+  const sobreMax = item.precio_max !== null && nuevo > item.precio_max;
+
+  if (modo === 'bloquear') {
+    if (bajoMin) {
+      if (window.showToast) showToast(
+        `Precio bajo el mínimo ($${item.precio_min.toFixed(2)}) — bloqueado`, 'danger', 5000);
+      renderCarrito();
+      return;
+    }
+    if (sobreMax) {
+      if (window.showToast) showToast(
+        `Precio sobre el máximo ($${item.precio_max.toFixed(2)}) — bloqueado`, 'danger', 5000);
+      renderCarrito();
+      return;
+    }
+  } else if (modo === 'advertir') {
+    if (bajoMin) {
+      if (window.showToast) showToast(
+        `⚠ Precio bajo el mínimo permitido ($${item.precio_min.toFixed(2)})`, 'warning', 5000);
+    }
+    if (sobreMax) {
+      if (window.showToast) showToast(
+        `⚠ Precio sobre el máximo sugerido ($${item.precio_max.toFixed(2)})`, 'warning', 5000);
+    }
+  }
+  // 'permitir' → sin avisos
+
+  item.precio = nuevo;
+  renderCarrito();
 }
 
 function cambiarCantidad(i, delta) {
   const nueva = carrito[i].cantidad + delta;
   if (nueva < 1) { quitarItem(i); return; }
-  if (nueva > carrito[i].stock) return;
+  if (nueva > carrito[i].stock && !PREFS.permitirSinStock) {
+    if (window.showToast) showToast(`Stock máximo: ${carrito[i].stock} uds.`, 'warning');
+    return;
+  }
   carrito[i].cantidad = nueva;
   renderCarrito();
 }
 function setCantidad(i, val) {
-  const v = Math.max(1, Math.min(parseInt(val)||1, carrito[i].stock));
+  let v = Math.max(1, parseInt(val)||1);
+  if (!PREFS.permitirSinStock) v = Math.min(v, carrito[i].stock);
   carrito[i].cantidad = v;
   renderCarrito();
 }
@@ -461,6 +724,15 @@ document.querySelectorAll('.sale-type-btn').forEach(btn => {
     btn.classList.add('selected');
     tipoActual = btn.dataset.tipo;
     actualizarUI();
+  });
+});
+
+/* ─── FORMA DE PAGO (botones tipo card) ────────────── */
+document.querySelectorAll('.pay-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pay-type-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    document.getElementById('forma-pago-valor').value = btn.dataset.forma;
   });
 });
 
@@ -501,8 +773,24 @@ function calcularCambio() {
 /* ─── COBRAR ──────────────────────────────────────── */
 document.getElementById('btn-cobrar').addEventListener('click', () => {
   const clienteId = document.getElementById('sel-cliente').value;
+  const emitirFact = document.getElementById('emitir-factura').checked;
+
   if (tipoActual !== 'contado' && !clienteId) {
-    alert('Selecciona un cliente para continuar.'); return;
+    if (window.showToast) showToast('Selecciona un cliente para continuar', 'danger');
+    else alert('Selecciona un cliente para continuar.');
+    return;
+  }
+  if (tipoActual === 'contado' && !clienteId && PREFS.clienteObligatorio) {
+    if (window.showToast) showToast('La configuración del sistema exige cliente en cada venta', 'danger', 5000);
+    else alert('La configuración del sistema exige cliente en cada venta.');
+    document.getElementById('cliente-buscar').focus();
+    return;
+  }
+  if (emitirFact && !clienteId) {
+    if (window.showToast) showToast('Para emitir factura SRI debes seleccionar un cliente', 'danger', 5000);
+    else alert('Para emitir factura SRI debes seleccionar un cliente.');
+    document.getElementById('cliente-buscar').focus();
+    return;
   }
   if (tipoActual === 'apartado') {
     const monto = parseFloat(document.getElementById('monto-inicial-pos').value);
@@ -513,9 +801,111 @@ document.getElementById('btn-cobrar').addEventListener('click', () => {
   document.getElementById('hidden-monto-inicial').value = document.getElementById('monto-inicial-pos').value;
   document.getElementById('hidden-fecha-limite').value  = document.getElementById('fecha-limite-pos').value;
   document.getElementById('hidden-plazo').value         = document.getElementById('plazo-dias').value;
-  document.getElementById('hidden-forma-pago').value    = document.querySelector('input[name="forma_pago"]:checked')?.value||'efectivo';
-  document.getElementById('hidden-items').value         = JSON.stringify(carrito.map(i=>({producto_id:i.id,cantidad:i.cantidad})));
+  document.getElementById('hidden-forma-pago').value    = document.getElementById('forma-pago-valor').value || 'efectivo';
+  document.getElementById('hidden-items').value         = JSON.stringify(carrito.map(i=>({producto_id:i.id,cantidad:i.cantidad,precio_unitario:i.precio})));
+  document.getElementById('hidden-emitir-factura').value = document.getElementById('emitir-factura').checked ? '1' : '0';
   document.getElementById('form-venta').submit();
+});
+
+/* ─── BUSCADOR DE CLIENTES ───────────────────────── */
+const clientes = {{ clientes_json|safe }};
+const cliBuscar  = document.getElementById('cliente-buscar');
+const cliResults = document.getElementById('cliente-resultados');
+const cliHidden  = document.getElementById('sel-cliente');
+const cliSelMsg  = document.getElementById('cliente-seleccionado');
+const cliClearBtn = document.getElementById('cliente-clear');
+
+function limpiarCliente() {
+  cliHidden.value = '';
+  cliBuscar.value = '';
+  cliBuscar.disabled = false;
+  cliResults.classList.remove('open');
+  cliSelMsg.style.display = 'none';
+  actualizarFacturaToggle();
+}
+
+function seleccionarCliente(c) {
+  cliHidden.value = c.id;
+  cliBuscar.value = '';
+  cliBuscar.disabled = true;
+  cliResults.classList.remove('open');
+  cliSelMsg.querySelector('span').textContent = `${c.nombre} (${c.cedula_ruc})`;
+  cliSelMsg.style.display = '';
+  actualizarFacturaToggle();
+}
+
+function actualizarFacturaToggle() {
+  const tieneCliente = !!cliHidden.value;
+  const cb = document.getElementById('emitir-factura');
+  const hint = document.getElementById('emitir-factura-hint');
+  if (!cb) return;
+  // Siempre habilitado
+  cb.disabled = false;
+  if (cb.checked && !tieneCliente) {
+    hint.textContent = '⚠ Selecciona un cliente — es obligatorio para facturar';
+    hint.style.color = '#E11D48';
+    cliBuscar.style.borderColor = '#E11D48';
+  } else if (cb.checked && tieneCliente) {
+    hint.textContent = '✓ Se generará y enviará al SRI automáticamente';
+    hint.style.color = '#10B981';
+    cliBuscar.style.borderColor = '';
+  } else {
+    hint.textContent = 'Marca esta opción para emitir factura electrónica';
+    hint.style.color = 'var(--text-muted)';
+    cliBuscar.style.borderColor = '';
+  }
+}
+
+document.getElementById('emitir-factura').addEventListener('change', actualizarFacturaToggle);
+
+function renderResultadosCli(q) {
+  cliResults.innerHTML = '';
+  if (!q) { cliResults.classList.remove('open'); return; }
+  const ql = q.toLowerCase();
+  const hits = clientes.filter(c =>
+    c.nombre.toLowerCase().includes(ql) ||
+    c.cedula_ruc.includes(q) ||
+    (c.telefono || '').includes(q)
+  ).slice(0, 8);
+  if (!hits.length) {
+    cliResults.innerHTML = `<div class="search-result-item disabled" style="color:#94A3B8">
+      Sin coincidencias. <a href="#" id="link-nuevo-desde-buscador" style="color:#4F46E5">Crear nuevo</a>
+    </div>`;
+    cliResults.classList.add('open');
+    document.getElementById('link-nuevo-desde-buscador').addEventListener('click', e => {
+      e.preventDefault();
+      cliResults.classList.remove('open');
+      document.getElementById('btn-nuevo-cliente').click();
+      // Pre-llenar nombre con lo que escribió
+      const nc = document.getElementById('nc-nombre');
+      if (nc) nc.value = q;
+    });
+    return;
+  }
+  hits.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'search-result-item';
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:500;font-size:13.5px">${c.nombre}</div>
+        <div style="font-size:12px;color:#94A3B8">${c.cedula_ruc}${c.telefono ? ' · '+c.telefono : ''}</div>
+      </div>`;
+    div.addEventListener('click', () => seleccionarCliente(c));
+    cliResults.appendChild(div);
+  });
+  cliResults.classList.add('open');
+}
+
+cliBuscar.addEventListener('input', e => renderResultadosCli(e.target.value.trim()));
+cliBuscar.addEventListener('focus', e => { if (e.target.value.trim()) renderResultadosCli(e.target.value.trim()); });
+cliClearBtn.addEventListener('click', limpiarCliente);
+
+// Estado inicial del toggle de factura
+actualizarFacturaToggle();
+
+document.addEventListener('click', e => {
+  if (!cliResults.contains(e.target) && e.target !== cliBuscar)
+    cliResults.classList.remove('open');
 });
 
 /* ─── NUEVO CLIENTE RÁPIDO (AJAX) ─────────────────── */
@@ -557,14 +947,12 @@ document.getElementById('nc-guardar').addEventListener('click', async () => {
       errBox.style.display = '';
       return;
     }
-    // Agregar al select y seleccionarlo
-    const sel = document.getElementById('sel-cliente');
-    const opt = document.createElement('option');
-    opt.value = json.id;
-    opt.textContent = json.label;
-    opt.selected = true;
-    sel.appendChild(opt);
-    sel.value = json.id;
+    // Agregar al array de clientes y seleccionarlo en el buscador
+    clientes.push({
+      id: json.id, nombre: json.nombre,
+      cedula_ruc: json.cedula_ruc, telefono: '',
+    });
+    seleccionarCliente({id: json.id, nombre: json.nombre, cedula_ruc: json.cedula_ruc});
     modalNC.hide();
     if (window.showToast) showToast(`Cliente "${json.nombre}" creado y seleccionado`, 'success');
   } catch (e) {

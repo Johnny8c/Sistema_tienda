@@ -3,10 +3,77 @@
 {% block nav_compras %}active{% endblock %}
 {% block page_title %}Compras{% endblock %}
 
+{% block extra_head %}
+<style>
+  .comp-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    transition: box-shadow .2s, transform .2s, border-color .2s;
+    height: 100%;
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .comp-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+    border-color: var(--primary);
+  }
+  [data-theme="dark"] .comp-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+
+  .comp-avatar {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    color: #fff; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(79,70,229,.25);
+  }
+  .comp-prov { font-weight: 700; font-size: 15px; color: var(--text-1); margin-bottom: 2px; }
+  .comp-num {
+    font-family: monospace; font-size: 11px;
+    background: var(--table-head-bg); color: var(--text-muted);
+    padding: 2px 8px; border-radius: 4px;
+    display: inline-block;
+  }
+
+  .comp-meta {
+    display: flex; gap: 16px;
+    font-size: 12px;
+    margin: 12px 0;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .comp-meta > div { flex: 1; }
+  .comp-meta-label { color: var(--text-muted); margin-bottom: 2px; }
+  .comp-meta-value { font-weight: 700; color: var(--text-1); font-size: 14px; }
+
+  .comp-total {
+    font-size: 22px; font-weight: 800;
+    margin: 8px 0 12px;
+  }
+
+  .comp-actions {
+    margin-top: auto;
+    display: flex; gap: 6px;
+  }
+  .comp-actions .btn { flex: 1; font-size: 12px; padding: 6px 8px; }
+
+  .comp-status {
+    position: absolute; top: 14px; right: 14px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1 class="page-header-title">Compras a proveedores</h1>
-  <div class="d-flex gap-2">
+  <div>
+    <h1 class="page-header-title">Compras a proveedores</h1>
+    <p class="page-header-sub">{{ compras|length }} compra{{ compras|length|pluralize }} registrada{{ compras|length|pluralize }}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
     <a href="{% url 'lista_proveedores' %}" class="btn btn-outline-secondary">
       <i class="bi bi-truck me-1"></i>Proveedores
     </a>
@@ -18,38 +85,115 @@
   </div>
 </div>
 
-<div class="card">
-  <div style="overflow-x:auto">
-    <table class="table table-hover mb-0">
-      <thead>
-        <tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th class="text-end">Total</th><th class="text-center">Estado</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for c in compras %}
-        <tr>
-          <td style="color:#64748B">{{ c.fecha|date:"d/m/Y" }}</td>
-          <td class="fw-semibold">{{ c.proveedor }}</td>
-          <td style="color:#64748B">{{ c.numero_factura|default:"—" }}</td>
-          <td class="text-end fw-semibold text-money">${{ c.total|floatformat:2 }}</td>
-          <td class="text-center">
-            {% if c.estado == 'pagada' %}
-              <span class="badge badge-pagada">Pagada</span>
-            {% else %}
-              <span class="badge badge-pendiente">Pendiente</span>
-            {% endif %}
-          </td>
-          <td><a href="{% url 'detalle_compra' c.pk %}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="6" class="text-center py-5" style="color:#94A3B8">
-            <i class="bi bi-basket3" style="font-size:32px;display:block;margin-bottom:8px"></i>
-            No hay compras registradas.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<!-- Filtros -->
+<div class="card mb-4">
+  <div class="card-body" style="padding:14px 16px !important">
+    <form method="get" class="d-flex gap-2 flex-wrap align-items-center">
+      <span style="font-size:13px;color:var(--text-muted)">Estado:</span>
+      <a href="{% url 'lista_compras' %}"
+         class="btn btn-sm {% if not estado %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        Todas
+      </a>
+      <a href="?estado=pendiente"
+         class="btn btn-sm {% if estado == 'pendiente' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        <i class="bi bi-clock me-1"></i>Pendientes
+      </a>
+      <a href="?estado=pagada"
+         class="btn btn-sm {% if estado == 'pagada' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        <i class="bi bi-check-circle me-1"></i>Pagadas
+      </a>
+    </form>
   </div>
 </div>
+
+{% if compras %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px">
+  {% for c in compras %}
+  <div class="comp-card">
+    <!-- Estado badge -->
+    <div class="comp-status">
+      {% if c.estado == 'pagada' %}
+        <span class="badge badge-pagada">Pagada</span>
+      {% else %}
+        <span class="badge badge-pendiente">Pendiente</span>
+      {% endif %}
+    </div>
+
+    <!-- Header: avatar + proveedor -->
+    <div class="d-flex align-items-center gap-3 mb-2" style="padding-right:80px">
+      <div class="comp-avatar">{{ c.proveedor.nombre|slice:":2"|upper }}</div>
+      <div style="flex:1;min-width:0">
+        <div class="comp-prov" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          {{ c.proveedor.nombre }}
+        </div>
+        {% if c.numero_factura %}
+        <span class="comp-num">F-{{ c.numero_factura }}</span>
+        {% else %}
+        <span class="comp-num" style="opacity:.6">Sin nº de factura</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Metadata -->
+    <div class="comp-meta">
+      <div>
+        <div class="comp-meta-label"><i class="bi bi-calendar3 me-1"></i>Fecha</div>
+        <div class="comp-meta-value">{{ c.fecha|date:"d/m/Y" }}</div>
+      </div>
+      <div>
+        <div class="comp-meta-label"><i class="bi bi-box-seam me-1"></i>Productos</div>
+        <div class="comp-meta-value">{{ c.items_cnt|default:0 }}</div>
+      </div>
+    </div>
+
+    <!-- Total -->
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em">Total</div>
+      <div class="comp-total text-money">${{ c.total|floatformat:2 }}</div>
+    </div>
+
+    {% if c.registrado_por %}
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">
+      <i class="bi bi-person me-1"></i>Registró: {{ c.registrado_por.get_full_name|default:c.registrado_por.username }}
+    </div>
+    {% endif %}
+
+    <!-- Acciones -->
+    <div class="comp-actions">
+      <a href="{% url 'detalle_compra' c.pk %}" class="btn btn-primary">
+        <i class="bi bi-eye me-1"></i>Ver detalle
+      </a>
+      {% if c.estado == 'pendiente' and user.es_dueno %}
+      <form method="post" action="{% url 'marcar_pagada' c.pk %}" style="flex:1"
+            data-confirm="Se marcará esta compra como pagada."
+            data-confirm-title="¿Marcar compra #{{ c.pk }} como pagada?"
+            data-confirm-variant="success">
+        {% csrf_token %}
+        <button class="btn w-100" style="border:1px solid #10B981;color:#10B981;background:transparent">
+          <i class="bi bi-check-lg me-1"></i>Pagar
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5" style="color:var(--text-muted)">
+    <i class="bi bi-basket3" style="font-size:40px;display:block;margin-bottom:10px"></i>
+    <div class="fw-semibold mb-1">
+      {% if estado %}Sin compras {{ estado }}s{% else %}No hay compras registradas{% endif %}
+    </div>
+    <div class="small">
+      {% if estado %}Cambia el filtro para ver otras compras.{% else %}Registra la primera compra a un proveedor.{% endif %}
+    </div>
+    {% if user.puede_registrar_compras and not estado %}
+    <a href="{% url 'crear_compra' %}" class="btn btn-primary btn-sm mt-3">
+      <i class="bi bi-plus-lg me-1"></i>Registrar compra
+    </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}

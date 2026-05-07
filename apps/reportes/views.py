@@ -69,13 +69,23 @@ def antiguedad_cartera(request):
 @login_required
 @requiere_dueno
 def adelantos_por_vencer(request):
+    from datetime import timedelta
+    from apps.configuracion.models import ConfiguracionGeneral
+    cfg = ConfiguracionGeneral.objects.first()
+    dias_alerta = cfg.dias_alerta_vencimiento if cfg else 7
+
     hoy = _hoy()
+    limite_proximo = hoy + timedelta(days=dias_alerta)
+
     adelantos = Adelanto.objects.filter(
         estado=Adelanto.ACTIVO
     ).select_related('cliente', 'vendedor').order_by('fecha_limite')
 
     vencidos = [a for a in adelantos if a.fecha_limite and a.fecha_limite < hoy]
-    proximos = [a for a in adelantos if a.fecha_limite and a.fecha_limite >= hoy]
+    proximos = [a for a in adelantos
+                if a.fecha_limite and hoy <= a.fecha_limite <= limite_proximo]
+    mas_lejanos = [a for a in adelantos
+                   if a.fecha_limite and a.fecha_limite > limite_proximo]
     sin_fecha = [a for a in adelantos if not a.fecha_limite]
 
     total_saldo = adelantos.aggregate(t=Sum('saldo_pendiente'))['t'] or Decimal('0')
@@ -86,10 +96,12 @@ def adelantos_por_vencer(request):
     ctx = {
         'vencidos': vencidos,
         'proximos': proximos,
+        'mas_lejanos': mas_lejanos,
         'sin_fecha': sin_fecha,
         'total_saldo': total_saldo,
         'total_recibido': total_recibido,
         'hoy': hoy,
+        'dias_alerta': dias_alerta,
     }
     return render(request, 'reportes/adelantos_por_vencer.html', ctx)
 
@@ -126,18 +138,22 @@ def cierre_caja(request):
         fecha__date=fecha, tipo_pago=Venta.CONTADO
     ).select_related('vendedor')
 
+    # Solo abonos POSITIVOS son ingresos. Los negativos (reembolsos) se separan.
     abonos_adelanto = Pago.objects.filter(
-        tipo=Pago.TIPO_ADELANTO, fecha__date=fecha
+        tipo=Pago.TIPO_ADELANTO, fecha__date=fecha, monto__gt=0
     ).select_related('vendedor')
-
     abonos_deuda = Pago.objects.filter(
-        tipo=Pago.TIPO_DEUDA, fecha__date=fecha
+        tipo=Pago.TIPO_DEUDA, fecha__date=fecha, monto__gt=0
+    ).select_related('vendedor')
+    reembolsos = Pago.objects.filter(
+        fecha__date=fecha, monto__lt=0
     ).select_related('vendedor')
 
     total_contado = ventas_contado.aggregate(t=Sum('total'))['t'] or Decimal('0')
     total_abonos_adelanto = abonos_adelanto.aggregate(t=Sum('monto'))['t'] or Decimal('0')
     total_abonos_deuda = abonos_deuda.aggregate(t=Sum('monto'))['t'] or Decimal('0')
-    total_dia = total_contado + total_abonos_adelanto + total_abonos_deuda
+    total_reembolsos = reembolsos.aggregate(t=Sum('monto'))['t'] or Decimal('0')   # negativo
+    total_dia = total_contado + total_abonos_adelanto + total_abonos_deuda + total_reembolsos
 
     # Desglose por vendedor
     def por_vendedor(qs, campo_monto):
@@ -153,9 +169,11 @@ def cierre_caja(request):
         'ventas_contado': ventas_contado,
         'abonos_adelanto': abonos_adelanto,
         'abonos_deuda': abonos_deuda,
+        'reembolsos': reembolsos,
         'total_contado': total_contado,
         'total_abonos_adelanto': total_abonos_adelanto,
         'total_abonos_deuda': total_abonos_deuda,
+        'total_reembolsos': total_reembolsos,
         'total_dia': total_dia,
         'ventas_por_vendedor': por_vendedor(ventas_contado, 'total'),
         'abonos_por_vendedor': {

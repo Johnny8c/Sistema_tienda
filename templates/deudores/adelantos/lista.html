@@ -3,93 +3,320 @@
 {% block nav_adelantos %}active{% endblock %}
 {% block page_title %}Adelantos{% endblock %}
 
+{% block extra_head %}
+<style>
+  .adel-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    transition: box-shadow .2s, transform .2s, border-color .2s;
+    height: 100%;
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .adel-card:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,.08);
+    transform: translateY(-2px);
+    border-color: var(--primary);
+  }
+  [data-theme="dark"] .adel-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+  .adel-card.vencido { border-color: rgba(239,68,68,.4); }
+  .adel-card.completado { opacity: .75; }
+  .adel-card.cancelado { opacity: .65; }
+
+  .adel-avatar {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+    color: #fff; font-weight: 700; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(79,70,229,.25);
+  }
+  .adel-cliente { font-weight: 700; font-size: 15px; color: var(--text-1); margin-bottom: 2px; }
+  .adel-cedula {
+    font-family: monospace; font-size: 11px;
+    background: var(--table-head-bg); color: var(--text-muted);
+    padding: 2px 8px; border-radius: 4px;
+    display: inline-block;
+  }
+  .adel-id {
+    position: absolute; top: 14px; right: 14px;
+    font-family: monospace; font-size: 11px;
+    color: var(--text-muted);
+    background: var(--table-head-bg);
+    padding: 2px 8px; border-radius: 4px;
+  }
+
+  .adel-progress-wrap {
+    margin: 12px 0;
+    padding: 10px 0;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .adel-progress-info {
+    display: flex; justify-content: space-between;
+    font-size: 12px; color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .adel-progress-info b { color: var(--text-1); font-weight: 700; }
+  .adel-progress-bar {
+    height: 8px; background: var(--table-head-bg);
+    border-radius: 4px; overflow: hidden;
+  }
+  .adel-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4F46E5, #7C3AED);
+    border-radius: 4px;
+    transition: width .3s;
+  }
+  .adel-progress-fill.completed {
+    background: linear-gradient(90deg, #10B981, #059669);
+  }
+
+  .adel-meta {
+    display: flex; gap: 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .adel-meta > div { flex: 1; }
+  .adel-meta-label { color: var(--text-muted); margin-bottom: 2px; font-size: 11px; }
+  .adel-meta-value { font-weight: 600; color: var(--text-1); font-size: 13px; }
+
+  .adel-actions {
+    margin-top: auto;
+    display: flex; gap: 6px;
+  }
+  .adel-actions .btn { font-size: 12px; padding: 6px 8px; }
+  .adel-actions .btn-flex { flex: 1; }
+
+  .vencido-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 700;
+    color: #B91C1C;
+    background: rgba(239,68,68,.12);
+    padding: 2px 8px; border-radius: 12px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
-  <h1 class="page-header-title">Adelantos / Apartados</h1>
+  <div>
+    <h1 class="page-header-title">Adelantos / Apartados</h1>
+    <p class="page-header-sub">{{ adelantos|length }} apartado{{ adelantos|length|pluralize }}</p>
+  </div>
   <a href="{% url 'crear_adelanto' %}" class="btn btn-primary">
     <i class="bi bi-plus-lg me-1"></i>Nuevo apartado
   </a>
 </div>
 
-<div class="card mb-3">
+<!-- Filtros -->
+<div class="card mb-4">
   <div class="card-body" style="padding:14px 16px !important">
-    <form method="get" class="d-flex flex-wrap gap-2">
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
       <div style="position:relative;flex:1;min-width:200px;max-width:360px">
-        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94A3B8"></i>
+        <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
         <input type="text" name="q" value="{{ q }}" class="form-control" style="padding-left:36px"
                placeholder="Buscar cliente o cédula…">
       </div>
       <select name="estado" class="form-select" style="max-width:180px">
         <option value="">Todos los estados</option>
-        <option value="activo"     {% if estado == 'activo' %}selected{% endif %}>Activo</option>
-        <option value="completado" {% if estado == 'completado' %}selected{% endif %}>Completado</option>
-        <option value="cancelado"  {% if estado == 'cancelado' %}selected{% endif %}>Cancelado</option>
+        <option value="activo"     {% if estado == 'activo' %}selected{% endif %}>Activos</option>
+        <option value="completado" {% if estado == 'completado' %}selected{% endif %}>Completados</option>
+        <option value="cancelado"  {% if estado == 'cancelado' %}selected{% endif %}>Cancelados</option>
       </select>
-      <button class="btn btn-outline-secondary">Filtrar</button>
-      <a href="{% url 'lista_adelantos' %}" class="btn btn-outline-danger"><i class="bi bi-x-lg"></i></a>
+      <button class="btn btn-outline-secondary"><i class="bi bi-funnel me-1"></i>Filtrar</button>
+      {% if q or estado %}
+      <a href="{% url 'lista_adelantos' %}" class="btn btn-outline-danger" title="Limpiar">
+        <i class="bi bi-x-lg"></i>
+      </a>
+      {% endif %}
     </form>
   </div>
 </div>
 
+{% if adelantos %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px">
+  {% for a in adelantos %}
+  {% with vencido=a.fecha_limite|default:False %}
+  <div class="adel-card {% if a.estado == 'completado' %}completado{% elif a.estado == 'cancelado' %}cancelado{% elif a.fecha_limite and a.fecha_limite < hoy and a.estado == 'activo' %}vencido{% endif %}">
+    <span class="adel-id">#{{ a.pk }}</span>
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-2" style="padding-right:48px">
+      <div class="adel-avatar">{{ a.cliente.nombre|slice:":2"|upper }}</div>
+      <div style="flex:1;min-width:0">
+        <a href="{% url 'detalle_cliente' a.cliente.pk %}"
+           class="adel-cliente d-block text-decoration-none"
+           style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-1)">
+          {{ a.cliente.nombre }}
+        </a>
+        <span class="adel-cedula">{{ a.cliente.cedula_ruc }}</span>
+      </div>
+    </div>
+
+    <!-- Estado + venc -->
+    <div class="d-flex flex-wrap gap-2 mb-1">
+      {% if a.estado == 'activo' %}<span class="badge badge-activo">Activo</span>
+      {% elif a.estado == 'completado' %}<span class="badge badge-completado">Completado</span>
+      {% else %}<span class="badge badge-cancelado">Cancelado</span>{% endif %}
+
+      {% if a.fecha_limite and a.fecha_limite < hoy and a.estado == 'activo' %}
+      <span class="vencido-tag">
+        <i class="bi bi-exclamation-triangle-fill"></i>Vencido
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Progreso de pago -->
+    <div class="adel-progress-wrap">
+      <div class="adel-progress-info">
+        <span>Abonado: <b class="text-money" style="color:#15803D">${{ a.abonado|floatformat:2 }}</b></span>
+        <span>Total: <b class="text-money">${{ a.total|floatformat:2 }}</b></span>
+      </div>
+      <div class="adel-progress-bar">
+        <div class="adel-progress-fill {% if a.saldo_pendiente == 0 %}completed{% endif %}"
+             style="width: {{ a.pct_pagado }}%"></div>
+      </div>
+      <div class="adel-progress-info" style="margin-top:6px;margin-bottom:0">
+        {% if a.saldo_pendiente == 0 %}
+          <span style="color:#15803D;font-weight:700"><i class="bi bi-check-circle-fill me-1"></i>¡Pagado completamente!</span>
+        {% else %}
+          <span>{{ a.pct_pagado }}% pagado</span>
+          <span class="text-money" style="color:#B91C1C;font-weight:700">Falta ${{ a.saldo_pendiente|floatformat:2 }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Meta: fecha creación + fecha límite -->
+    <div class="adel-meta">
+      <div>
+        <div class="adel-meta-label"><i class="bi bi-calendar-plus me-1"></i>Creado</div>
+        <div class="adel-meta-value">{{ a.fecha_creacion|date:"d/m/Y" }}</div>
+      </div>
+      <div>
+        <div class="adel-meta-label"><i class="bi bi-calendar-x me-1"></i>Límite</div>
+        <div class="adel-meta-value {% if a.fecha_limite and a.fecha_limite < hoy and a.estado == 'activo' %}text-danger{% endif %}">
+          {% if a.fecha_limite %}{{ a.fecha_limite|date:"d/m/Y" }}{% else %}Sin fecha{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div class="adel-actions">
+      {% if a.estado == 'activo' and a.saldo_pendiente == 0 %}
+        <form method="post" action="{% url 'completar_adelanto' a.pk %}" class="btn-flex"
+              data-confirm="¿Completar el apartado y generar la venta?"
+              data-confirm-title="Completar apartado" data-confirm-variant="success">
+          {% csrf_token %}
+          <button class="btn w-100" style="background:#10B981;color:#fff;border:none">
+            <i class="bi bi-check-lg me-1"></i>Completar
+          </button>
+        </form>
+      {% elif a.estado == 'activo' %}
+        <button class="btn btn-primary btn-flex btn-abonar"
+                data-pk="{{ a.pk }}" data-cliente="{{ a.cliente.nombre }}"
+                data-saldo="{{ a.saldo_pendiente }}" data-tipo="adelanto">
+          <i class="bi bi-cash-coin me-1"></i>Abonar
+        </button>
+      {% endif %}
+      <a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-outline-secondary {% if a.estado != 'activo' %}btn-flex{% endif %}" title="Ver detalle">
+        <i class="bi bi-eye{% if a.estado != 'activo' %} me-1{% endif %}"></i>{% if a.estado != 'activo' %}Ver detalle{% endif %}
+      </a>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+</div>
+{% else %}
 <div class="card">
-  <div style="overflow-x:auto">
-    <table class="table table-hover mb-0">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Cliente</th>
-          <th class="text-end">Total</th>
-          <th class="text-end">Saldo pendiente</th>
-          <th>Estado</th>
-          <th>Fecha límite</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for a in adelantos %}
-        <tr>
-          <td data-label="#" style="color:#94A3B8;font-size:12px">#{{ a.pk }}</td>
-          <td data-label="Cliente">
-            <a href="{% url 'detalle_cliente' a.cliente.pk %}" style="font-weight:600;color:#1E293B;text-decoration:none">
-              {{ a.cliente.nombre }}
-            </a>
-            <div style="font-size:12px;color:#94A3B8">{{ a.cliente.cedula_ruc }}</div>
-          </td>
-          <td data-label="Total" class="text-end text-money">${{ a.total|floatformat:2 }}</td>
-          <td data-label="Saldo pendiente" class="text-end">
-            {% if a.saldo_pendiente == 0 %}
-              <span style="color:#15803D;font-weight:600;font-size:13px">Pagado</span>
-            {% else %}
-              <span class="fw-semibold text-money">${{ a.saldo_pendiente|floatformat:2 }}</span>
-            {% endif %}
-          </td>
-          <td data-label="Estado">
-            {% if a.estado == 'activo' %}<span class="badge badge-activo">Activo</span>
-            {% elif a.estado == 'completado' %}<span class="badge badge-completado">Completado</span>
-            {% else %}<span class="badge badge-cancelado">Cancelado</span>{% endif %}
-          </td>
-          <td data-label="Fecha límite">
-            {% if a.fecha_limite %}
-              <span class="{% if a.fecha_limite < hoy and a.estado == 'activo' %}text-danger fw-semibold{% else %}{% endif %}"
-                    style="font-size:13px">
-                {{ a.fecha_limite|date:"d/m/Y" }}
-              </span>
-            {% else %}<span style="color:#CBD5E1">—</span>{% endif %}
-          </td>
-          <td>
-            <a href="{% url 'detalle_adelanto' a.pk %}" class="btn btn-sm btn-outline-secondary w-100">Ver detalle</a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="7" class="text-center py-5" style="color:#94A3B8">
-            <i class="bi bi-bookmark-check" style="font-size:32px;display:block;margin-bottom:8px"></i>
-            Sin adelantos registrados.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="card-body text-center py-5" style="color:var(--text-muted)">
+    <i class="bi bi-bookmark-check" style="font-size:40px;display:block;margin-bottom:10px"></i>
+    <div class="fw-semibold mb-1">
+      {% if q or estado %}Sin resultados{% else %}No hay apartados registrados{% endif %}
+    </div>
+    <div class="small">
+      {% if q or estado %}Ajusta los filtros para ver más apartados.{% else %}Crea el primer apartado para reservar productos a un cliente.{% endif %}
+    </div>
+    {% if not q and not estado %}
+    <a href="{% url 'crear_adelanto' %}" class="btn btn-primary btn-sm mt-3">
+      <i class="bi bi-plus-lg me-1"></i>Nuevo apartado
+    </a>
+    {% endif %}
   </div>
 </div>
+{% endif %}
+
+<!-- Modal abono rápido -->
+<div class="modal fade" id="modalAbonoRapido" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <form method="post" id="form-abono-rapido">
+      {% csrf_token %}
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Registrar abono</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3" style="background:var(--table-head-bg);border-radius:8px;padding:10px 12px;font-size:13.5px">
+            <div style="color:var(--text-muted)">Cliente</div>
+            <div class="fw-semibold" id="ar-cliente">—</div>
+            <div class="d-flex justify-content-between mt-2">
+              <span style="color:var(--text-muted)">Saldo pendiente</span>
+              <span class="fw-bold text-money" id="ar-saldo">$0.00</span>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Monto del abono <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" name="monto" id="ar-monto" class="form-control"
+                     step="0.01" min="0.01" required autofocus>
+            </div>
+            <div class="form-text">No puede exceder el saldo pendiente.</div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-semibold">Forma de pago</label>
+            <select name="forma_pago" class="form-select">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="transferencia">QR / Transferencia</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2 me-1"></i>Registrar abono
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const modalAbono = new bootstrap.Modal(document.getElementById('modalAbonoRapido'));
+const formAbono  = document.getElementById('form-abono-rapido');
+
+document.querySelectorAll('.btn-abonar').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const pk     = btn.dataset.pk;
+    const cliente = btn.dataset.cliente;
+    const saldo  = parseFloat(btn.dataset.saldo);
+    const tipo   = btn.dataset.tipo;
+    formAbono.action = (tipo === 'adelanto')
+      ? `/deudores/adelantos/${pk}/abonar/`
+      : `/deudores/deudas/${pk}/abonar/`;
+    document.getElementById('ar-cliente').textContent = cliente;
+    document.getElementById('ar-saldo').textContent = '$' + saldo.toFixed(2);
+    document.getElementById('ar-monto').value = '';
+    document.getElementById('ar-monto').max = saldo;
+    modalAbono.show();
+  });
+});
+</script>
 {% endblock %}
