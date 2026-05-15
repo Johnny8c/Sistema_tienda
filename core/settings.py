@@ -109,18 +109,23 @@ DEV_PAGO_INSTRUCCIONES      = config('DEV_PAGO_INSTRUCCIONES',      default='') 
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
-# Media / fotos de productos
+# Media / fotos de productos. Django 5.1+ usa STORAGES en lugar de
+# DEFAULT_FILE_STORAGE/STATICFILES_STORAGE — las settings viejas se ignoran.
+_default_storage = 'django.core.files.storage.FileSystemStorage'
 _CLOUDINARY_URL = config('CLOUDINARY_URL', default='')
 if _CLOUDINARY_URL:
     import cloudinary
     cloudinary.config(cloudinary_url=_CLOUDINARY_URL)
     INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-else:
-    MEDIA_URL = '/media/'
-    MEDIA_ROOT = BASE_DIR / 'media'
+    _default_storage = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+STORAGES = {
+    'default':     {'BACKEND': _default_storage},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

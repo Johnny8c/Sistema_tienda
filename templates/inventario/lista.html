@@ -189,10 +189,11 @@
   {% with stock=c.stock_total_disponible variantes_count=c.variantes.count pmin=c.precio_min pmax=c.precio_max %}
   <a href="{% url 'detalle_producto' c.pk %}" class="producto-card">
     <div class="producto-foto">
+      <i class="bi bi-image producto-foto-placeholder"
+         {% if c.foto %}style="display:none"{% endif %}></i>
       {% if c.foto %}
-        <img src="{{ c.foto.url }}" alt="{{ c.nombre }}" loading="lazy">
-      {% else %}
-        <i class="bi bi-image producto-foto-placeholder"></i>
+        <img src="{{ c.foto.url }}" alt="{{ c.nombre }}" loading="lazy"
+             onerror="this.remove();this.parentElement.querySelector('.producto-foto-placeholder').style.display=''">
       {% endif %}
     </div>
     <div class="producto-info">
