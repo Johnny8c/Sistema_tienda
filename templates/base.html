@@ -989,11 +989,6 @@
       <a class="sidebar-link {% block nav_inventario %}{% endblock %}" href="{% url 'lista_inventario' %}" data-label="Inventario">
         <i class="bi bi-box-seam"></i> <span>Inventario</span>
       </a>
-      {% if not user.es_vendedor %}
-      <a class="sidebar-link {% block nav_categorias %}{% endblock %}" href="{% url 'lista_categorias' %}" data-label="Categorías">
-        <i class="bi bi-tags"></i> <span>Categorías</span>
-      </a>
-      {% endif %}
       <a class="sidebar-link {% block nav_consultar %}{% endblock %}" href="{% url 'consultar_precio' %}" data-label="Consultar precio">
         <i class="bi bi-upc-scan"></i> <span>Consultar precio</span>
       </a>
