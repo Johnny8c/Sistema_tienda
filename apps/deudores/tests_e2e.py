@@ -2,6 +2,8 @@
 Tests end-to-end de los 4 flujos principales del módulo Deudores y Adelantos.
 Usan el cliente de test de Django para recorrer vistas reales.
 """
+import json
+
 from decimal import Decimal
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -33,6 +35,31 @@ class BaseE2ETestCase(TestCase):
             nombre='Pantalón casual', talla='32', color='Negro',
             precio=Decimal('45.00'), stock=20
         )
+
+
+class FlujoPosContadoTest(BaseE2ETestCase):
+    def test_pos_contado_acepta_precio_con_coma(self):
+        self.client.login(username='vendedor_e2e', password='pass123')
+
+        resp = self.client.post(reverse('procesar_venta'), {
+            'tipo_venta': 'contado',
+            'cliente_id': str(self.cliente.pk),
+            'forma_pago': 'efectivo',
+            'emitir_factura': '1',
+            'items_json': json.dumps([{
+                'producto_id': self.producto.pk,
+                'cantidad': 2,
+                'precio_unitario': '10,50',
+            }]),
+        })
+
+        self.assertEqual(resp.status_code, 302)
+
+        venta = Venta.objects.get(tipo_pago=Venta.CONTADO)
+        self.producto.refresh_from_db()
+
+        self.assertEqual(venta.total, Decimal('21.00'))
+        self.assertEqual(self.producto.stock, 18)
 
 
 class FlujoApartarCompletarTest(BaseE2ETestCase):

@@ -341,6 +341,15 @@ function beep(ok = true) {
 let carrito = [];
 let tipoActual = 'contado';
 
+function parseDecimalInput(value) {
+  if (value === null || value === undefined) return NaN;
+  return Number.parseFloat(String(value).trim().replace(',', '.'));
+}
+
+function normalizeDecimalInput(value) {
+  return String(value ?? '').trim().replace(',', '.');
+}
+
 /* ─── BÚSQUEDA ────────────────────────────────────── */
 const buscador    = document.getElementById('buscador-producto');
 const resultados  = document.getElementById('sugerencias-producto');
@@ -652,7 +661,7 @@ function renderCarrito() {
 }
 
 function cambiarPrecio(i, val) {
-  const nuevo = parseFloat(val);
+  const nuevo = parseDecimalInput(val);
   const item = carrito[i];
   if (isNaN(nuevo) || nuevo <= 0) {
     if (window.showToast) showToast('Precio inválido', 'danger');
@@ -761,7 +770,7 @@ function actualizarUI() {
 document.getElementById('monto-recibido').addEventListener('input', calcularCambio);
 function calcularCambio() {
   const total = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
-  const recibido = parseFloat(document.getElementById('monto-recibido').value)||0;
+  const recibido = parseDecimalInput(document.getElementById('monto-recibido').value)||0;
   const div = document.getElementById('cambio-display');
   if (recibido > 0) {
     const cambio = recibido - total;
@@ -793,12 +802,12 @@ document.getElementById('btn-cobrar').addEventListener('click', () => {
     return;
   }
   if (tipoActual === 'apartado') {
-    const monto = parseFloat(document.getElementById('monto-inicial-pos').value);
+    const monto = parseDecimalInput(document.getElementById('monto-inicial-pos').value);
     if (!monto || monto <= 0) { alert('Ingresa el monto del adelanto.'); return; }
   }
   document.getElementById('hidden-tipo').value          = tipoActual;
   document.getElementById('hidden-cliente').value       = clienteId;
-  document.getElementById('hidden-monto-inicial').value = document.getElementById('monto-inicial-pos').value;
+  document.getElementById('hidden-monto-inicial').value = normalizeDecimalInput(document.getElementById('monto-inicial-pos').value);
   document.getElementById('hidden-fecha-limite').value  = document.getElementById('fecha-limite-pos').value;
   document.getElementById('hidden-plazo').value         = document.getElementById('plazo-dias').value;
   document.getElementById('hidden-forma-pago').value    = document.getElementById('forma-pago-valor').value || 'efectivo';

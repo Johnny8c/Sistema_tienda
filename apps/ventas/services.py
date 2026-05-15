@@ -4,12 +4,40 @@ Servicios de ventas: lógica de negocio extraída del view procesar_venta.
 `crear_venta_contado()` valida stock, precio (según preferencias del sistema)
 y registra la venta + items + descuento de stock dentro de una transacción.
 """
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+
 from django.db import transaction
 
 from apps.deudores.exceptions import StockInsuficienteError
 from apps.inventario.models import Producto
-from .models import Venta, ItemVenta
+
+from .models import ItemVenta, Venta
+
+
+def _parse_cantidad(raw_value, nombre_producto):
+    try:
+        cantidad = int(raw_value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f'Cantidad inválida para "{nombre_producto}".') from exc
+
+    if cantidad <= 0:
+        raise ValueError(f'Cantidad inválida para "{nombre_producto}".')
+
+    return cantidad
+
+
+def _parse_precio_unitario(raw_value, precio_default, nombre_producto):
+    valor = precio_default if raw_value in (None, '') else raw_value
+
+    try:
+        precio = Decimal(str(valor).strip().replace(',', '.'))
+    except InvalidOperation as exc:
+        raise ValueError(f'Precio unitario inválido para "{nombre_producto}".') from exc
+
+    if precio <= 0:
+        raise ValueError(f'Precio unitario inválido para "{nombre_producto}".')
+
+    return precio
 
 
 @transaction.atomic
@@ -34,16 +62,31 @@ def crear_venta_contado(*, items, cliente_id, vendedor, forma_pago, cfg_gen):
     if not items:
         raise ValueError('Agrega al menos un producto.')
 
-    # Validar y bloquear filas de productos antes de crear nada
     productos_locked = {}
-    for i in items:
-        prod = (Producto.objects
-                .select_related('catalogo')
-                .select_for_update()
-                .get(pk=i['producto_id']))
-        productos_locked[prod.pk] = prod
+    items_resueltos = []
+    total = Decimal('0')
 
-        cant = i['cantidad']
+    for item in items:
+        producto_id = item.get('producto_id')
+        if not producto_id:
+            raise ValueError('Hay un producto inválido en el carrito.')
+
+        prod = productos_locked.get(producto_id)
+        if prod is None:
+            try:
+                prod = (
+                    Producto.objects
+                    .select_related('catalogo')
+                    .select_for_update()
+                    .get(pk=producto_id)
+                )
+            except Producto.DoesNotExist as exc:
+                raise ValueError('Hay un producto inválido o ya no disponible en el carrito.') from exc
+            productos_locked[producto_id] = prod
+
+        cant = _parse_cantidad(item.get('cantidad'), prod.nombre)
+        pu = _parse_precio_unitario(item.get('precio_unitario'), prod.precio, prod.nombre)
+
         if prod.stock_disponible < cant and not cfg_gen.permitir_vender_sin_stock:
             raise StockInsuficienteError(
                 f'"{prod.nombre}" tiene solo {prod.stock_disponible} unidades disponibles '
@@ -51,12 +94,6 @@ def crear_venta_contado(*, items, cliente_id, vendedor, forma_pago, cfg_gen):
                 f'No se puede vender {cant}.'
             )
 
-        # Precio: del carrito si viene, sino del producto
-        pu = Decimal(str(i.get('precio_unitario', prod.precio)))
-        if pu <= 0:
-            raise ValueError(f'Precio unitario inválido para "{prod.nombre}".')
-
-        # Validar rango si la preferencia es bloquear
         if cfg_gen.precio_fuera_rango_modo == cfg_gen.PRECIO_RANGO_BLOQUEAR and prod.catalogo:
             if prod.catalogo.precio_minimo is not None and pu < prod.catalogo.precio_minimo:
                 raise ValueError(
@@ -69,16 +106,9 @@ def crear_venta_contado(*, items, cliente_id, vendedor, forma_pago, cfg_gen):
                     f'${prod.catalogo.precio_maximo} (precio máximo).'
                 )
 
-    # Calcular total con los precios resueltos (usando productos ya bloqueados)
-    total = Decimal('0')
-    items_resueltos = []
-    for i in items:
-        prod = productos_locked[i['producto_id']]
-        pu = Decimal(str(i.get('precio_unitario', prod.precio)))
-        items_resueltos.append({'prod': prod, 'cantidad': i['cantidad'], 'pu': pu})
-        total += pu * i['cantidad']
+        items_resueltos.append({'prod': prod, 'cantidad': cant, 'pu': pu})
+        total += pu * cant
 
-    # Crear venta + items + descontar stock
     venta = Venta.objects.create(
         cliente_id=int(cliente_id) if cliente_id else None,
         tipo_pago=Venta.CONTADO,
@@ -86,14 +116,14 @@ def crear_venta_contado(*, items, cliente_id, vendedor, forma_pago, cfg_gen):
         total=total,
         vendedor=vendedor,
     )
-    for ir in items_resueltos:
+    for item in items_resueltos:
         ItemVenta.objects.create(
             venta=venta,
-            producto=ir['prod'],
-            cantidad=ir['cantidad'],
-            precio_unitario=ir['pu'],
+            producto=item['prod'],
+            cantidad=item['cantidad'],
+            precio_unitario=item['pu'],
         )
-        ir['prod'].stock -= ir['cantidad']
-        ir['prod'].save(update_fields=['stock'])
+        item['prod'].stock -= item['cantidad']
+        item['prod'].save(update_fields=['stock'])
 
     return venta

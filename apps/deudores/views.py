@@ -1,6 +1,6 @@
 import json
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -370,6 +370,9 @@ def procesar_venta(request):
 
     except (StockInsuficienteError, SaldoInsuficienteError, ValueError) as e:
         messages.error(request, str(e))
+        return redirect('pos')
+    except (InvalidOperation, TypeError, KeyError):
+        messages.error(request, 'Hay valores invalidos en el carrito. Revisa precios y cantidades.')
         return redirect('pos')
     except json.JSONDecodeError:
         messages.error(request, 'Carrito inválido. Intenta de nuevo.')
