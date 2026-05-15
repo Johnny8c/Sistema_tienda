@@ -3,102 +3,278 @@
 {% block nav_empleados %}active{% endblock %}
 {% block page_title %}{{ accion }} empleado{% endblock %}
 
+{% block extra_head %}
+<style>
+  .form-section-title {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-muted);
+    margin: 6px 0 14px; padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .form-section-title i { color: var(--primary); font-size: 14px; }
+
+  .avatar-preview {
+    width: 88px; height: 88px; border-radius: 50%;
+    color: #fff; font-weight: 700; font-size: 32px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px; line-height: 1;
+    transition: background .25s ease, box-shadow .25s ease;
+  }
+  .avatar-preview.dueno     { background: linear-gradient(135deg,#7C3AED 0%,#A855F7 100%); box-shadow: 0 8px 24px rgba(124,58,237,.28); }
+  .avatar-preview.vendedor  { background: linear-gradient(135deg,#2563EB 0%,#3B82F6 100%); box-shadow: 0 8px 24px rgba(37,99,235,.28); }
+  .avatar-preview.bodeguero { background: linear-gradient(135deg,#F59E0B 0%,#FBBF24 100%); box-shadow: 0 8px 24px rgba(245,158,11,.28); }
+
+  .role-info {
+    font-size: 12.5px; color: var(--text-muted); line-height: 1.55;
+    background: var(--table-head-bg);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .role-info strong { color: var(--text-1); }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="d-flex align-items-center gap-3">
     <a href="{% url 'lista_empleados' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
-    <h1 class="page-header-title">{{ accion }} empleado</h1>
+    <div>
+      <h1 class="page-header-title">{{ accion }} empleado</h1>
+      <p class="page-header-sub">
+        {% if empleado %}Actualiza los datos de {{ empleado.get_full_name|default:empleado.username }}{% else %}Completa la información para dar de alta un nuevo miembro del equipo{% endif %}
+      </p>
+    </div>
   </div>
 </div>
 
-<div class="card border-0 shadow-sm" style="max-width:480px">
-  <div class="card-body">
-    <form method="post">
-      {% csrf_token %}
+<form method="post">
+  {% csrf_token %}
+  <div class="row g-3">
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Usuario <span class="text-danger">*</span></label>
-        {% if empleado %}
-          <input type="text" class="form-control" value="{{ f_username }}" disabled>
-        {% else %}
-          <input type="text" name="username" class="form-control"
-                 value="{{ f_username }}" required autofocus>
-          <div class="form-text">Sin espacios ni caracteres especiales.</div>
-        {% endif %}
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col">
-          <label class="form-label fw-semibold">Nombre</label>
-          <input type="text" name="first_name" class="form-control" value="{{ f_fname }}">
+    <!-- ── Columna izquierda: formulario principal ─────────────── -->
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-person-badge me-2 text-primary"></i>Información del empleado
         </div>
-        <div class="col">
-          <label class="form-label fw-semibold">Apellido</label>
-          <input type="text" name="last_name" class="form-control" value="{{ f_lname }}">
+        <div class="card-body">
+
+          <!-- Datos de acceso -->
+          <div class="form-section-title"><i class="bi bi-shield-lock"></i>Datos de acceso</div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-at me-1 text-muted"></i>Usuario <span class="text-danger">*</span>
+              </label>
+              {% if empleado %}
+                <input type="text" class="form-control" value="{{ f_username }}"
+                       style="background:var(--table-head-bg);color:var(--text-muted)" disabled>
+                <div class="form-text">No se puede modificar.</div>
+              {% else %}
+                <input type="text" name="username" id="id_username" class="form-control"
+                       value="{{ f_username }}" required autofocus
+                       placeholder="ej. juan.perez">
+                <div class="form-text">Sin espacios ni caracteres especiales.</div>
+              {% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-person-gear me-1 text-muted"></i>Rol <span class="text-danger">*</span>
+              </label>
+              <select name="rol" id="id_rol" class="form-select">
+                {% for valor, etiqueta in roles %}
+                <option value="{{ valor }}" {% if f_rol == valor %}selected{% endif %}>{{ etiqueta }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-key me-1 text-muted"></i>
+              {% if empleado %}Nueva contraseña{% else %}Contraseña <span class="text-danger">*</span>{% endif %}
+            </label>
+            <div class="input-group">
+              <input type="password" name="password" id="id_password" class="form-control"
+                     {% if not empleado %}required{% endif %} autocomplete="new-password"
+                     placeholder="{% if empleado %}Dejar en blanco para no cambiarla{% else %}Mínimo 8 caracteres{% endif %}">
+              <button class="btn btn-outline-secondary" type="button"
+                      onclick="const i=document.getElementById('id_password');i.type=i.type==='password'?'text':'password';this.querySelector('i').classList.toggle('bi-eye');this.querySelector('i').classList.toggle('bi-eye-slash')">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+            {% if empleado %}<div class="form-text">Dejar en blanco para no cambiarla.</div>{% endif %}
+          </div>
+
+          <!-- Datos personales -->
+          <div class="form-section-title"><i class="bi bi-person-vcard"></i>Datos personales</div>
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-person me-1 text-muted"></i>Nombre
+              </label>
+              <input type="text" name="first_name" id="id_fname" class="form-control"
+                     value="{{ f_fname }}" placeholder="Ej. Juan">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-person me-1 text-muted"></i>Apellido
+              </label>
+              <input type="text" name="last_name" id="id_lname" class="form-control"
+                     value="{{ f_lname }}" placeholder="Ej. Pérez">
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-card-text me-1 text-muted"></i>Cédula
+            </label>
+            <input type="text" name="cedula" class="form-control"
+                   value="{{ f_cedula }}" inputmode="numeric" maxlength="20"
+                   placeholder="Ej. 1712345678">
+          </div>
+
+          <!-- Contacto -->
+          <div class="form-section-title"><i class="bi bi-telephone"></i>Contacto</div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-phone me-1 text-muted"></i>Teléfono celular
+            </label>
+            <input type="tel" name="telefono" class="form-control"
+                   value="{{ f_telefono }}" inputmode="tel" maxlength="20"
+                   placeholder="Ej. 0991234567">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              <i class="bi bi-geo-alt me-1 text-muted"></i>Dirección
+            </label>
+            <textarea name="direccion" class="form-control" rows="3"
+                      placeholder="Calle, número, barrio, ciudad…">{{ f_direccion }}</textarea>
+          </div>
+
+          {% if empleado %}
+          <!-- Estado -->
+          <div class="form-section-title"><i class="bi bi-toggles"></i>Estado de la cuenta</div>
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input type="checkbox" name="is_active" class="form-check-input" id="activo"
+                     {% if empleado.is_active %}checked{% endif %} role="switch">
+              <label class="form-check-label fw-semibold" for="activo">
+                Cuenta activa
+              </label>
+              <div class="form-text">Si está desactivada, el empleado no podrá iniciar sesión.</div>
+            </div>
+          </div>
+          {% endif %}
+
+          <div class="d-flex gap-2 pt-3" style="border-top:1px solid var(--border)">
+            <button type="submit" class="btn btn-primary mt-3">
+              <i class="bi bi-{% if empleado %}check2{% else %}plus-lg{% endif %} me-1"></i>
+              {% if empleado %}Guardar cambios{% else %}Crear empleado{% endif %}
+            </button>
+            <a href="{% url 'lista_empleados' %}" class="btn btn-outline-secondary mt-3">Cancelar</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Columna derecha: preview + ayuda ────────────────────── -->
+    <div class="col-lg-4">
+
+      <!-- Preview avatar -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <i class="bi bi-eye me-2"></i>Vista previa
+        </div>
+        <div class="card-body text-center">
+          <div id="avatar-preview" class="avatar-preview {{ f_rol|default:'vendedor' }}">??</div>
+          <div id="preview-name" class="fw-bold" style="font-size:15px;color:var(--text-1)">
+            {% if f_fname or f_lname %}{{ f_fname }} {{ f_lname }}{% else %}Nombre del empleado{% endif %}
+          </div>
+          <div id="preview-username" class="text-muted" style="font-family:monospace;font-size:12px">
+            @{{ f_username|default:"usuario" }}
+          </div>
+          <div class="mt-2">
+            <span id="preview-badge" class="badge badge-{{ f_rol|default:'vendedor' }}">
+              {% for valor, etiqueta in roles %}{% if f_rol == valor %}{{ etiqueta }}{% endif %}{% endfor %}
+              {% if not f_rol %}Vendedor{% endif %}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Rol <span class="text-danger">*</span></label>
-        <select name="rol" class="form-select">
-          {% for valor, etiqueta in roles %}
-          <option value="{{ valor }}" {% if f_rol == valor %}selected{% endif %}>
-            {{ etiqueta }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="row g-2 mb-3">
-        <div class="col-12 col-sm-6">
-          <label class="form-label fw-semibold">Cédula</label>
-          <input type="text" name="cedula" class="form-control"
-                 value="{{ f_cedula }}" inputmode="numeric" maxlength="20"
-                 placeholder="Ej: 1712345678">
-        </div>
-        <div class="col-12 col-sm-6">
-          <label class="form-label fw-semibold">Teléfono celular</label>
-          <input type="tel" name="telefono" class="form-control"
-                 value="{{ f_telefono }}" inputmode="tel" maxlength="20"
-                 placeholder="Ej: 0991234567">
+      <!-- Info sobre roles -->
+      <div class="card" style="background:#F0F9FF;border-color:#BAE6FD !important">
+        <div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <i class="bi bi-info-circle-fill" style="color:#0284C7;font-size:18px"></i>
+            <strong style="color:#0C4A6E">Permisos por rol</strong>
+          </div>
+          <div class="d-flex flex-column gap-2" style="font-size:12.5px;color:#0C4A6E;line-height:1.55">
+            <div>
+              <span class="badge badge-dueno mb-1">Dueño</span>
+              <div>Acceso total: ventas, inventario, deudas, empleados, reportes y configuración.</div>
+            </div>
+            <div>
+              <span class="badge badge-vendedor mb-1">Vendedor</span>
+              <div>POS, ventas, clientes, deudas y adelantos. No modifica inventario.</div>
+            </div>
+            <div>
+              <span class="badge badge-bodeguero mb-1">Bodeguero</span>
+              <div>Inventario, compras y recepción de mercadería. No factura.</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Dirección</label>
-        <textarea name="direccion" class="form-control" rows="2"
-                  placeholder="Calle, número, ciudad...">{{ f_direccion }}</textarea>
-      </div>
-
-      <div class="mb-3">
-        <label class="form-label fw-semibold">
-          {% if empleado %}Nueva contraseña{% else %}Contraseña <span class="text-danger">*</span>{% endif %}
-        </label>
-        <input type="password" name="password" class="form-control"
-               {% if not empleado %}required{% endif %} autocomplete="new-password">
-        {% if empleado %}
-        <div class="form-text">Dejar en blanco para no cambiarla.</div>
-        {% endif %}
-      </div>
-
-      {% if empleado %}
-      <div class="mb-4">
-        <div class="form-check">
-          <input type="checkbox" name="is_active" class="form-check-input" id="activo"
-                 {% if empleado.is_active %}checked{% endif %}>
-          <label class="form-check-label" for="activo">Cuenta activa</label>
-        </div>
-      </div>
-      {% endif %}
-
-      <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">
-          <i class="bi bi-{% if empleado %}check2{% else %}plus-lg{% endif %} me-1"></i>
-          {% if empleado %}Guardar cambios{% else %}Crear empleado{% endif %}
-        </button>
-        <a href="{% url 'lista_empleados' %}" class="btn btn-outline-secondary">Cancelar</a>
-      </div>
-    </form>
+    </div>
   </div>
-</div>
+</form>
+
+<script>
+  (function () {
+    const fname    = document.getElementById('id_fname');
+    const lname    = document.getElementById('id_lname');
+    const username = document.getElementById('id_username');
+    const rolSel   = document.getElementById('id_rol');
+
+    const avatar  = document.getElementById('avatar-preview');
+    const pName   = document.getElementById('preview-name');
+    const pUser   = document.getElementById('preview-username');
+    const pBadge  = document.getElementById('preview-badge');
+
+    function update () {
+      const fn = (fname?.value || '').trim();
+      const ln = (lname?.value || '').trim();
+      const un = (username?.value || '').trim();
+      const rol = rolSel?.value || 'vendedor';
+
+      let iniciales = '';
+      if (fn || ln) iniciales = (fn[0] || '') + (ln[0] || '');
+      else if (un)  iniciales = un.slice(0, 2);
+      else          iniciales = '??';
+      avatar.textContent = iniciales.toUpperCase();
+
+      avatar.classList.remove('dueno', 'vendedor', 'bodeguero');
+      avatar.classList.add(rol);
+
+      pName.textContent = (fn || ln) ? (fn + ' ' + ln).trim() : 'Nombre del empleado';
+      pUser.textContent = '@' + (un || 'usuario');
+
+      pBadge.className = 'badge badge-' + rol;
+      const opt = rolSel?.options[rolSel.selectedIndex];
+      pBadge.textContent = opt ? opt.text : '';
+    }
+
+    [fname, lname, username, rolSel].forEach(el => {
+      if (el) el.addEventListener('input', update);
+      if (el) el.addEventListener('change', update);
+    });
+    update();
+  })();
+</script>
 {% endblock %}
