@@ -85,8 +85,9 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ productos_data|json_script:"compra-productos-data" }}
 <script>
-const todosProductos = {{ productos_json|safe }};
+const todosProductos = JSON.parse(document.getElementById('compra-productos-data').textContent);
 let items = [];
 
 const buscador = document.getElementById('buscador');

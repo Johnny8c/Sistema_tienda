@@ -19,6 +19,17 @@ def _form_producto_data(post=None):
     return {k: (post.get(k, '') if post else '') for k in keys}
 
 
+def _validar_foto(request, foto):
+    """Valida tamano y tipo de una imagen subida. Devuelve mensaje de error o None."""
+    if not foto:
+        return None
+    if foto.size > 5 * 1024 * 1024:
+        return 'La imagen no puede pesar más de 5 MB.'
+    if not (foto.content_type or '').startswith('image/'):
+        return 'El archivo debe ser una imagen.'
+    return None
+
+
 # ── Inventario (catálogo) ──────────────────────────────────
 
 @login_required
@@ -106,11 +117,17 @@ def crear_producto(request):
         # Precio inicial de la variante = precio mínimo (o lo que el form mande)
         precio_var = (request.POST.get('precio', '') or '').strip() or str(pmin)
 
+        foto = request.FILES.get('foto')
+        err = _validar_foto(request, foto)
+        if err:
+            messages.error(request, err)
+            return _re_render()
+
         catalogo = CatalogoProducto.objects.create(
             nombre=nombre, categoria=categoria_obj,
             descripcion=descripcion, precio_base=pb,
             precio_minimo=pmin, precio_maximo=pmax,
-            foto=request.FILES.get('foto') or None,
+            foto=foto or None,
         )
 
         variante = Producto.objects.create(
@@ -165,8 +182,13 @@ def editar_producto(request, pk):
         catalogo.precio_minimo = pmin
         catalogo.precio_maximo = pmax
         catalogo.precio_base = ((pmin + pmax) / 2).quantize(Decimal('0.01'))
-        if request.FILES.get('foto'):
-            catalogo.foto = request.FILES['foto']
+        nueva_foto = request.FILES.get('foto')
+        if nueva_foto:
+            err = _validar_foto(request, nueva_foto)
+            if err:
+                messages.error(request, err)
+                return redirect('editar_producto', pk=catalogo.pk)
+            catalogo.foto = nueva_foto
         catalogo.save()
         # Sincronizar nombre en variantes
         catalogo.variantes.all().update(nombre=catalogo.nombre)
@@ -369,7 +391,6 @@ def api_buscar_codigo(request):
 def imprimir_etiquetas(request):
     """Página para configurar e imprimir lotes de etiquetas pegables.
     Genera vista previa de N copias por variante con código de barras."""
-    import json
     from apps.configuracion.models import ConfiguracionGeneral
 
     if not request.user.puede_gestionar_inventario():
@@ -410,7 +431,7 @@ def imprimir_etiquetas(request):
             logo_url = ''
 
     return render(request, 'inventario/etiquetas.html', {
-        'productos_json': json.dumps(productos_data),
+        'productos_data': productos_data,
         'producto_preseleccionado': producto_id,
         'variante_preseleccionada': variante_id,
         'nombre_negocio': cfg.nombre_negocio if cfg else 'Sistema Tienda',

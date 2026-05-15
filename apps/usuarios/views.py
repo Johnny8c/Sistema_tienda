@@ -1,6 +1,7 @@
 import logging
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum, ProtectedError
@@ -11,18 +12,49 @@ from .decorators import requiere_dueno
 
 logger = logging.getLogger(__name__)
 
+# Rate-limit: 5 intentos fallidos en 10 min por (IP+username) bloquean 10 min
+LOGIN_MAX_INTENTOS = 5
+LOGIN_VENTANA_SEG = 600
+
+
+def _login_clave(request, username):
+    ip = (request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip()
+          or request.META.get('REMOTE_ADDR', ''))
+    return f'login_fail:{ip}:{(username or "").lower()}'
+
 
 def vista_login(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
     if request.method == 'POST':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        username = request.POST.get('username') or ''
+        password = request.POST.get('password') or ''
+
+        clave = _login_clave(request, username)
+        intentos = cache.get(clave, 0)
+        if intentos >= LOGIN_MAX_INTENTOS:
+            messages.error(
+                request,
+                'Demasiados intentos fallidos. Espera unos minutos antes de volver a intentar.'
+            )
+            return render(request, 'usuarios/login.html')
+
         user = authenticate(request, username=username, password=password)
         if user:
+            cache.delete(clave)
             login(request, user)
             return redirect('dashboard')
-        messages.error(request, 'Usuario o contraseña incorrectos.')
+
+        # Incrementar contador con expiracion deslizante
+        cache.set(clave, intentos + 1, LOGIN_VENTANA_SEG)
+        restantes = max(0, LOGIN_MAX_INTENTOS - (intentos + 1))
+        if restantes <= 2 and restantes > 0:
+            messages.error(
+                request,
+                f'Usuario o contraseña incorrectos. Te quedan {restantes} intento{"s" if restantes != 1 else ""} antes del bloqueo.'
+            )
+        else:
+            messages.error(request, 'Usuario o contraseña incorrectos.')
     return render(request, 'usuarios/login.html')
 
 

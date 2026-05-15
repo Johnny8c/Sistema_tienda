@@ -84,10 +84,10 @@ def lista_compras(request):
 def crear_compra(request):
     proveedores = Proveedor.objects.filter(activo=True)
     productos = Producto.objects.filter(activo=True).order_by('nombre')
-    productos_json = json.dumps([
+    productos_data = [
         {'id': p.id, 'nombre': str(p), 'precio': str(p.precio)}
         for p in productos
-    ])
+    ]
 
     if request.method == 'POST':
         proveedor_id = request.POST.get('proveedor_id')
@@ -102,7 +102,7 @@ def crear_compra(request):
             if not items:
                 messages.error(request, 'Agrega al menos un producto.')
                 return render(request, 'proveedores/form_compra.html', {
-                    'proveedores': proveedores, 'productos_json': productos_json, 'post': request.POST
+                    'proveedores': proveedores, 'productos_data': productos_data, 'post': request.POST
                 })
 
             # Validar items antes de abrir transacción
@@ -118,7 +118,7 @@ def crear_compra(request):
                 for e in errores:
                     messages.error(request, e)
                 return render(request, 'proveedores/form_compra.html', {
-                    'proveedores': proveedores, 'productos_json': productos_json,
+                    'proveedores': proveedores, 'productos_data': productos_data,
                 })
 
             with transaction.atomic():
@@ -158,7 +158,7 @@ def crear_compra(request):
             messages.error(request, 'No se pudo registrar la compra. Intenta de nuevo.')
 
     return render(request, 'proveedores/form_compra.html', {
-        'proveedores': proveedores, 'productos_json': productos_json,
+        'proveedores': proveedores, 'productos_data': productos_data,
     })
 
 

@@ -34,31 +34,47 @@ from .services import (
 logger = logging.getLogger(__name__)
 
 
-def _productos_json():
-    return json.dumps(
-        [
-            {
-                'id': p.pk,
-                'nombre': p.nombre,
-                'talla': p.talla,
-                'color': p.color,
-                'precio': str(p.precio),
-                'stock_disponible': p.stock_disponible,
-                'codigo_barras': p.codigo_barras or '',
-                'precio_min': (
-                    str(p.catalogo.precio_minimo)
-                    if p.catalogo and p.catalogo.precio_minimo is not None
-                    else None
-                ),
-                'precio_max': (
-                    str(p.catalogo.precio_maximo)
-                    if p.catalogo and p.catalogo.precio_maximo is not None
-                    else None
-                ),
-            }
-            for p in Producto.objects.select_related('catalogo').filter(activo=True)
-        ]
+def _verificar_propietario_o_dueno(request, obj, redirect_name, pk):
+    """Permite solo al vendedor que creo el objeto o al dueno operar sobre el.
+    Devuelve un redirect a `redirect_name` con mensaje de error si no aplica,
+    o None si esta autorizado. Asume que `obj` tiene campo `vendedor`."""
+    user = request.user
+    if user.es_dueno():
+        return None
+    if obj.vendedor_id == user.pk:
+        return None
+    messages.error(
+        request,
+        'No puedes operar sobre este registro porque pertenece a otro vendedor.'
     )
+    return redirect(redirect_name, pk=pk)
+
+
+def _productos_data():
+    """Lista plana de productos. Se entrega al template como dato para
+    json_script (escape-seguro contra XSS)."""
+    return [
+        {
+            'id': p.pk,
+            'nombre': p.nombre,
+            'talla': p.talla,
+            'color': p.color,
+            'precio': str(p.precio),
+            'stock_disponible': p.stock_disponible,
+            'codigo_barras': p.codigo_barras or '',
+            'precio_min': (
+                str(p.catalogo.precio_minimo)
+                if p.catalogo and p.catalogo.precio_minimo is not None
+                else None
+            ),
+            'precio_max': (
+                str(p.catalogo.precio_maximo)
+                if p.catalogo and p.catalogo.precio_maximo is not None
+                else None
+            ),
+        }
+        for p in Producto.objects.select_related('catalogo').filter(activo=True)
+    ]
 
 
 @login_required
@@ -102,7 +118,7 @@ def crear_adelanto_view(request):
             return render(
                 request,
                 'deudores/adelantos/crear.html',
-                {'clientes': clientes, 'productos': productos, 'productos_json': _productos_json()},
+                {'clientes': clientes, 'productos': productos, 'productos_data': _productos_data()},
             )
 
         items = [
@@ -126,7 +142,7 @@ def crear_adelanto_view(request):
     return render(
         request,
         'deudores/adelantos/crear.html',
-        {'clientes': clientes, 'productos': productos, 'productos_json': _productos_json()},
+        {'clientes': clientes, 'productos': productos, 'productos_data': _productos_data()},
     )
 
 
@@ -144,6 +160,11 @@ def abonar_adelanto(request, pk):
     if request.method != 'POST':
         return redirect('detalle_adelanto', pk=pk)
 
+    adelanto = get_object_or_404(Adelanto, pk=pk)
+    bloqueo = _verificar_propietario_o_dueno(request, adelanto, 'detalle_adelanto', pk)
+    if bloqueo:
+        return bloqueo
+
     monto = request.POST.get('monto', '0')
     forma_pago = request.POST.get('forma_pago', 'efectivo')
     try:
@@ -159,6 +180,11 @@ def abonar_adelanto(request, pk):
 def completar_adelanto_view(request, pk):
     if request.method != 'POST':
         return redirect('detalle_adelanto', pk=pk)
+
+    adelanto = get_object_or_404(Adelanto, pk=pk)
+    bloqueo = _verificar_propietario_o_dueno(request, adelanto, 'detalle_adelanto', pk)
+    if bloqueo:
+        return bloqueo
 
     try:
         completar_adelanto(pk, request.user)
@@ -257,6 +283,11 @@ def abonar_deuda(request, pk):
     if request.method != 'POST':
         return redirect('detalle_deuda', pk=pk)
 
+    deuda = get_object_or_404(Deuda, pk=pk)
+    bloqueo = _verificar_propietario_o_dueno(request, deuda, 'detalle_deuda', pk)
+    if bloqueo:
+        return bloqueo
+
     monto = request.POST.get('monto', '0')
     forma_pago = request.POST.get('forma_pago', 'efectivo')
     try:
@@ -272,6 +303,11 @@ def abonar_deuda(request, pk):
 def saldar_deuda_view(request, pk):
     if request.method != 'POST':
         return redirect('detalle_deuda', pk=pk)
+
+    deuda = get_object_or_404(Deuda, pk=pk)
+    bloqueo = _verificar_propietario_o_dueno(request, deuda, 'detalle_deuda', pk)
+    if bloqueo:
+        return bloqueo
 
     try:
         saldar_deuda(pk, request.user)
@@ -300,24 +336,22 @@ def condonar_deuda_view(request, pk):
 @requiere_no_bodeguero
 def pos(request):
     clientes = Cliente.objects.filter(activo=True).order_by('nombre')
-    clientes_json = json.dumps(
-        [
-            {
-                'id': cliente.pk,
-                'nombre': cliente.nombre,
-                'cedula_ruc': cliente.cedula_ruc,
-                'telefono': cliente.telefono or '',
-            }
-            for cliente in clientes
-        ]
-    )
+    clientes_data = [
+        {
+            'id': cliente.pk,
+            'nombre': cliente.nombre,
+            'cedula_ruc': cliente.cedula_ruc,
+            'telefono': cliente.telefono or '',
+        }
+        for cliente in clientes
+    ]
     return render(
         request,
         'pos/index.html',
         {
             'clientes': clientes,
-            'clientes_json': clientes_json,
-            'productos_json': _productos_json(),
+            'clientes_data': clientes_data,
+            'productos_data': _productos_data(),
         },
     )
 

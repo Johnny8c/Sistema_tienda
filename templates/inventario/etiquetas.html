@@ -1031,8 +1031,9 @@
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+{{ productos_data|json_script:"etiquetas-productos-data" }}
 <script>
-const PRODUCTOS = {{ productos_json|safe }};
+const PRODUCTOS = JSON.parse(document.getElementById('etiquetas-productos-data').textContent);
 const NOMBRE_NEGOCIO = "{{ nombre_negocio|escapejs }}";
 const LOGO_URL = "{{ logo_url|escapejs }}";
 const PRESELECT_PRODUCTO = "{{ producto_preseleccionado|default:'' }}";

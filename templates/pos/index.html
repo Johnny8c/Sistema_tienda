@@ -309,8 +309,10 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ productos_data|json_script:"pos-productos-data" }}
+{{ clientes_data|json_script:"pos-clientes-data" }}
 <script>
-const productos = {{ productos_json|safe }};
+const productos = JSON.parse(document.getElementById('pos-productos-data').textContent);
 const PREFS = {
   clienteObligatorio: {{ config_general.cliente_obligatorio_venta|yesno:"true,false" }},
   permitirSinStock:   {{ config_general.permitir_vender_sin_stock|yesno:"true,false" }},
@@ -817,7 +819,7 @@ document.getElementById('btn-cobrar').addEventListener('click', () => {
 });
 
 /* ─── BUSCADOR DE CLIENTES ───────────────────────── */
-const clientes = {{ clientes_json|safe }};
+const clientes = JSON.parse(document.getElementById('pos-clientes-data').textContent);
 const cliBuscar  = document.getElementById('cliente-buscar');
 const cliResults = document.getElementById('cliente-resultados');
 const cliHidden  = document.getElementById('sel-cliente');

@@ -108,8 +108,9 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ productos_data|json_script:"adelanto-productos-data" }}
 <script>
-const productos = {{ productos_json|safe }};
+const productos = JSON.parse(document.getElementById('adelanto-productos-data').textContent);
 
 function calcularTotal() {
   let total = 0;

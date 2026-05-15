@@ -49,8 +49,17 @@ def datos_negocio(request):
         if request.POST.get('quitar_logo') == '1' and cfg.logo:
             cfg.logo.delete(save=False)
             cfg.logo = None
-        if request.FILES.get('logo'):
-            cfg.logo = request.FILES['logo']
+        nuevo_logo = request.FILES.get('logo')
+        if nuevo_logo:
+            # Limite duro de 5 MB: ya viene comprimido por el JS del cliente,
+            # esto cubre el caso de un atacante saltandose el navegador.
+            if nuevo_logo.size > 5 * 1024 * 1024:
+                messages.error(request, 'El logo no puede pesar más de 5 MB.')
+                return redirect('config_datos_negocio')
+            if not (nuevo_logo.content_type or '').startswith('image/'):
+                messages.error(request, 'El logo debe ser una imagen.')
+                return redirect('config_datos_negocio')
+            cfg.logo = nuevo_logo
         cfg.save()
         messages.success(request, 'Datos del negocio actualizados.')
         return redirect('config_datos_negocio')
