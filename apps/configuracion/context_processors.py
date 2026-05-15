@@ -1,7 +1,14 @@
 """
 Context processors que exponen configuración a todos los templates.
 """
+import logging
+from django.core.cache import cache
 from .models import ConfiguracionGeneral
+
+logger = logging.getLogger(__name__)
+
+_LOGO_CHECK_CACHE_KEY = 'cfg_logo_ok'
+_LOGO_CHECK_TTL = 60 * 5  # 5 min
 
 
 def config_general(request):
@@ -9,6 +16,24 @@ def config_general(request):
         cfg = ConfiguracionGeneral.objects.first()
     except Exception:
         cfg = None
+
+    # Auto-limpieza de logo huérfano. Solo verificamos contra el storage una vez
+    # cada 5 minutos para no añadir latencia a cada request (Cloudinary.exists()
+    # es una llamada HTTP). El resultado positivo se cachea; si es negativo
+    # limpiamos el campo y refrescamos el cfg en memoria.
+    if cfg and cfg.logo:
+        if cache.get(_LOGO_CHECK_CACHE_KEY) != cfg.logo.name:
+            try:
+                if cfg.logo.storage.exists(cfg.logo.name):
+                    cache.set(_LOGO_CHECK_CACHE_KEY, cfg.logo.name, _LOGO_CHECK_TTL)
+                else:
+                    logger.warning('Logo huérfano (%s). Limpiando referencia.', cfg.logo.name)
+                    cfg.logo = None
+                    cfg.save(update_fields=['logo'])
+                    cache.delete(_LOGO_CHECK_CACHE_KEY)
+            except Exception:
+                logger.exception('No se pudo verificar la existencia del logo')
+
     return {'config_general': cfg}
 
 
