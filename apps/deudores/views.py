@@ -1,42 +1,65 @@
 import json
 import logging
 from decimal import Decimal, InvalidOperation
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from apps.usuarios.decorators import requiere_no_bodeguero, requiere_dueno
 from apps.clientes.models import Cliente
 from apps.inventario.models import Producto
+from apps.usuarios.decorators import requiere_dueno, requiere_no_bodeguero
+
+from .exceptions import (
+    AbonoExcedeSaldoError,
+    EstadoInvalidoError,
+    PermisoInsuficienteError,
+    SaldoInsuficienteError,
+    StockInsuficienteError,
+)
 from .models import Adelanto, Deuda, Pago
+from .services import (
+    cancelar_adelanto,
+    completar_adelanto,
+    condonar_deuda,
+    crear_adelanto,
+    crear_venta_credito,
+    registrar_abono_adelanto,
+    registrar_abono_deuda,
+    saldar_deuda,
+)
 
 logger = logging.getLogger(__name__)
-from .services import (
-    crear_adelanto, registrar_abono_adelanto, completar_adelanto, cancelar_adelanto,
-    crear_venta_credito, registrar_abono_deuda, saldar_deuda, condonar_deuda,
-)
-from .exceptions import (
-    SaldoInsuficienteError, AbonoExcedeSaldoError, EstadoInvalidoError,
-    StockInsuficienteError, PermisoInsuficienteError,
-)
 
 
 def _productos_json():
-    return json.dumps([
-        {
-            'id': p.pk, 'nombre': p.nombre, 'talla': p.talla, 'color': p.color,
-            'precio': str(p.precio), 'stock_disponible': p.stock_disponible,
-            'codigo_barras': p.codigo_barras or '',
-            'precio_min': str(p.catalogo.precio_minimo) if (p.catalogo and p.catalogo.precio_minimo is not None) else None,
-            'precio_max': str(p.catalogo.precio_maximo) if (p.catalogo and p.catalogo.precio_maximo is not None) else None,
-        }
-        for p in Producto.objects.select_related('catalogo').filter(activo=True)
-    ])
+    return json.dumps(
+        [
+            {
+                'id': p.pk,
+                'nombre': p.nombre,
+                'talla': p.talla,
+                'color': p.color,
+                'precio': str(p.precio),
+                'stock_disponible': p.stock_disponible,
+                'codigo_barras': p.codigo_barras or '',
+                'precio_min': (
+                    str(p.catalogo.precio_minimo)
+                    if p.catalogo and p.catalogo.precio_minimo is not None
+                    else None
+                ),
+                'precio_max': (
+                    str(p.catalogo.precio_maximo)
+                    if p.catalogo and p.catalogo.precio_maximo is not None
+                    else None
+                ),
+            }
+            for p in Producto.objects.select_related('catalogo').filter(activo=True)
+        ]
+    )
 
-
-# --- Adelantos ---
 
 @login_required
 @requiere_no_bodeguero
@@ -50,13 +73,15 @@ def lista_adelantos(request):
         qs = qs.filter(Q(cliente__nombre__icontains=q) | Q(cliente__cedula_ruc__icontains=q))
 
     adelantos = list(qs)
-    for a in adelantos:
-        a.abonado = a.total - a.saldo_pendiente
-        a.pct_pagado = int((a.abonado / a.total) * 100) if a.total else 0
+    for adelanto in adelantos:
+        adelanto.abonado = adelanto.total - adelanto.saldo_pendiente
+        adelanto.pct_pagado = int((adelanto.abonado / adelanto.total) * 100) if adelanto.total else 0
 
-    return render(request, 'deudores/adelantos/lista.html', {
-        'adelantos': adelantos, 'q': q, 'estado': estado, 'hoy': timezone.now().date(),
-    })
+    return render(
+        request,
+        'deudores/adelantos/lista.html',
+        {'adelantos': adelantos, 'q': q, 'estado': estado, 'hoy': timezone.now().date()},
+    )
 
 
 @login_required
@@ -64,6 +89,7 @@ def lista_adelantos(request):
 def crear_adelanto_view(request):
     clientes = Cliente.objects.filter(activo=True).order_by('nombre')
     productos = Producto.objects.filter(activo=True)
+
     if request.method == 'POST':
         cliente_id = request.POST.get('cliente_id')
         monto_inicial = request.POST.get('monto_inicial', '0')
@@ -73,30 +99,35 @@ def crear_adelanto_view(request):
 
         if not cliente_id or not producto_ids:
             messages.error(request, 'Selecciona un cliente y al menos un producto.')
-            return render(request, 'deudores/adelantos/crear.html', {
-                'clientes': clientes, 'productos': productos, 'productos_json': _productos_json(),
-            })
+            return render(
+                request,
+                'deudores/adelantos/crear.html',
+                {'clientes': clientes, 'productos': productos, 'productos_json': _productos_json()},
+            )
 
         items = [
             {'producto_id': int(pid), 'cantidad': int(cant)}
-            for pid, cant in zip(producto_ids, cantidades) if pid and int(cant) > 0
+            for pid, cant in zip(producto_ids, cantidades)
+            if pid and int(cant) > 0
         ]
         try:
             adelanto = crear_adelanto(
                 cliente_id=int(cliente_id),
                 items=items,
                 monto_inicial=Decimal(monto_inicial),
-                fecha_limite=fecha_limite or None,
+                fecha_limite=fecha_limite,
                 vendedor=request.user,
             )
             messages.success(request, f'Apartado #{adelanto.pk} creado correctamente.')
             return redirect('detalle_adelanto', pk=adelanto.pk)
-        except (StockInsuficienteError, SaldoInsuficienteError) as e:
-            messages.error(request, str(e))
+        except (SaldoInsuficienteError, StockInsuficienteError) as exc:
+            messages.error(request, str(exc))
 
-    return render(request, 'deudores/adelantos/crear.html', {
-        'clientes': clientes, 'productos': productos, 'productos_json': _productos_json(),
-    })
+    return render(
+        request,
+        'deudores/adelantos/crear.html',
+        {'clientes': clientes, 'productos': productos, 'productos_json': _productos_json()},
+    )
 
 
 @login_required
@@ -112,13 +143,14 @@ def detalle_adelanto(request, pk):
 def abonar_adelanto(request, pk):
     if request.method != 'POST':
         return redirect('detalle_adelanto', pk=pk)
+
     monto = request.POST.get('monto', '0')
     forma_pago = request.POST.get('forma_pago', 'efectivo')
     try:
         registrar_abono_adelanto(pk, Decimal(monto), forma_pago, request.user)
         messages.success(request, f'Abono de ${monto} registrado.')
-    except (AbonoExcedeSaldoError, EstadoInvalidoError) as e:
-        messages.error(request, str(e))
+    except (AbonoExcedeSaldoError, EstadoInvalidoError) as exc:
+        messages.error(request, str(exc))
     return redirect('detalle_adelanto', pk=pk)
 
 
@@ -127,11 +159,12 @@ def abonar_adelanto(request, pk):
 def completar_adelanto_view(request, pk):
     if request.method != 'POST':
         return redirect('detalle_adelanto', pk=pk)
+
     try:
         completar_adelanto(pk, request.user)
         messages.success(request, 'Apartado completado. Venta generada.')
-    except (SaldoInsuficienteError, EstadoInvalidoError) as e:
-        messages.error(request, str(e))
+    except (EstadoInvalidoError, SaldoInsuficienteError) as exc:
+        messages.error(request, str(exc))
     return redirect('detalle_adelanto', pk=pk)
 
 
@@ -140,26 +173,31 @@ def completar_adelanto_view(request, pk):
 def cancelar_adelanto_view(request, pk):
     if request.method != 'POST':
         return redirect('detalle_adelanto', pk=pk)
+
     motivo = request.POST.get('motivo', '')
-    tipo_dev = request.POST.get('tipo_devolucion', 'saldo_favor')
+    tipo_devolucion = request.POST.get('tipo_devolucion', 'saldo_favor')
     forma_pago = request.POST.get('forma_pago', 'efectivo')
-    if tipo_dev not in ('saldo_favor', 'reembolso'):
-        tipo_dev = 'saldo_favor'
+    if tipo_devolucion not in ('saldo_favor', 'reembolso'):
+        tipo_devolucion = 'saldo_favor'
     if forma_pago not in ('efectivo', 'tarjeta', 'transferencia'):
         forma_pago = 'efectivo'
+
     try:
-        cancelar_adelanto(pk, motivo, request.user,
-                          tipo_devolucion=tipo_dev, forma_pago=forma_pago)
-        if tipo_dev == 'reembolso':
+        cancelar_adelanto(
+            pk,
+            motivo,
+            request.user,
+            tipo_devolucion=tipo_devolucion,
+            forma_pago=forma_pago,
+        )
+        if tipo_devolucion == 'reembolso':
             messages.success(request, 'Apartado cancelado. Reembolso registrado en el cierre de caja.')
         else:
-            messages.success(request, 'Apartado cancelado. Saldo transferido como crédito a favor del cliente.')
-    except (EstadoInvalidoError, PermisoInsuficienteError) as e:
-        messages.error(request, str(e))
+            messages.success(request, 'Apartado cancelado. Saldo transferido como credito a favor del cliente.')
+    except (EstadoInvalidoError, PermisoInsuficienteError) as exc:
+        messages.error(request, str(exc))
     return redirect('detalle_adelanto', pk=pk)
 
-
-# --- Deudas ---
 
 @login_required
 @requiere_no_bodeguero
@@ -177,26 +215,32 @@ def lista_deudas(request):
     def bucket_sum(dias_min, dias_max=None):
         hoy = timezone.now().date()
         total = Decimal('0')
-        for d in pendientes:
-            dias = (hoy - d.fecha_creacion.date()).days
+        for deuda in pendientes:
+            dias = (hoy - deuda.fecha_creacion.date()).days
             en_rango = dias >= dias_min and (dias_max is None or dias <= dias_max)
             if en_rango:
-                total += d.saldo_pendiente
+                total += deuda.saldo_pendiente
         return total
 
     deudas = list(qs)
-    for d in deudas:
-        d.abonado = d.monto_original - d.saldo_pendiente
-        d.pct_pagado = int((d.abonado / d.monto_original) * 100) if d.monto_original else 0
+    for deuda in deudas:
+        deuda.abonado = deuda.monto_original - deuda.saldo_pendiente
+        deuda.pct_pagado = int((deuda.abonado / deuda.monto_original) * 100) if deuda.monto_original else 0
 
-    return render(request, 'deudores/deudas/lista.html', {
-        'deudas': deudas, 'q': q, 'estado': estado,
-        'hoy': timezone.now().date(),
-        'bucket_0_30': bucket_sum(0, 30),
-        'bucket_31_60': bucket_sum(31, 60),
-        'bucket_61_90': bucket_sum(61, 90),
-        'bucket_90_mas': bucket_sum(91),
-    })
+    return render(
+        request,
+        'deudores/deudas/lista.html',
+        {
+            'deudas': deudas,
+            'q': q,
+            'estado': estado,
+            'hoy': timezone.now().date(),
+            'bucket_0_30': bucket_sum(0, 30),
+            'bucket_31_60': bucket_sum(31, 60),
+            'bucket_61_90': bucket_sum(61, 90),
+            'bucket_90_mas': bucket_sum(91),
+        },
+    )
 
 
 @login_required
@@ -212,13 +256,14 @@ def detalle_deuda(request, pk):
 def abonar_deuda(request, pk):
     if request.method != 'POST':
         return redirect('detalle_deuda', pk=pk)
+
     monto = request.POST.get('monto', '0')
     forma_pago = request.POST.get('forma_pago', 'efectivo')
     try:
         registrar_abono_deuda(pk, Decimal(monto), forma_pago, request.user)
         messages.success(request, f'Abono de ${monto} registrado.')
-    except (AbonoExcedeSaldoError, EstadoInvalidoError) as e:
-        messages.error(request, str(e))
+    except (AbonoExcedeSaldoError, EstadoInvalidoError) as exc:
+        messages.error(request, str(exc))
     return redirect('detalle_deuda', pk=pk)
 
 
@@ -227,11 +272,12 @@ def abonar_deuda(request, pk):
 def saldar_deuda_view(request, pk):
     if request.method != 'POST':
         return redirect('detalle_deuda', pk=pk)
+
     try:
         saldar_deuda(pk, request.user)
         messages.success(request, 'Deuda saldada completamente.')
-    except (EstadoInvalidoError,) as e:
-        messages.error(request, str(e))
+    except EstadoInvalidoError as exc:
+        messages.error(request, str(exc))
     return redirect('detalle_deuda', pk=pk)
 
 
@@ -240,49 +286,59 @@ def saldar_deuda_view(request, pk):
 def condonar_deuda_view(request, pk):
     if request.method != 'POST':
         return redirect('detalle_deuda', pk=pk)
+
     motivo = request.POST.get('motivo', '')
     try:
         condonar_deuda(pk, motivo, request.user)
         messages.success(request, 'Deuda condonada.')
-    except (EstadoInvalidoError, PermisoInsuficienteError) as e:
-        messages.error(request, str(e))
+    except (EstadoInvalidoError, PermisoInsuficienteError) as exc:
+        messages.error(request, str(exc))
     return redirect('detalle_deuda', pk=pk)
 
-
-# --- POS ---
 
 @login_required
 @requiere_no_bodeguero
 def pos(request):
     clientes = Cliente.objects.filter(activo=True).order_by('nombre')
-    clientes_json = json.dumps([
-        {'id': c.pk, 'nombre': c.nombre, 'cedula_ruc': c.cedula_ruc,
-         'telefono': c.telefono or ''}
-        for c in clientes
-    ])
-    return render(request, 'pos/index.html', {
-        'clientes': clientes,
-        'clientes_json': clientes_json,
-        'productos_json': _productos_json(),
-    })
+    clientes_json = json.dumps(
+        [
+            {
+                'id': cliente.pk,
+                'nombre': cliente.nombre,
+                'cedula_ruc': cliente.cedula_ruc,
+                'telefono': cliente.telefono or '',
+            }
+            for cliente in clientes
+        ]
+    )
+    return render(
+        request,
+        'pos/index.html',
+        {
+            'clientes': clientes,
+            'clientes_json': clientes_json,
+            'productos_json': _productos_json(),
+        },
+    )
 
 
 def _emitir_factura_si_corresponde(request, venta):
-    """Si la venta lleva flag de emitir_factura y tiene cliente,
-    crea y envía la factura SRI. Devuelve un HttpResponse a usar en
-    redirección, o None si no se debe emitir / falló."""
+    """Emite factura SRI si el POS la solicito y la venta tiene cliente."""
     if request.POST.get('emitir_factura') != '1' or not venta.cliente_id:
         return None
+
     from apps.facturacion.models import ConfiguracionSRI
     from apps.facturacion.views import _crear_factura_desde_venta, _emitir_factura
+
     cfg = ConfiguracionSRI.get_singleton()
     if not cfg or not cfg.cert_configurado:
         messages.warning(
             request,
             f'Venta #{venta.pk} registrada pero no se pudo facturar al SRI: '
-            f'configura tus datos y certificado en SRI → Configuración.'
+            'configura tus datos y certificado en SRI -> Configuracion.'
         )
         return None
+
     try:
         factura = _crear_factura_desde_venta(venta, request.user, cfg)
         return _emitir_factura(request, factura, cfg)
@@ -291,13 +347,12 @@ def _emitir_factura_si_corresponde(request, venta):
         messages.warning(
             request,
             f'Venta #{venta.pk} registrada, pero la factura SRI no se pudo emitir. '
-            f'Puedes reintentarla desde Facturación SRI.'
+            'Puedes reintentarla desde Facturacion SRI.'
         )
         return None
 
 
 def _redireccion_post_venta(venta, cfg_gen):
-    """Redirige a la nota de venta, agregando ?print=auto si la pref lo pide."""
     response = redirect('nota_venta', pk=venta.pk)
     if cfg_gen.imprimir_auto_nota:
         response['Location'] += '?print=auto'
@@ -308,12 +363,12 @@ def _emitir_factura_pos_segura(request, venta):
     """Evita que un fallo inesperado del flujo SRI rompa el cobro del POS."""
     try:
         return _emitir_factura_si_corresponde(request, venta)
-    except Exception:
+    except Exception as exc:
         logger.exception('Error inesperado cerrando la facturacion SRI para venta %s', venta.pk)
         messages.warning(
             request,
-            f'Venta #{venta.pk} registrada, pero ocurrio un error al cerrar la facturacion. '
-            f'Puedes revisar la venta y reintentar la factura SRI si hace falta.'
+            f'Venta #{venta.pk} registrada, pero hubo un error cerrando la facturacion: '
+            f'{type(exc).__name__}: {exc}'
         )
         return None
 
@@ -326,8 +381,8 @@ def procesar_venta(request):
 
     from apps.configuracion.models import ConfiguracionGeneral
     from apps.ventas.services import crear_venta_contado
-    cfg_gen = ConfiguracionGeneral.get_singleton()
 
+    cfg_gen = ConfiguracionGeneral.get_singleton()
     tipo = request.POST.get('tipo_venta', 'contado')
     cliente_id = request.POST.get('cliente_id') or None
     items_json = request.POST.get('items_json', '[]')
@@ -335,9 +390,8 @@ def procesar_venta(request):
     if forma_pago not in ('efectivo', 'tarjeta', 'transferencia'):
         forma_pago = 'efectivo'
 
-    # Preferencia: cliente obligatorio en venta al contado
     if tipo == 'contado' and not cliente_id and cfg_gen.cliente_obligatorio_venta:
-        messages.error(request, 'La configuración del sistema exige cliente en cada venta.')
+        messages.error(request, 'La configuracion del sistema exige cliente en cada venta.')
         return redirect('pos')
 
     venta = None
@@ -365,10 +419,9 @@ def procesar_venta(request):
                 plazo_dias=int(request.POST.get('plazo_dias', 30)),
                 vendedor=request.user,
             )
-            messages.success(request, f'Venta a crédito registrada. Deuda #{deuda.pk} creada.')
+            messages.success(request, f'Venta a credito registrada. Deuda #{deuda.pk} creada.')
             return redirect('detalle_deuda', pk=deuda.pk)
 
-        # Default: venta al contado
         venta = crear_venta_contado(
             items=items,
             cliente_id=cliente_id,
@@ -383,12 +436,22 @@ def procesar_venta(request):
 
         return _redireccion_post_venta(venta, cfg_gen)
 
-    except (StockInsuficienteError, SaldoInsuficienteError, ValueError) as e:
-        messages.error(request, str(e))
+    except (StockInsuficienteError, SaldoInsuficienteError, ValueError) as exc:
+        messages.error(request, str(exc))
         return redirect('pos')
-    except (InvalidOperation, TypeError, KeyError):
-        messages.error(request, 'Hay valores invalidos en el carrito. Revisa precios y cantidades.')
+    except (InvalidOperation, TypeError, KeyError) as exc:
+        messages.error(request, f'Hay valores invalidos en el carrito: {type(exc).__name__}: {exc}')
         return redirect('pos')
     except json.JSONDecodeError:
-        messages.error(request, 'Carrito inválido. Intenta de nuevo.')
+        messages.error(request, 'Carrito invalido. Intenta de nuevo.')
+        return redirect('pos')
+    except Exception as exc:
+        logger.exception('Error inesperado procesando venta POS')
+        if venta is not None:
+            messages.warning(
+                request,
+                f'Venta #{venta.pk} registrada, pero hubo un error final: {type(exc).__name__}: {exc}'
+            )
+            return _redireccion_post_venta(venta, cfg_gen)
+        messages.error(request, f'Error interno POS: {type(exc).__name__}: {exc}')
         return redirect('pos')
