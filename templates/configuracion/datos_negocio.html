@@ -443,7 +443,8 @@
           <label class="btn btn-outline-secondary w-100" style="cursor:pointer">
             <i class="bi bi-upload me-1"></i>
             {% if cfg.logo %}Cambiar logo{% else %}Subir logo{% endif %}
-            <input type="file" name="logo" accept="image/*" id="logo-input" class="d-none">
+            <input type="file" name="logo" accept="image/*" id="logo-input" class="d-none"
+                   data-compress data-compress-max="512">
           </label>
 
           {% if cfg.logo %}

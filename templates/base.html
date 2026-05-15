@@ -1,4 +1,4 @@
-{% load config_extras %}<!DOCTYPE html>
+{% load config_extras static %}<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -1249,6 +1249,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<script src="{% static 'js/image_compressor.js' %}" defer></script>
 {% block extra_js %}{% endblock %}
 <!-- PWA: registro del service worker -->
 <script>

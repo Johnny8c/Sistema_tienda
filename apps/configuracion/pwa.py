@@ -21,10 +21,15 @@ CLOUDINARY_UPLOAD_MARKER = '/image/upload/'
 
 def _cloudinary_icon(url, size):
     """Inserta transformación Cloudinary para generar un PNG cuadrado de `size`px
-    con padding blanco. Si no es URL de Cloudinary devuelve la URL original."""
+    con marco blanco alrededor del logo (logo ocupa 80%, resto blanco).
+    Si no es URL de Cloudinary devuelve la URL original."""
     if not url or CLOUDINARY_UPLOAD_MARKER not in url:
         return url
-    transform = f'f_png,c_pad,w_{size},h_{size},b_white,q_auto'
+    inner = int(size * 0.8)
+    transform = (
+        f'c_fit,w_{inner},h_{inner}/'
+        f'c_pad,w_{size},h_{size},b_white,f_png,q_auto'
+    )
     return url.replace(CLOUDINARY_UPLOAD_MARKER, f'{CLOUDINARY_UPLOAD_MARKER}{transform}/', 1)
 
 

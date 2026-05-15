@@ -101,7 +101,8 @@
           <label class="btn btn-outline-secondary btn-sm w-100" style="cursor:pointer">
             <i class="bi bi-camera me-1"></i>
             {% if catalogo.foto %}Cambiar foto{% else %}Subir foto{% endif %}
-            <input type="file" name="foto" accept="image/*" id="foto-input" class="d-none">
+            <input type="file" name="foto" accept="image/*" id="foto-input" class="d-none"
+                   data-compress data-compress-max="1200">
           </label>
           <div class="form-text">JPG, PNG o WEBP. Máx. 5 MB.</div>
         </div>
