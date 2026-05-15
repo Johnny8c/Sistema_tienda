@@ -14,6 +14,9 @@ class Usuario(AbstractUser):
     ]
 
     rol = models.CharField(max_length=20, choices=ROLES, default=ROL_VENDEDOR)
+    cedula = models.CharField(max_length=20, blank=True)
+    telefono = models.CharField(max_length=20, blank=True)
+    direccion = models.TextField(blank=True)
 
     class Meta:
         verbose_name = 'Usuario'

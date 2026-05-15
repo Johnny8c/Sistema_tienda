@@ -49,6 +49,27 @@
         </select>
       </div>
 
+      <div class="row g-2 mb-3">
+        <div class="col-12 col-sm-6">
+          <label class="form-label fw-semibold">Cédula</label>
+          <input type="text" name="cedula" class="form-control"
+                 value="{{ f_cedula }}" inputmode="numeric" maxlength="20"
+                 placeholder="Ej: 1712345678">
+        </div>
+        <div class="col-12 col-sm-6">
+          <label class="form-label fw-semibold">Teléfono celular</label>
+          <input type="tel" name="telefono" class="form-control"
+                 value="{{ f_telefono }}" inputmode="tel" maxlength="20"
+                 placeholder="Ej: 0991234567">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Dirección</label>
+        <textarea name="direccion" class="form-control" rows="2"
+                  placeholder="Calle, número, ciudad...">{{ f_direccion }}</textarea>
+      </div>
+
       <div class="mb-3">
         <label class="form-label fw-semibold">
           {% if empleado %}Nueva contraseña{% else %}Contraseña <span class="text-danger">*</span>{% endif %}

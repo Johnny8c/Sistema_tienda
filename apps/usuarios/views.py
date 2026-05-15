@@ -255,6 +255,9 @@ def crear_empleado(request):
         last_name = request.POST.get('last_name', '').strip()
         rol = request.POST.get('rol', Usuario.ROL_VENDEDOR)
         password = request.POST.get('password', '').strip()
+        cedula = request.POST.get('cedula', '').strip()
+        telefono = request.POST.get('telefono', '').strip()
+        direccion = request.POST.get('direccion', '').strip()
 
         errores = []
         if not username:
@@ -278,6 +281,7 @@ def crear_empleado(request):
                 'accion': 'Crear', 'roles': Usuario.ROLES,
                 'f_username': username, 'f_fname': first_name,
                 'f_lname': last_name, 'f_rol': rol,
+                'f_cedula': cedula, 'f_telefono': telefono, 'f_direccion': direccion,
             })
 
         Usuario.objects.create_user(
@@ -286,6 +290,9 @@ def crear_empleado(request):
             last_name=last_name,
             password=password,
             rol=rol,
+            cedula=cedula,
+            telefono=telefono,
+            direccion=direccion,
         )
         messages.success(request, f'Empleado "{username}" creado correctamente.')
         return redirect('lista_empleados')
@@ -293,6 +300,7 @@ def crear_empleado(request):
     return render(request, 'usuarios/empleados/form.html', {
         'accion': 'Crear', 'roles': Usuario.ROLES,
         'f_username': '', 'f_fname': '', 'f_lname': '', 'f_rol': '',
+        'f_cedula': '', 'f_telefono': '', 'f_direccion': '',
     })
 
 
@@ -310,6 +318,9 @@ def editar_empleado(request, pk):
         empleado.first_name = request.POST.get('first_name', '').strip()
         empleado.last_name = request.POST.get('last_name', '').strip()
         empleado.rol = request.POST.get('rol', empleado.rol)
+        empleado.cedula = request.POST.get('cedula', '').strip()
+        empleado.telefono = request.POST.get('telefono', '').strip()
+        empleado.direccion = request.POST.get('direccion', '').strip()
         empleado.is_active = 'is_active' in request.POST
 
         nueva_password = request.POST.get('password', '').strip()
@@ -323,6 +334,8 @@ def editar_empleado(request, pk):
                     'accion': 'Editar', 'empleado': empleado, 'roles': Usuario.ROLES,
                     'f_username': empleado.username, 'f_fname': empleado.first_name,
                     'f_lname': empleado.last_name, 'f_rol': empleado.rol,
+                    'f_cedula': empleado.cedula, 'f_telefono': empleado.telefono,
+                    'f_direccion': empleado.direccion,
                 })
             empleado.set_password(nueva_password)
 
@@ -334,6 +347,8 @@ def editar_empleado(request, pk):
         'accion': 'Editar', 'empleado': empleado, 'roles': Usuario.ROLES,
         'f_username': empleado.username, 'f_fname': empleado.first_name,
         'f_lname': empleado.last_name, 'f_rol': empleado.rol,
+        'f_cedula': empleado.cedula, 'f_telefono': empleado.telefono,
+        'f_direccion': empleado.direccion,
     })
 
 
