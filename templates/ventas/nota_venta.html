@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load config_extras %}
 {% block title %}Nota de venta #{{ venta.pk }}{% endblock %}
 {% block nav_pos %}active{% endblock %}
 {% block page_title %}Venta registrada{% endblock %}
@@ -44,7 +45,7 @@
         {% if config_general.mostrar_logo_en_nota %}
         <div style="width:48px;height:48px;background:#EEF2FF;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;overflow:hidden">
           {% if config_general.logo %}
-            <img src="{{ config_general.logo.url }}" alt="logo" style="width:100%;height:100%;object-fit:contain">
+            <img src="{% logo_url config_general.logo 128 %}" alt="logo" width="48" height="48" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain">
           {% else %}
             <i class="bi bi-shop" style="font-size:22px;color:#4F46E5"></i>
           {% endif %}
