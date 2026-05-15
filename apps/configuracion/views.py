@@ -24,6 +24,15 @@ def datos_negocio(request):
     import re
     cfg = ConfiguracionGeneral.get_singleton()
 
+    if request.method == 'GET' and cfg.logo:
+        try:
+            if not cfg.logo.storage.exists(cfg.logo.name):
+                logger.warning('Logo huérfano detectado (%s). Limpiando referencia.', cfg.logo.name)
+                cfg.logo = None
+                cfg.save(update_fields=['logo'])
+        except Exception:
+            logger.exception('No se pudo verificar la existencia del logo')
+
     if request.method == 'POST':
         cfg.nombre_negocio     = request.POST.get('nombre_negocio', '').strip() or 'Sistema Tienda'
         cfg.slogan             = request.POST.get('slogan', '').strip()

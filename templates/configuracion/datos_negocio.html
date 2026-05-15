@@ -433,12 +433,11 @@
         </div>
         <div class="dn-section-body">
           <div class="logo-preview-wrap {% if cfg.logo %}has-logo{% endif %}" id="logo-preview">
-            {% if cfg.logo %}
-              <img src="{{ cfg.logo.url }}" id="preview-img" alt="Logo actual">
-            {% else %}
-              <i class="bi bi-shop logo-empty" id="preview-icon"></i>
-              <img id="preview-img" style="display:none" alt="">
-            {% endif %}
+            <i class="bi bi-shop logo-empty" id="preview-icon"
+               {% if cfg.logo %}style="display:none"{% endif %}></i>
+            <img id="preview-img" alt="Logo actual"
+                 {% if cfg.logo %}src="{{ cfg.logo.url }}"{% else %}style="display:none"{% endif %}
+                 onerror="this.style.display='none';document.getElementById('preview-icon').style.display='';this.closest('.logo-preview-wrap').classList.remove('has-logo')">
           </div>
 
           <label class="btn btn-outline-secondary w-100" style="cursor:pointer">
