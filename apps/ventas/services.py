@@ -74,10 +74,13 @@ def crear_venta_contado(*, items, cliente_id, vendedor, forma_pago, cfg_gen):
         prod = productos_locked.get(producto_id)
         if prod is None:
             try:
+                # of=('self',) bloquea solo la fila de Producto. Sin esto,
+                # Postgres rechaza FOR UPDATE porque select_related('catalogo')
+                # genera LEFT OUTER JOIN sobre una FK nullable.
                 prod = (
                     Producto.objects
                     .select_related('catalogo')
-                    .select_for_update()
+                    .select_for_update(of=('self',))
                     .get(pk=producto_id)
                 )
             except Producto.DoesNotExist as exc:
