@@ -304,6 +304,20 @@ def _redireccion_post_venta(venta, cfg_gen):
     return response
 
 
+def _emitir_factura_pos_segura(request, venta):
+    """Evita que un fallo inesperado del flujo SRI rompa el cobro del POS."""
+    try:
+        return _emitir_factura_si_corresponde(request, venta)
+    except Exception:
+        logger.exception('Error inesperado cerrando la facturacion SRI para venta %s', venta.pk)
+        messages.warning(
+            request,
+            f'Venta #{venta.pk} registrada, pero ocurrio un error al cerrar la facturacion. '
+            f'Puedes revisar la venta y reintentar la factura SRI si hace falta.'
+        )
+        return None
+
+
 @login_required
 @requiere_no_bodeguero
 def procesar_venta(request):
@@ -326,6 +340,7 @@ def procesar_venta(request):
         messages.error(request, 'La configuración del sistema exige cliente en cada venta.')
         return redirect('pos')
 
+    venta = None
     try:
         items = json.loads(items_json)
         if not items:
@@ -362,7 +377,7 @@ def procesar_venta(request):
             cfg_gen=cfg_gen,
         )
 
-        respuesta_factura = _emitir_factura_si_corresponde(request, venta)
+        respuesta_factura = _emitir_factura_pos_segura(request, venta)
         if respuesta_factura is not None:
             return respuesta_factura
 

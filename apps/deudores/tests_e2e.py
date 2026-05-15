@@ -5,6 +5,8 @@ Usan el cliente de test de Django para recorrer vistas reales.
 import json
 
 from decimal import Decimal
+from unittest.mock import patch
+
 from django.test import TestCase, Client
 from django.urls import reverse
 
@@ -60,6 +62,27 @@ class FlujoPosContadoTest(BaseE2ETestCase):
 
         self.assertEqual(venta.total, Decimal('21.00'))
         self.assertEqual(self.producto.stock, 18)
+
+    def test_pos_contado_sigue_si_falla_facturacion_sri(self):
+        self.client.login(username='vendedor_e2e', password='pass123')
+
+        with patch('apps.deudores.views._emitir_factura_si_corresponde', side_effect=RuntimeError('boom')):
+            resp = self.client.post(reverse('procesar_venta'), {
+                'tipo_venta': 'contado',
+                'cliente_id': str(self.cliente.pk),
+                'forma_pago': 'efectivo',
+                'emitir_factura': '1',
+                'items_json': json.dumps([{
+                    'producto_id': self.producto.pk,
+                    'cantidad': 1,
+                    'precio_unitario': '45.00',
+                }]),
+            })
+
+        self.assertEqual(resp.status_code, 302)
+
+        venta = Venta.objects.get(tipo_pago=Venta.CONTADO)
+        self.assertIn(reverse('nota_venta', args=[venta.pk]), resp['Location'])
 
 
 class FlujoApartarCompletarTest(BaseE2ETestCase):
