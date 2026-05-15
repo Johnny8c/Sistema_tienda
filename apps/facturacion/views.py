@@ -15,6 +15,9 @@ from django.utils.dateparse import parse_datetime
 
 logger = logging.getLogger(__name__)
 
+SRI_INTERACTIVE_TIMEOUT = 4
+SRI_INTERACTIVE_RETRY_DELAYS = [1]
+
 from apps.usuarios.decorators import requiere_dueno, requiere_no_bodeguero
 from apps.clientes.models import Cliente
 from apps.ventas.models import Venta
@@ -342,7 +345,12 @@ def _emitir_factura(request, factura, cfg):
     factura.save(update_fields=['clave_acceso', 'xml_firmado', 'estado'])
 
     # 4. Enviar al SRI (recepción)
-    rec = enviar_comprobante(xml_firmado, cfg.ambiente)
+    rec = enviar_comprobante(
+        xml_firmado,
+        cfg.ambiente,
+        timeout=SRI_INTERACTIVE_TIMEOUT,
+        retry_delays=SRI_INTERACTIVE_RETRY_DELAYS,
+    )
     factura.sri_intentos_recepcion += 1
     if rec['contingencia']:
         factura.es_contingencia = True
@@ -372,7 +380,12 @@ def _emitir_factura(request, factura, cfg):
     factura.save(update_fields=['sri_intentos_recepcion'])
 
     # 5. Consultar autorización
-    aut = consultar_autorizacion(clave, cfg.ambiente)
+    aut = consultar_autorizacion(
+        clave,
+        cfg.ambiente,
+        timeout=SRI_INTERACTIVE_TIMEOUT,
+        retry_delays=SRI_INTERACTIVE_RETRY_DELAYS,
+    )
     if aut['contingencia']:
         factura.sri_respuesta = 'Recibido por SRI — autorización pendiente'
         factura.save(update_fields=['sri_respuesta'])

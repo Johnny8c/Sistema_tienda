@@ -35,17 +35,18 @@ def _soap_request(host, path, soap_body, timeout=30):
     return resp.text
 
 
-def _soap_request_retry(host, path, soap_body, timeout=30):
+def _soap_request_retry(host, path, soap_body, timeout=30, retry_delays=None):
+    retry_delays = RETRY_DELAYS if retry_delays is None else list(retry_delays)
     last_err = None
-    for attempt in range(len(RETRY_DELAYS) + 1):
+    for attempt in range(len(retry_delays) + 1):
         try:
             data = _soap_request(host, path, soap_body, timeout)
             return {'data': data, 'contingencia': False, 'error': None}
         except Exception as e:
             last_err = e
-            print(f'[SRI] Intento {attempt + 1}/{len(RETRY_DELAYS) + 1} fallido: {e}')
-            if attempt < len(RETRY_DELAYS):
-                time.sleep(RETRY_DELAYS[attempt])
+            print(f'[SRI] Intento {attempt + 1}/{len(retry_delays) + 1} fallido: {e}')
+            if attempt < len(retry_delays):
+                time.sleep(retry_delays[attempt])
     print('[SRI] Todos los reintentos agotados — modo contingencia')
     return {'data': None, 'contingencia': True, 'error': last_err}
 
@@ -61,7 +62,7 @@ def _extract_all_tags(xml, tag):
     return [m.strip() for m in re.findall(pattern, xml or '', flags=re.IGNORECASE)]
 
 
-def enviar_comprobante(xml_firmado: str, ambiente: str):
+def enviar_comprobante(xml_firmado: str, ambiente: str, timeout=30, retry_delays=None):
     """
     Envía el XML firmado al SRI (recepción).
     Retorna {estado, contingencia, mensajes, raw}.
@@ -80,7 +81,13 @@ def enviar_comprobante(xml_firmado: str, ambiente: str):
         '</soap:Envelope>'
     )
 
-    res = _soap_request_retry(ep['host'], ep['path_recepcion'], envelope)
+    res = _soap_request_retry(
+        ep['host'],
+        ep['path_recepcion'],
+        envelope,
+        timeout=timeout,
+        retry_delays=retry_delays,
+    )
     if res['contingencia']:
         return {
             'estado':       'CONTINGENCIA',
@@ -103,7 +110,7 @@ def enviar_comprobante(xml_firmado: str, ambiente: str):
     return {'estado': estado, 'contingencia': False, 'mensajes': mensajes, 'raw': data}
 
 
-def consultar_autorizacion(clave_acceso: str, ambiente: str):
+def consultar_autorizacion(clave_acceso: str, ambiente: str, timeout=30, retry_delays=None):
     """
     Consulta autorización al SRI.
     Retorna {estado, contingencia, numeroAutorizacion, fechaAutorizacion, mensajes, raw}.
@@ -121,7 +128,13 @@ def consultar_autorizacion(clave_acceso: str, ambiente: str):
         '</soap:Envelope>'
     )
 
-    res = _soap_request_retry(ep['host'], ep['path_autorizacion'], envelope)
+    res = _soap_request_retry(
+        ep['host'],
+        ep['path_autorizacion'],
+        envelope,
+        timeout=timeout,
+        retry_delays=retry_delays,
+    )
     if res['contingencia']:
         return {
             'estado':              'CONTINGENCIA',
