@@ -28,15 +28,28 @@
           </div>
           <div class="mb-3">
             <label class="form-label fw-semibold">Categoría</label>
+            {% if categorias %}
             <select name="categoria" class="form-select">
-              {% for val, label in categorias %}
-              <option value="{{ val }}"
-                {% if catalogo.categoria == val %}selected
-                {% elif f.categoria == val %}selected{% endif %}>
-                {{ label }}
+              <option value="">— Sin categoría —</option>
+              {% for c in categorias %}
+              <option value="{{ c.pk }}"
+                {% if catalogo.categoria_id == c.pk %}selected
+                {% elif f.categoria|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
+                {{ c.nombre }}
               </option>
               {% endfor %}
             </select>
+            <div class="form-text">
+              ¿Falta alguna? <a href="{% url 'lista_categorias' %}">Administrar categorías</a>.
+            </div>
+            {% else %}
+            <div class="alert mb-0" style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);color:#92400E;font-size:13px;padding:12px 14px;border-radius:10px">
+              <i class="bi bi-info-circle me-1"></i>
+              No hay categorías creadas todavía.
+              <a href="{% url 'crear_categoria' %}" class="fw-semibold" style="color:#92400E">Crear la primera</a>.
+              <input type="hidden" name="categoria" value="">
+            </div>
+            {% endif %}
           </div>
 
           <!-- Rango de precio (mínimo y máximo) -->

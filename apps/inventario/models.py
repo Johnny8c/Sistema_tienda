@@ -1,23 +1,42 @@
 from django.db import models
+from django.utils.text import slugify
+
+
+class Categoria(models.Model):
+    """Categorías de productos administradas por el dueño/bodeguero."""
+    nombre    = models.CharField(max_length=80, unique=True)
+    slug      = models.SlugField(max_length=90, unique=True, blank=True)
+    orden     = models.PositiveIntegerField(default=0, help_text='Orden de aparición. Menor = primero.')
+    activo    = models.BooleanField(default=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Categoría'
+        verbose_name_plural = 'Categorías'
+        ordering            = ['orden', 'nombre']
+
+    def __str__(self):
+        return self.nombre
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base = slugify(self.nombre) or 'categoria'
+            slug = base
+            i = 2
+            while Categoria.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f'{base}-{i}'
+                i += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
 
 
 class CatalogoProducto(models.Model):
     """Producto base: nombre, foto y precio de referencia. Agrupa variantes por color/talla."""
-    CATEGORIAS = [
-        ('blusas',      'Blusas'),
-        ('camisas',     'Camisas'),
-        ('camisetas',   'Camisetas'),
-        ('pantalones',  'Pantalones'),
-        ('vestidos',    'Vestidos'),
-        ('faldas',      'Faldas'),
-        ('chaquetas',   'Chaquetas'),
-        ('zapatos',     'Zapatos'),
-        ('accesorios',  'Accesorios'),
-        ('otro',        'Otro'),
-    ]
-
     nombre        = models.CharField(max_length=200)
-    categoria     = models.CharField(max_length=50, choices=CATEGORIAS, default='otro')
+    categoria     = models.ForeignKey(
+        Categoria, on_delete=models.SET_NULL,
+        related_name='productos', null=True, blank=True,
+    )
     descripcion   = models.TextField(blank=True)
     precio_base   = models.DecimalField(max_digits=10, decimal_places=2,
                                         help_text='Precio sugerido / por defecto.')

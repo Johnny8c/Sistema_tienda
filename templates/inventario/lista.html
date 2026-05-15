@@ -169,8 +169,8 @@
       </div>
       <select name="cat" class="form-select" style="width:auto">
         <option value="">Todas las categorías</option>
-        {% for val, label in categorias %}
-        <option value="{{ val }}" {% if cat == val %}selected{% endif %}>{{ label }}</option>
+        {% for c in categorias %}
+        <option value="{{ c.pk }}" {% if cat|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nombre }}</option>
         {% endfor %}
       </select>
       <button class="btn btn-outline-secondary">Filtrar</button>
@@ -194,7 +194,7 @@
     </div>
     <div class="producto-info">
       <div class="producto-nombre" title="{{ c.nombre }}">{{ c.nombre }}</div>
-      <div class="producto-cat">{{ c.get_categoria_display }}</div>
+      <div class="producto-cat">{{ c.categoria.nombre|default:"Sin categoría" }}</div>
 
       <div class="producto-precio">
         {% if pmin == pmax %}

@@ -59,7 +59,18 @@ for c in clientes_data:
 print(f'OK: {len(clientes_creados)} clientes creados')
 
 # ── CATALOGO + VARIANTES ──────────────────────────────────
-from apps.inventario.models import CatalogoProducto, Producto
+from apps.inventario.models import CatalogoProducto, Producto, Categoria
+
+# Categorías de ejemplo
+CATEGORIAS_LABELS = {
+    'blusas': 'Blusas', 'camisas': 'Camisas', 'camisetas': 'Camisetas',
+    'pantalones': 'Pantalones', 'vestidos': 'Vestidos', 'chaquetas': 'Chaquetas',
+}
+_cat_cache = {}
+def _categoria(slug):
+    if slug not in _cat_cache:
+        _cat_cache[slug], _ = Categoria.objects.get_or_create(nombre=CATEGORIAS_LABELS.get(slug, slug.title()))
+    return _cat_cache[slug]
 
 catalogo_data = [
     dict(
@@ -145,7 +156,7 @@ catalogos_creados = []
 variantes_creadas = []
 for c in catalogo_data:
     cat, _ = CatalogoProducto.objects.get_or_create(nombre=c['nombre'], defaults={
-        'categoria': c['categoria'],
+        'categoria': _categoria(c['categoria']),
         'precio_base': c['precio_base'],
         'descripcion': c['descripcion'],
     })

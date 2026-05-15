@@ -18,4 +18,10 @@ urlpatterns = [
     path('api/codigo/',   views.api_buscar_codigo, name='api_buscar_codigo'),
     # Etiquetas pegables (impresión por lotes)
     path('etiquetas/',    views.imprimir_etiquetas, name='imprimir_etiquetas'),
+    # Categorías
+    path('categorias/',                     views.lista_categorias,    name='lista_categorias'),
+    path('categorias/nueva/',               views.crear_categoria,     name='crear_categoria'),
+    path('categorias/<int:pk>/editar/',     views.editar_categoria,    name='editar_categoria'),
+    path('categorias/<int:pk>/toggle/',     views.toggle_categoria,    name='toggle_categoria'),
+    path('categorias/<int:pk>/eliminar/',   views.eliminar_categoria,  name='eliminar_categoria'),
 ]

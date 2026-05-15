@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.usuarios.models import Usuario
 from apps.clientes.models import Cliente
-from apps.inventario.models import CatalogoProducto, Producto
+from apps.inventario.models import CatalogoProducto, Producto, Categoria
 from apps.proveedores.models import Proveedor, Compra, ItemCompra
 from apps.ventas.models import Venta, ItemVenta
 
@@ -106,8 +106,9 @@ catalogo_data = [
 ]
 variantes = []
 for c in catalogo_data:
+    cat_obj, _ = Categoria.objects.get_or_create(nombre=c['categoria'].title())
     cat, _ = CatalogoProducto.objects.get_or_create(nombre=c['nombre'], defaults={
-        'categoria':   c['categoria'],
+        'categoria':   cat_obj,
         'precio_base': c['precio_base'],
         'descripcion': c['descripcion'],
     })

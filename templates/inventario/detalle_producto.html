@@ -10,7 +10,7 @@
     <a href="{% url 'lista_inventario' %}" class="back-btn"><i class="bi bi-arrow-left"></i></a>
     <div>
       <h1 class="page-header-title">{{ catalogo.nombre }}</h1>
-      <p class="page-header-sub">{{ catalogo.get_categoria_display }}</p>
+      <p class="page-header-sub">{{ catalogo.categoria.nombre|default:"Sin categoría" }}</p>
     </div>
   </div>
   {% if user.puede_gestionar_inventario %}
