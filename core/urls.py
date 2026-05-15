@@ -3,8 +3,13 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from apps.configuracion import pwa
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # PWA — manifest y service worker en la raíz para controlar todo el sitio
+    path('manifest.webmanifest', pwa.manifest, name='pwa_manifest'),
+    path('sw.js', pwa.service_worker, name='pwa_service_worker'),
     path('', include('apps.usuarios.urls')),
     path('clientes/', include('apps.clientes.urls')),
     path('inventario/', include('apps.inventario.urls')),

@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Iniciar sesión — {{ config_general.nombre_negocio|default:"Sistema Tienda" }}</title>
+  <!-- PWA: manifest + tema + iOS -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="{{ config_general.color_primario|default:'#4F46E5' }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="{{ config_general.nombre_negocio|default:'Tienda' }}">
+  {% if pwa_apple_icon %}<link rel="apple-touch-icon" href="{{ pwa_apple_icon }}">{% endif %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -466,6 +473,16 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span><span>Iniciando…</span>';
     });
+  </script>
+  <!-- PWA: registro del service worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function (err) {
+          console.warn('SW no registrado:', err);
+        });
+      });
+    }
   </script>
 </body>
 </html>

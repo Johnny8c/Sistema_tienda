@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ config_general.nombre_negocio|default:"Sistema Tienda" }}{% endblock %}</title>
+  <!-- PWA: manifest + tema + iOS -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="{{ config_general.color_primario|default:'#4F46E5' }}">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="{{ config_general.nombre_negocio|default:'Tienda' }}">
+  {% if pwa_apple_icon %}<link rel="apple-touch-icon" href="{{ pwa_apple_icon }}">{% endif %}
   <!-- Anti-FOUC: aplica el tema antes de pintar -->
   <script>(function(){
     var t=localStorage.getItem('theme');
@@ -1242,5 +1250,15 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 {% block extra_js %}{% endblock %}
+<!-- PWA: registro del service worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (err) {
+        console.warn('SW no registrado:', err);
+      });
+    });
+  }
+</script>
 </body>
 </html>

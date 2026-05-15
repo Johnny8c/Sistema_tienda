@@ -4,6 +4,7 @@ Context processors que exponen configuración a todos los templates.
 import logging
 from django.core.cache import cache
 from .models import ConfiguracionGeneral
+from .pwa import apple_touch_icon_url
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,10 @@ def config_general(request):
             except Exception:
                 logger.exception('No se pudo verificar la existencia del logo')
 
-    return {'config_general': cfg}
+    return {
+        'config_general': cfg,
+        'pwa_apple_icon': apple_touch_icon_url(request, cfg),
+    }
 
 
 def aviso_pago_proveedor(request):
