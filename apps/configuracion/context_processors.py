@@ -35,9 +35,11 @@ def config_general(request):
             except Exception:
                 logger.exception('No se pudo verificar la existencia del logo')
 
+    from django.conf import settings
     return {
         'config_general': cfg,
         'pwa_apple_icon': apple_touch_icon_url(request, cfg),
+        'session_inactivity_seconds': getattr(settings, 'SESSION_INACTIVITY_SECONDS', 1800),
     }
 
 

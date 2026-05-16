@@ -77,6 +77,13 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
 
+# Cierre de sesión por inactividad (30 min). SESSION_SAVE_EVERY_REQUEST hace
+# que el contador sea "deslizante": cada request del usuario lo reinicia.
+SESSION_INACTIVITY_SECONDS = config('SESSION_INACTIVITY_SECONDS', default=1800, cast=int)
+SESSION_COOKIE_AGE = SESSION_INACTIVITY_SECONDS
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {

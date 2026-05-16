@@ -913,7 +913,7 @@
   </style>
   {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body{% if user.is_authenticated %} data-session-timeout="{{ session_inactivity_seconds }}"{% endif %}>
 
 {% if user.is_authenticated %}
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -1251,6 +1251,7 @@
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="{% static 'js/image_compressor.js' %}" defer></script>
 <script src="{% static 'js/form_lock.js' %}" defer></script>
+{% if user.is_authenticated %}<script src="{% static 'js/session_timeout.js' %}" defer></script>{% endif %}
 {% block extra_js %}{% endblock %}
 <!-- PWA: registro del service worker -->
 <script>
