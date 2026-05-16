@@ -1,4 +1,4 @@
-{% load config_extras %}<!DOCTYPE html>
+{% load config_extras static %}<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -11,6 +11,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="{{ config_general.nombre_negocio|default:'Tienda' }}">
   {% if pwa_apple_icon %}<link rel="apple-touch-icon" href="{{ pwa_apple_icon }}">{% endif %}
+  {% if config_general.logo %}
+    <link rel="icon" type="image/png" href="{% logo_url config_general.logo 64 %}">
+  {% else %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'icons/app-icon.svg' %}">
+  {% endif %}
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">

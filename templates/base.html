@@ -12,6 +12,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="{{ config_general.nombre_negocio|default:'Tienda' }}">
   {% if pwa_apple_icon %}<link rel="apple-touch-icon" href="{{ pwa_apple_icon }}">{% endif %}
+  <!-- Favicon: logo del negocio o icono por defecto -->
+  {% if config_general.logo %}
+    <link rel="icon" type="image/png" href="{% logo_url config_general.logo 64 %}">
+  {% else %}
+    <link rel="icon" type="image/svg+xml" href="{% static 'icons/app-icon.svg' %}">
+  {% endif %}
   <!-- Anti-FOUC: aplica el tema antes de pintar -->
   <script>(function(){
     var t=localStorage.getItem('theme');
