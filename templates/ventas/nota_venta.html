@@ -157,6 +157,24 @@
   #nota-imprimible .card-body { padding: 3mm 4mm !important; }
   /* Fondos grises gastan tinta térmica y no aportan nada en papel */
   #nota-imprimible [style*="background:#F8FAFC"] { background: transparent !important; }
+
+  /* ── NITIDEZ EN TÉRMICA ──────────────────────────────────────
+     La impresora térmica es 1-bit: solo negro o blanco, sin grises.
+     Los textos en gris claro salían difuminados/granulados. Forzamos
+     negro puro y subimos el peso para que las letras salgan limpias. */
+  #nota-imprimible, #nota-imprimible * {
+    color: #000 !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: economy;
+    print-color-adjust: economy;
+  }
+  #nota-imprimible { font-weight: 500 !important; }
+  #nota-imprimible div, #nota-imprimible span, #nota-imprimible td, #nota-imprimible th {
+    font-weight: 600 !important;
+  }
+  /* Líneas separadoras: de gris tenue a negro sólido para que se vean */
+  #nota-imprimible [style*="dashed"] { border-style: solid !important; border-color: #000 !important; }
+  #nota-imprimible [style*="#E2E8F0"] { border-color: #000 !important; }
   .sidebar, .main-wrap > header, .page-header, .d-flex.gap-2 { display: none !important; }
 }
 </style>
