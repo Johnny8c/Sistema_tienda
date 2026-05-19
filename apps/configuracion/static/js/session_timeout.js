@@ -7,18 +7,47 @@
  *
  * El tiempo se lee de <body data-session-timeout="SEGUNDOS">.
  * Muestra un aviso 60s antes de cerrar.
+ *
+ * IMPORTANTE — por qué NO usamos solo setTimeout:
+ * Los navegadores CONGELAN setTimeout/setInterval cuando la pestaña está
+ * en segundo plano o el equipo suspendido. Con setTimeout puro, dejar el
+ * sistema abierto en otra pestaña hacía que el cierre NUNCA se disparara.
+ * Solución: guardamos la marca de tiempo de la última actividad y
+ * comprobamos el RELOJ REAL (Date.now) periódicamente y, sobre todo,
+ * cada vez que la pestaña vuelve a primer plano (visibilitychange).
+ * Así el tiempo transcurrido es real aunque los temporizadores se congelen.
+ * Además sincronizamos la actividad entre pestañas vía localStorage.
  */
 (function () {
   var body = document.body;
   var totalSeg = parseInt(body.getAttribute('data-session-timeout') || '0', 10);
   if (!totalSeg || totalSeg < 60) return;  // desactivado o muy corto
 
-  var AVISO_SEG = 60;                       // avisar 1 min antes
-  var timerCierre = null;
-  var timerAviso = null;
+  var LIMITE_MS = totalSeg * 1000;
+  var AVISO_MS = 60 * 1000;                 // avisar 1 min antes
+  var CHEQUEO_MS = 15 * 1000;               // revisar el reloj cada 15s
+  var LS_KEY = 'sessionLastActivity';       // compartido entre pestañas
+
   var aviso = null;
+  var intervalo = null;
+  var cerrando = false;
+
+  function ahora() { return Date.now(); }
+
+  function leerUltima() {
+    var v = parseInt(localStorage.getItem(LS_KEY) || '0', 10);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function marcarActividad() {
+    try { localStorage.setItem(LS_KEY, String(ahora())); } catch (e) {}
+    quitarAviso();
+  }
 
   function logout() {
+    if (cerrando) return;
+    cerrando = true;
+    if (intervalo) { clearInterval(intervalo); intervalo = null; }
     window.location.href = '/logout/';
   }
 
@@ -27,7 +56,7 @@
   }
 
   function mostrarAviso() {
-    if (aviso) return;
+    if (aviso || cerrando) return;
     aviso = document.createElement('div');
     aviso.setAttribute('role', 'alert');
     aviso.style.cssText =
@@ -47,28 +76,36 @@
       // Un fetch ligero al servidor renueva la cookie de sesión (sliding)
       fetch('/dashboard/', { method: 'HEAD', credentials: 'same-origin' })
         .catch(function () {})
-        .finally(reiniciar);
+        .finally(function () {
+          marcarActividad();
+          evaluar();
+        });
     });
     aviso.appendChild(texto);
     aviso.appendChild(btn);
     body.appendChild(aviso);
   }
 
-  function reiniciar() {
-    clearTimeout(timerCierre);
-    clearTimeout(timerAviso);
-    quitarAviso();
-    timerAviso = setTimeout(mostrarAviso, (totalSeg - AVISO_SEG) * 1000);
-    timerCierre = setTimeout(logout, totalSeg * 1000);
+  // Núcleo: compara el reloj real contra la última actividad.
+  function evaluar() {
+    if (cerrando) return;
+    var transcurrido = ahora() - leerUltima();
+    if (transcurrido >= LIMITE_MS) {
+      logout();
+    } else if (transcurrido >= LIMITE_MS - AVISO_MS) {
+      mostrarAviso();
+    } else {
+      quitarAviso();
+    }
   }
 
-  // Throttle: no reiniciar más de 1 vez cada 5s para no castigar el CPU
-  var ultimo = 0;
+  // Throttle: registrar actividad a lo sumo 1 vez cada 5s.
+  var ultimoRegistro = 0;
   function actividad() {
-    var ahora = Date.now();
-    if (ahora - ultimo < 5000) return;
-    ultimo = ahora;
-    reiniciar();
+    var t = ahora();
+    if (t - ultimoRegistro < 5000) return;
+    ultimoRegistro = t;
+    marcarActividad();
   }
 
   ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click']
@@ -76,5 +113,24 @@
       window.addEventListener(ev, actividad, { passive: true });
     });
 
-  reiniciar();
+  // Clave anti-congelamiento: al volver la pestaña a primer plano,
+  // evaluamos el tiempo real transcurrido inmediatamente.
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) evaluar();
+  });
+  window.addEventListener('focus', evaluar);
+  window.addEventListener('pageshow', evaluar);
+
+  // Sincronización entre pestañas: si en otra pestaña hubo actividad o
+  // se cerró sesión, esta reacciona.
+  window.addEventListener('storage', function (e) {
+    if (e.key === LS_KEY) evaluar();
+  });
+
+  // Arranque: cargar esta página YA es actividad y el servidor acabó de
+  // renovar la cookie de sesión, así que reiniciamos el contador. (Si no
+  // lo hiciéramos, una marca vieja en localStorage cerraría al instante.)
+  marcarActividad();
+  intervalo = setInterval(evaluar, CHEQUEO_MS);
+  evaluar();
 })();
