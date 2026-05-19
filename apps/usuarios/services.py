@@ -59,8 +59,14 @@ def datos_dashboard_dueno():
     total_ventas_hoy = ventas_hoy_qs.aggregate(t=Sum('total'))['t'] or 0
     tickets_hoy      = ventas_hoy_qs.count()
     ticket_promedio  = (total_ventas_hoy / tickets_hoy) if tickets_hoy else 0
-    total_ventas_mes = (Venta.objects.filter(fecha__date__gte=inicio_mes)
-                        .aggregate(t=Sum('total'))['t'] or 0)
+    ventas_mes_qs    = Venta.objects.filter(fecha__date__gte=inicio_mes)
+    total_ventas_mes = ventas_mes_qs.aggregate(t=Sum('total'))['t'] or 0
+
+    # IVA cobrado (solo ventas con factura SRI autorizada). Informativo:
+    # NO se suma a las ventas, que siguen en precio base.
+    from apps.facturacion.reporting import iva_cobrado
+    iva_cobrado_hoy = iva_cobrado(ventas_hoy_qs)
+    iva_cobrado_mes = iva_cobrado(ventas_mes_qs)
 
     # Por cobrar / adelantos
     total_por_cobrar = (Deuda.objects.filter(estado=Deuda.PENDIENTE)
@@ -123,6 +129,8 @@ def datos_dashboard_dueno():
         'tickets_hoy':        tickets_hoy,
         'ticket_promedio':    ticket_promedio,
         'total_ventas_mes':   total_ventas_mes,
+        'iva_cobrado_hoy':    iva_cobrado_hoy,
+        'iva_cobrado_mes':    iva_cobrado_mes,
         'total_por_cobrar':   total_por_cobrar,
         'adelantos_activos':  adelantos_activos,
         'total_en_adelantos': total_en_adelantos,

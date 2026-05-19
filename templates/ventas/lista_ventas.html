@@ -18,21 +18,28 @@
 
 <!-- KPIs del filtro -->
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-4">
+  <div class="col-6 col-md-3">
     <div class="kpi-card">
       <div class="kpi-icon indigo"><i class="bi bi-receipt"></i></div>
       <div class="kpi-label">Ventas en este filtro</div>
       <div class="kpi-value">{{ cant_filtrado }}</div>
     </div>
   </div>
-  <div class="col-6 col-md-4">
+  <div class="col-6 col-md-3">
     <div class="kpi-card">
       <div class="kpi-icon emerald"><i class="bi bi-cash-stack"></i></div>
-      <div class="kpi-label">Total recaudado</div>
+      <div class="kpi-label">Total recaudado (base)</div>
       <div class="kpi-value text-money">${{ total_filtrado|floatformat:2 }}</div>
     </div>
   </div>
-  <div class="col-12 col-md-4">
+  <div class="col-6 col-md-3">
+    <div class="kpi-card">
+      <div class="kpi-icon amber"><i class="bi bi-receipt-cutoff"></i></div>
+      <div class="kpi-label">IVA cobrado (facturado)</div>
+      <div class="kpi-value text-money">${{ iva_filtrado|floatformat:2 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
     <div class="kpi-card">
       <div class="kpi-icon amber"><i class="bi bi-graph-up"></i></div>
       <div class="kpi-label">Ticket promedio</div>
@@ -101,7 +108,8 @@
           <th>Tipo</th>
           <th>Forma de pago</th>
           {% if user.es_dueno %}<th>Vendedor</th>{% endif %}
-          <th class="text-end">Total</th>
+          <th class="text-end">Total (base)</th>
+          <th class="text-end">IVA</th>
           <th></th>
         </tr>
       </thead>
@@ -137,7 +145,14 @@
             <span style="font-size:13px">{{ v.vendedor.get_full_name|default:v.vendedor.username }}</span>
           </td>
           {% endif %}
-          <td data-label="Total" class="text-end fw-semibold text-money">${{ v.total|floatformat:2 }}</td>
+          <td data-label="Total (base)" class="text-end fw-semibold text-money">${{ v.total|floatformat:2 }}</td>
+          <td data-label="IVA" class="text-end text-money">
+            {% if v.factura_sri and v.factura_sri.estado == 'autorizada' %}
+              <span title="IVA de la factura {{ v.factura_sri.numero_factura }}">${{ v.factura_sri.iva_valor|floatformat:2 }}</span>
+            {% else %}
+              <span style="color:var(--text-muted)">—</span>
+            {% endif %}
+          </td>
           <td>
             <a href="{% url 'nota_venta' v.pk %}" class="btn btn-sm btn-outline-secondary w-100">
               <i class="bi bi-eye me-1"></i>Ver nota
@@ -146,7 +161,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="{% if user.es_dueno %}8{% else %}7{% endif %}" class="text-center py-5" style="color:var(--text-muted)">
+          <td colspan="{% if user.es_dueno %}9{% else %}8{% endif %}" class="text-center py-5" style="color:var(--text-muted)">
             <i class="bi bi-receipt" style="font-size:32px;display:block;margin-bottom:8px"></i>
             No hay ventas que coincidan con los filtros.
           </td>

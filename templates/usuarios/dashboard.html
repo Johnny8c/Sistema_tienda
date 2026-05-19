@@ -122,6 +122,11 @@
       <div class="kpi-icon emerald"><i class="bi bi-graph-up-arrow"></i></div>
       <div class="kpi-label">Ventas del mes</div>
       <div class="kpi-value text-money">${{ total_ventas_mes|floatformat:2 }}</div>
+      {% if iva_cobrado_mes %}
+      <div class="mini-kpi-sub" title="IVA de ventas con factura SRI autorizada. No suma a las ventas (precio base).">
+        + IVA cobrado: ${{ iva_cobrado_mes|floatformat:2 }}
+      </div>
+      {% endif %}
     </div>
   </div>
   <div class="col-6 col-md-3">

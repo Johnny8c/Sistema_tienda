@@ -138,9 +138,16 @@ def _dashboard_vendedor(request, vendedor, viendo_como_dueno=False):
     tickets_hoy      = ventas_hoy_qs.count()
     ticket_promedio  = (total_ventas_hoy / tickets_hoy) if tickets_hoy else 0
 
-    total_ventas_mes = Venta.objects.filter(
+    ventas_mes_qs = Venta.objects.filter(
         vendedor=vendedor, fecha__date__gte=inicio_mes
-    ).aggregate(t=Sum('total'))['t'] or 0
+    )
+    total_ventas_mes = ventas_mes_qs.aggregate(t=Sum('total'))['t'] or 0
+
+    # IVA cobrado (solo ventas con factura SRI autorizada). Informativo:
+    # las ventas siguen contabilizándose en precio base.
+    from apps.facturacion.reporting import iva_cobrado
+    iva_cobrado_hoy = iva_cobrado(ventas_hoy_qs)
+    iva_cobrado_mes = iva_cobrado(ventas_mes_qs)
 
     total_ventas_total = Venta.objects.filter(vendedor=vendedor) \
         .aggregate(t=Sum('total'))['t'] or 0
@@ -194,6 +201,8 @@ def _dashboard_vendedor(request, vendedor, viendo_como_dueno=False):
         'tickets_hoy':        tickets_hoy,
         'ticket_promedio':    ticket_promedio,
         'total_ventas_mes':   total_ventas_mes,
+        'iva_cobrado_hoy':    iva_cobrado_hoy,
+        'iva_cobrado_mes':    iva_cobrado_mes,
         'total_ventas_total': total_ventas_total,
         'total_por_cobrar':   total_por_cobrar,
         'cant_deudas':        cant_deudas,

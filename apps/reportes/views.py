@@ -149,7 +149,12 @@ def cierre_caja(request):
         fecha__date=fecha, monto__lt=0
     ).select_related('vendedor')
 
+    from apps.facturacion.reporting import iva_cobrado
     total_contado = ventas_contado.aggregate(t=Sum('total'))['t'] or Decimal('0')
+    # IVA cobrado del día (solo ventas contado con factura SRI autorizada).
+    # No entra en total_dia: el efectivo en caja es el base; el IVA se
+    # informa aparte para conciliación tributaria.
+    total_iva_cobrado = iva_cobrado(ventas_contado)
     total_abonos_adelanto = abonos_adelanto.aggregate(t=Sum('monto'))['t'] or Decimal('0')
     total_abonos_deuda = abonos_deuda.aggregate(t=Sum('monto'))['t'] or Decimal('0')
     total_reembolsos = reembolsos.aggregate(t=Sum('monto'))['t'] or Decimal('0')   # negativo
@@ -175,6 +180,7 @@ def cierre_caja(request):
         'total_abonos_deuda': total_abonos_deuda,
         'total_reembolsos': total_reembolsos,
         'total_dia': total_dia,
+        'total_iva_cobrado': total_iva_cobrado,
         'ventas_por_vendedor': por_vendedor(ventas_contado, 'total'),
         'abonos_por_vendedor': {
             k: v for k, v in {

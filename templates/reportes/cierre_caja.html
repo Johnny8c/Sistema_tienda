@@ -54,6 +54,11 @@
         Reembolsos: ${{ total_reembolsos|floatformat:2 }}
       </div>
       {% endif %}
+      {% if total_iva_cobrado %}
+      <div style="font-size:11px;color:#FCD34D;margin-top:4px" title="IVA de ventas con factura SRI autorizada. No suma al total: el efectivo en caja es el base.">
+        IVA cobrado (facturado): ${{ total_iva_cobrado|floatformat:2 }}
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>

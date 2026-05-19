@@ -28,7 +28,9 @@ def lista_ventas(request):
     - Dueño: ve todas las ventas; puede filtrar por vendedor
     - Vendedor: ve solo sus propias ventas (forzado)
     """
-    qs = Venta.objects.select_related('cliente', 'vendedor').order_by('-fecha')
+    qs = (Venta.objects
+          .select_related('cliente', 'vendedor', 'factura_sri')
+          .order_by('-fecha'))
 
     # Restricción por rol
     if not request.user.es_dueno():
@@ -69,6 +71,11 @@ def lista_ventas(request):
     total_filtrado = agg['total'] or 0
     cant_filtrado  = agg['n'] or 0
 
+    # IVA cobrado: solo de ventas con factura SRI autorizada (el total base
+    # NO se modifica; el IVA se muestra aparte).
+    from apps.facturacion.reporting import iva_cobrado
+    iva_filtrado = iva_cobrado(qs)
+
     # Paginación: 50 ventas por página
     paginator = Paginator(qs, 50)
     page_obj  = paginator.get_page(request.GET.get('page'))
@@ -82,6 +89,7 @@ def lista_ventas(request):
         'page_obj':       page_obj,
         'total_filtrado': total_filtrado,
         'cant_filtrado':  cant_filtrado,
+        'iva_filtrado':   iva_filtrado,
         'fecha_desde':    fecha_desde,
         'fecha_hasta':    fecha_hasta,
         'tipo_pago':      tipo_pago,
