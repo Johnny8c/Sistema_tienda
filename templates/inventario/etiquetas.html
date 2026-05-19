@@ -1470,10 +1470,14 @@ function renderPreview() {
   const optCodigo   = document.getElementById('opt-codigo').checked;
   const optNegocio  = document.getElementById('opt-negocio').checked;
 
+  // Etiqueta "baja": poca altura (≤20mm). Aunque sea ancha, la letra
+  // debe ser compacta para que entre toda la info (ej: 60×18mm).
+  const corto = labelH <= 20;
+
   // Tamaños relativos según etiqueta
-  const fontName = labelW <= 30 ? '7pt' : labelW <= 50 ? '8pt' : '10pt';
-  const fontPrecio = labelW <= 30 ? '11pt' : labelW <= 50 ? '13pt' : '16pt';
-  const barcodeH = labelH <= 20 ? 8 : labelH <= 30 ? 10 : 14;
+  const fontName = corto ? '6.5pt' : labelW <= 30 ? '7pt' : labelW <= 50 ? '8pt' : '10pt';
+  const fontPrecio = corto ? '10.5pt' : labelW <= 30 ? '11pt' : labelW <= 50 ? '13pt' : '16pt';
+  const barcodeH = labelH <= 20 ? 7 : labelH <= 30 ? 10 : 14;
   const barcodeFontSize = labelW <= 30 ? 8 : 10;
   const logoH = labelH <= 20 ? 4 : labelH <= 30 ? 6 : labelH <= 40 ? 8 : 10;
 
@@ -1485,7 +1489,7 @@ function renderPreview() {
   });
 
   // Tamaño de talla-tag y variant según etiqueta
-  const fontVariant = labelW <= 30 ? '6pt' : labelW <= 50 ? '7pt' : '8pt';
+  const fontVariant = corto ? '5.5pt' : labelW <= 30 ? '6pt' : labelW <= 50 ? '7pt' : '8pt';
 
   area.innerHTML = labels.map((p, idx) => {
     // Header (logo + nombre del negocio) — combinado en una sola línea cuando hay ambos
