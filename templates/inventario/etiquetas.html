@@ -654,6 +654,24 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
   }
+  /* Fila compacta para etiquetas bajas: nombre + variante en una línea */
+  .label-compact {
+    display: flex;
+    align-items: center;
+    gap: 1.5mm;
+    margin-bottom: 0.5mm;
+    min-width: 0;
+  }
+  .label-name-inline {
+    font-weight: 800;
+    color: #000;
+    line-height: 1.1;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .label-variant {
     color: #4B5563;
     display: flex;
@@ -1477,7 +1495,7 @@ function renderPreview() {
   // Tamaños relativos según etiqueta
   const fontName = corto ? '6.5pt' : labelW <= 30 ? '7pt' : labelW <= 50 ? '8pt' : '10pt';
   const fontPrecio = corto ? '10.5pt' : labelW <= 30 ? '11pt' : labelW <= 50 ? '13pt' : '16pt';
-  const barcodeH = labelH <= 20 ? 7 : labelH <= 30 ? 10 : 14;
+  const barcodeH = corto ? 6 : labelH <= 30 ? 10 : 14;
   const barcodeFontSize = labelW <= 30 ? 8 : 10;
   const logoH = labelH <= 20 ? 4 : labelH <= 30 ? 6 : labelH <= 40 ? 8 : 10;
 
@@ -1504,35 +1522,50 @@ function renderPreview() {
       headerHtml = `<div class="label-header">${logoImg}${businessText}</div>`;
     }
 
-    // Nombre del producto
-    const nombreHtml = optNombre
-      ? `<div class="label-name" style="font-size:${fontName}">${escapeHtml(p.nombre)}</div>`
+    // Partes de la variante (talla como tag negro + color como circulito)
+    const tieneVariante = optVariante && (p.talla || p.color);
+    const tallaPart = (tieneVariante && p.talla)
+      ? `<span class="talla-tag">${escapeHtml(p.talla)}</span>` : '';
+    const colorPart = (tieneVariante && p.color)
+      ? `<span class="color-info">
+           <span class="color-dot-print" style="background:${colorEspanolACss(p.color)}"></span>
+           ${escapeHtml(p.color)}
+         </span>`
       : '';
-
-    // Variante (talla como tag negro + color como circulito)
-    let variantHtml = '';
-    if (optVariante && (p.talla || p.color)) {
-      const tallaPart = p.talla ? `<span class="talla-tag">${escapeHtml(p.talla)}</span>` : '';
-      const colorPart = p.color
-        ? `<span class="color-info">
-             <span class="color-dot-print" style="background:${colorEspanolACss(p.color)}"></span>
-             ${escapeHtml(p.color)}
-           </span>`
-        : '';
-      variantHtml = `<div class="label-variant" style="font-size:${fontVariant}">${tallaPart}${colorPart}</div>`;
-    }
 
     // Precio (destacado)
     const precioHtml = optPrecio
       ? `<div class="label-precio" style="font-size:${fontPrecio}">$${parseFloat(p.precio).toFixed(2)}</div>`
       : '';
 
+    let infoHtml;
+    if (corto) {
+      // Etiqueta baja: nombre y variante en UNA sola línea para ganar
+      // espacio vertical y que el código no se recorte.
+      const nombreInline = optNombre
+        ? `<span class="label-name-inline" style="font-size:${fontName}">${escapeHtml(p.nombre)}</span>`
+        : '';
+      const variantInline = tieneVariante
+        ? `<span class="label-variant" style="font-size:${fontVariant};margin:0;flex-shrink:0">${tallaPart}${colorPart}</span>`
+        : '';
+      const filaInfo = (nombreInline || variantInline)
+        ? `<div class="label-compact">${nombreInline}${variantInline}</div>`
+        : '';
+      infoHtml = `${filaInfo}${precioHtml}`;
+    } else {
+      const nombreHtml = optNombre
+        ? `<div class="label-name" style="font-size:${fontName}">${escapeHtml(p.nombre)}</div>`
+        : '';
+      const variantHtml = tieneVariante
+        ? `<div class="label-variant" style="font-size:${fontVariant}">${tallaPart}${colorPart}</div>`
+        : '';
+      infoHtml = `${nombreHtml}${variantHtml}${precioHtml}`;
+    }
+
     return `
       <div class="label" style="width:${labelW}mm;height:${labelH}mm">
         ${headerHtml}
-        ${nombreHtml}
-        ${variantHtml}
-        ${precioHtml}
+        ${infoHtml}
         <div class="label-barcode-wrap">
           <svg class="label-barcode" id="bc-${idx}" style="height:${barcodeH}mm"></svg>
         </div>
