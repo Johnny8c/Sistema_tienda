@@ -136,16 +136,27 @@
 
 <style>
 @media print {
+  /* El papel ES un rollo térmico de 80mm de ancho, alto continuo, sin márgenes.
+     Sin esto el navegador asume A4 y la impresora recorta el lado izquierdo. */
+  @page { size: 80mm auto; margin: 0; }
+  html, body {
+    margin: 0 !important; padding: 0 !important;
+    background: #fff !important;
+  }
   body * { visibility: hidden; }
   #nota-imprimible, #nota-imprimible * { visibility: visible; }
   #nota-imprimible {
-    position: fixed; left: 50%; top: 0;
-    transform: translateX(-50%);
+    position: absolute; left: 0; top: 0;
     width: 80mm; max-width: 80mm;
+    margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
   }
-  .card { border: none !important; box-shadow: none !important; }
+  #nota-imprimible .card { border: none !important; box-shadow: none !important; border-radius: 0 !important; }
+  /* Padding reducido: en 80mm los 28px originales se comen el ancho útil */
+  #nota-imprimible .card-body { padding: 3mm 4mm !important; }
+  /* Fondos grises gastan tinta térmica y no aportan nada en papel */
+  #nota-imprimible [style*="background:#F8FAFC"] { background: transparent !important; }
   .sidebar, .main-wrap > header, .page-header, .d-flex.gap-2 { display: none !important; }
 }
 </style>
