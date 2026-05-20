@@ -722,7 +722,10 @@
   }
 
   /* === PRINT MEDIA === */
-  /* @page se inyecta dinámicamente desde JS (A4 horizontal por defecto) */
+  /* Hoja A4 horizontal (297×210mm) con margen 8mm. Estático para que Chrome
+     lo aplique siempre, sin depender de inyección por JS. */
+  @page { size: A4 landscape; margin: 8mm; }
+
   /* Por defecto el clon-de-impresión está oculto en pantalla */
   #print-clone { display: none; }
 
@@ -730,12 +733,14 @@
     /* Ocultar TODO lo que vive en body normalmente */
     body > * { display: none !important; }
 
-    /* Mostrar el clon-de-impresión como grilla que tile etiquetas en la hoja A4 */
+    /* Mostrar el clon-de-impresión como grilla que tile etiquetas en la hoja A4.
+       width = 297mm (A4 landscape) - 2*8mm de margen = 281mm. */
     #print-clone {
       display: flex !important;
       flex-wrap: wrap;
       align-content: flex-start;
       gap: 2mm;
+      width: 281mm !important;
       margin: 0 !important;
       padding: 0 !important;
       background: #fff !important;
@@ -755,6 +760,7 @@
       padding: 1.6mm 2mm !important;
       page-break-inside: avoid;
       break-inside: avoid;
+      flex: 0 0 auto !important; /* no encoger ni estirar */
       display: flex !important;
       flex-direction: column !important;
     }
@@ -1399,17 +1405,8 @@ function renderSeleccionados() {
 }
 
 // === TAMAÑO ===
-function actualizarPaginaImpresion() {
-  // Hoja A4 horizontal (297×210mm) con margen pequeño:
-  // las etiquetas conservan su tamaño en mm y se tilean dentro de la hoja.
-  let style = document.getElementById('print-page-style');
-  if (!style) {
-    style = document.createElement('style');
-    style.id = 'print-page-style';
-    document.head.appendChild(style);
-  }
-  style.textContent = `@page { size: A4 landscape; margin: 8mm; }`;
-}
+// @page { size: A4 landscape; margin: 8mm; } está definido estáticamente
+// en el bloque <style> del head — no se necesita inyección por JS.
 
 // === CLON DE IMPRESIÓN ===
 // Justo antes de imprimir, copiamos solo las etiquetas a un contenedor limpio
@@ -1445,13 +1442,9 @@ document.querySelectorAll('.size-card').forEach(card => {
     labelW = parseInt(card.dataset.w);
     labelH = parseInt(card.dataset.h);
     labelName = card.dataset.name;
-    actualizarPaginaImpresion();
     renderPreview();
   });
 });
-
-// Aplicar tamaño inicial (50x30 default)
-actualizarPaginaImpresion();
 
 // === OPCIONES ===
 ['opt-logo','opt-nombre','opt-variante','opt-precio','opt-codigo','opt-negocio'].forEach(id => {
