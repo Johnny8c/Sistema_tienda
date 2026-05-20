@@ -98,6 +98,56 @@
   @media (max-width: 900px) {
     .pos-layout { grid-template-columns: 1fr; }
   }
+
+  /* ── Borradores offline (Paso 4 lite) ───────────────────────────────── */
+  .borradores-fab {
+    position: fixed; right: 20px; bottom: 20px; z-index: 800;
+    background: #4F46E5; color: #fff;
+    border: none; border-radius: 999px;
+    padding: 12px 18px;
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+    box-shadow: 0 8px 20px rgba(79,70,229,.35);
+    cursor: pointer; display: none; align-items: center; gap: 8px;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .borradores-fab.visible { display: inline-flex; }
+  .borradores-fab:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(79,70,229,.45); }
+  .borradores-fab .badge-count {
+    background: #FBBF24; color: #78350F;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: 12px; font-weight: 800;
+  }
+  .borrador-card {
+    background: var(--card-bg, #fff); border: 1px solid var(--border, #E2E8F0);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .borrador-card .head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 8px; font-size: 12px; color: #6B7280;
+  }
+  .borrador-card .head .fecha { font-weight: 600; color: #374151; }
+  .borrador-card .head .total { font-size: 18px; font-weight: 800; color: #111827; }
+  .borrador-card .meta { font-size: 12px; color: #6B7280; margin-bottom: 6px; }
+  .borrador-card .meta b { color: #111827; }
+  .borrador-card .items {
+    font-size: 12px; color: #4B5563;
+    background: #F9FAFB; border-radius: 6px; padding: 6px 10px;
+    margin-bottom: 10px; max-height: 100px; overflow-y: auto;
+  }
+  .borrador-card .items div { padding: 2px 0; border-bottom: 1px dashed #E5E7EB; }
+  .borrador-card .items div:last-child { border-bottom: none; }
+  .borrador-card .acciones { display: flex; gap: 8px; }
+  .borrador-card .acciones button {
+    flex: 1; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 700;
+    border: 1px solid transparent; cursor: pointer;
+  }
+  .borrador-card .acciones .restaurar { background: #4F46E5; color: #fff; border-color: #4F46E5; }
+  .borrador-card .acciones .restaurar:hover { background: #3730A3; }
+  .borrador-card .acciones .eliminar { background: #fff; color: #DC2626; border-color: #FCA5A5; }
+  .borrador-card .acciones .eliminar:hover { background: #FEE2E2; }
+  .borradores-empty {
+    text-align: center; padding: 40px 20px; color: #94A3B8;
+  }
 </style>
 {% endblock %}
 
@@ -266,6 +316,36 @@
   <input type="hidden" name="items_json"    id="hidden-items">
   <input type="hidden" name="emitir_factura" id="hidden-emitir-factura" value="0">
 </form>
+
+<!-- Botón flotante de borradores offline -->
+<button type="button" id="borradores-fab" class="borradores-fab" data-bs-toggle="modal" data-bs-target="#modalBorradores">
+  <i class="bi bi-clipboard-check"></i>
+  Borradores
+  <span class="badge-count" id="borradores-count">0</span>
+</button>
+
+<!-- Modal de borradores -->
+<div class="modal fade" id="modalBorradores" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-clipboard-check me-2"></i>Borradores offline
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="borradores-lista">
+        <!-- llenado por JS -->
+      </div>
+      <div class="modal-footer">
+        <small class="text-muted me-auto" style="font-size:11px">
+          <i class="bi bi-info-circle me-1"></i>Los borradores quedan guardados en este dispositivo. Al restaurar uno, su carrito vuelve al POS y debes confirmar Cobrar para registrarlo de verdad.
+        </small>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal nuevo cliente rápido -->
 <div class="modal fade" id="modalNuevoCliente" tabindex="-1">
@@ -974,5 +1054,213 @@ document.getElementById('nc-guardar').addEventListener('click', async () => {
     btn.innerHTML = '<i class="bi bi-check2 me-1"></i>Crear y seleccionar';
   }
 });
+
+/* ─── BORRADORES OFFLINE (Paso 4 lite) ─────────────────────────────────
+   Si el cajero clickea COBRAR sin conexion, en vez de fallar:
+    - guardamos un "borrador" en localStorage (items + cliente + tipo + pago)
+    - limpiamos el carrito (como si la venta se hubiera procesado)
+    - mostramos toast: "Cobra al cliente y procesalo cuando vuelva la red"
+   Cuando vuelve la red, el cajero ve un boton flotante con un badge.
+   Click → modal con la lista → Restaurar carga el borrador al POS → COBRAR
+   normal → la venta pasa por toda la logica server-side (stock, SRI, etc.).
+   ─────────────────────────────────────────────────────────────────── */
+const BORRADORES_KEY = 'pos_borradores_v1';
+
+function cargarBorradores() {
+  try {
+    return JSON.parse(localStorage.getItem(BORRADORES_KEY) || '[]');
+  } catch (e) {
+    console.warn('Borradores corruptos, reseteo.', e);
+    return [];
+  }
+}
+
+function guardarBorradoresStore(arr) {
+  try {
+    localStorage.setItem(BORRADORES_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.error('No se pudo guardar borrador:', e);
+    if (window.showToast) showToast('Sin espacio para guardar el borrador.', 'danger');
+  }
+}
+
+function _snapshotEstado() {
+  const cliSpan = document.querySelector('#cliente-seleccionado span');
+  return {
+    id: 'b_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+    fecha: new Date().toISOString(),
+    tipo: tipoActual,
+    cliente_id: document.getElementById('sel-cliente').value || '',
+    cliente_label: cliSpan ? cliSpan.textContent.trim() : '',
+    forma_pago: document.getElementById('forma-pago-valor').value || 'efectivo',
+    emitir_factura: document.getElementById('emitir-factura').checked,
+    monto_inicial: document.getElementById('monto-inicial-pos').value || '',
+    fecha_limite: document.getElementById('fecha-limite-pos').value || '',
+    plazo: document.getElementById('plazo-dias').value || '',
+    items: carrito.map(i => ({
+      id: i.id, nombre: i.nombre, talla: i.talla, color: i.color,
+      precio: i.precio, precio_original: i.precio_original,
+      precio_min: i.precio_min, precio_max: i.precio_max,
+      cantidad: i.cantidad, stock: i.stock,
+    })),
+    total: carrito.reduce((s, i) => s + i.precio * i.cantidad, 0),
+  };
+}
+
+function guardarBorradorActual() {
+  if (!carrito.length) return false;
+  const arr = cargarBorradores();
+  arr.unshift(_snapshotEstado());
+  if (arr.length > 30) arr.length = 30; // tope para no saturar localStorage
+  guardarBorradoresStore(arr);
+  return true;
+}
+
+function _limpiarPOSDespuesBorrador() {
+  carrito.length = 0;
+  document.getElementById('sel-cliente').value = '';
+  document.getElementById('cliente-buscar').value = '';
+  const cliSel = document.getElementById('cliente-seleccionado');
+  if (cliSel) cliSel.style.display = 'none';
+  document.getElementById('monto-inicial-pos').value = '';
+  document.getElementById('emitir-factura').checked = false;
+  renderCarrito();
+}
+
+function restaurarBorrador(id) {
+  const arr = cargarBorradores();
+  const idx = arr.findIndex(b => b.id === id);
+  if (idx < 0) return;
+  const b = arr[idx];
+
+  // Cargar items
+  carrito.length = 0;
+  b.items.forEach(it => carrito.push({ ...it }));
+
+  // Tipo de venta (reflejar en botones)
+  tipoActual = b.tipo || 'contado';
+  document.querySelectorAll('.sale-type-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.tipo === tipoActual);
+  });
+
+  // Cliente
+  document.getElementById('sel-cliente').value = b.cliente_id || '';
+  if (b.cliente_label) {
+    const sel = document.getElementById('cliente-seleccionado');
+    sel.style.display = '';
+    sel.querySelector('span').textContent = b.cliente_label;
+  }
+
+  // Pago, factura, montos
+  document.getElementById('forma-pago-valor').value = b.forma_pago || 'efectivo';
+  document.querySelectorAll('.pay-type-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.forma === (b.forma_pago || 'efectivo'));
+  });
+  document.getElementById('emitir-factura').checked = !!b.emitir_factura;
+  document.getElementById('monto-inicial-pos').value = b.monto_inicial || '';
+  document.getElementById('fecha-limite-pos').value = b.fecha_limite || '';
+  document.getElementById('plazo-dias').value = b.plazo || '';
+
+  // Quitar el borrador (asumimos que el cajero va a procesarlo)
+  arr.splice(idx, 1);
+  guardarBorradoresStore(arr);
+
+  // Repintar todo
+  renderCarrito();
+  if (typeof actualizarUI === 'function') actualizarUI();
+  renderBorradores();
+
+  // Cerrar modal y avisar
+  const modalEl = document.getElementById('modalBorradores');
+  const modalInst = bootstrap.Modal.getInstance(modalEl);
+  if (modalInst) modalInst.hide();
+  if (window.showToast) showToast('Borrador cargado. Confirma con COBRAR para registrar.', 'success', 5000);
+}
+
+function eliminarBorrador(id) {
+  if (!confirm('Eliminar este borrador? No se podra recuperar.')) return;
+  const arr = cargarBorradores().filter(b => b.id !== id);
+  guardarBorradoresStore(arr);
+  renderBorradores();
+}
+
+function _escBorr(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[m]);
+}
+
+function _fechaCortaBorr(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString('es-EC', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (e) { return iso; }
+}
+
+function renderBorradores() {
+  const arr = cargarBorradores();
+  const fab = document.getElementById('borradores-fab');
+  const cnt = document.getElementById('borradores-count');
+  const lst = document.getElementById('borradores-lista');
+  if (cnt) cnt.textContent = arr.length;
+  if (fab) fab.classList.toggle('visible', arr.length > 0);
+  if (!lst) return;
+  if (!arr.length) {
+    lst.innerHTML = '<div class="borradores-empty"><i class="bi bi-clipboard" style="font-size:36px;display:block;margin-bottom:8px;opacity:.4"></i>Sin borradores. Cuando se caiga la red al cobrar, se guardarán acá.</div>';
+    return;
+  }
+  const tipos = {contado: 'Contado', apartado: 'Apartado', credito: 'Crédito'};
+  lst.innerHTML = arr.map(b => `
+    <div class="borrador-card">
+      <div class="head">
+        <span class="fecha"><i class="bi bi-clock-history me-1"></i>${_escBorr(_fechaCortaBorr(b.fecha))}</span>
+        <span class="total">$${(b.total || 0).toFixed(2)}</span>
+      </div>
+      <div class="meta">
+        <b>${_escBorr(tipos[b.tipo] || b.tipo)}</b>
+        · ${b.items.length} producto${b.items.length !== 1 ? 's' : ''}
+        ${b.cliente_label ? '· ' + _escBorr(b.cliente_label) : '· Sin cliente'}
+        ${b.emitir_factura ? '· <i class="bi bi-file-earmark-text"></i> Factura' : ''}
+      </div>
+      <div class="items">
+        ${b.items.map(it => `<div>${_escBorr(it.nombre)}${it.talla ? ' · ' + _escBorr(it.talla) : ''}${it.color ? ' · ' + _escBorr(it.color) : ''} × ${it.cantidad} = $${(it.precio * it.cantidad).toFixed(2)}</div>`).join('')}
+      </div>
+      <div class="acciones">
+        <button type="button" class="restaurar" onclick="restaurarBorrador('${_escBorr(b.id)}')">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar
+        </button>
+        <button type="button" class="eliminar" onclick="eliminarBorrador('${_escBorr(b.id)}')">
+          <i class="bi bi-trash me-1"></i>Eliminar
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// Interceptar COBRAR cuando esta offline. Capture phase = corre antes que el
+// handler original (definido sin capture). Si offline, prevenimos el submit y
+// guardamos borrador en su lugar.
+document.getElementById('btn-cobrar').addEventListener('click', function(ev) {
+  if (!navigator.onLine && carrito.length > 0) {
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    if (guardarBorradorActual()) {
+      _limpiarPOSDespuesBorrador();
+      renderBorradores();
+      if (window.showToast) {
+        showToast('Sin conexión: borrador guardado. Cobrá en efectivo y procesalo cuando vuelva la red.', 'warning', 8000);
+      } else {
+        alert('Sin conexión: borrador guardado.\n\nCobrá al cliente y procesalo cuando vuelva la red desde el botón "Borradores".');
+      }
+    }
+  }
+}, { capture: true });
+
+// Mantener badge sincronizado cuando cambia el estado de red
+window.addEventListener('online', renderBorradores);
+window.addEventListener('offline', renderBorradores);
+
+// Render inicial (por si ya habia borradores guardados de sesiones previas)
+renderBorradores();
 </script>
 {% endblock %}
