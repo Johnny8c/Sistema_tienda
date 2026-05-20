@@ -688,6 +688,9 @@
     font-weight: 700;
     letter-spacing: 0.3pt;
     text-transform: uppercase;
+    /* Forzar que el fondo negro se imprima (Chrome por defecto lo descarta) */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .label-variant .color-info {
     display: inline-flex; align-items: center; gap: 0.6mm;
@@ -697,6 +700,9 @@
     border-radius: 50%;
     border: 0.2mm solid #aaa;
     display: inline-block;
+    /* Forzar que el color de relleno se imprima (sino sale circulo vacio) */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   .label-precio {
     font-weight: 900;
@@ -722,25 +728,38 @@
   }
 
   /* === PRINT MEDIA === */
-  /* Hoja A4 horizontal (297×210mm) con margen 8mm. Estático para que Chrome
-     lo aplique siempre, sin depender de inyección por JS. */
-  @page { size: A4 landscape; margin: 8mm; }
+  /* Hoja A4 horizontal (297×210mm). Margen 5mm (lo minimo que respeta la
+     mayoria de impresoras hogarenas; menos arriesga recorte por hardware).
+     Estatico para que Chrome lo aplique siempre, sin depender de JS. */
+  @page { size: A4 landscape; margin: 5mm; }
 
   /* Por defecto el clon-de-impresión está oculto en pantalla */
   #print-clone { display: none; }
 
   @media print {
+    /* Forzar que TODO se imprima con sus colores reales (sin esto Chrome
+       descarta background-color por ahorrar tinta y los puntos de color
+       y la talla negra salen sin fondo). */
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
     /* Ocultar TODO lo que vive en body normalmente */
     body > * { display: none !important; }
 
     /* Mostrar el clon-de-impresión como grilla que tile etiquetas en la hoja A4.
-       width = 297mm (A4 landscape) - 2*8mm de margen = 281mm. */
+       width = 297mm (A4 landscape) - 2*5mm de margen = 287mm.
+       justify-content: center centra cada fila horizontalmente, asi el
+       espacio sobrante se reparte parejo a izquierda/derecha en vez de
+       quedar todo muerto a un solo lado. */
     #print-clone {
       display: flex !important;
       flex-wrap: wrap;
+      justify-content: center;
       align-content: flex-start;
-      gap: 2mm;
-      width: 281mm !important;
+      gap: 1.5mm;
+      width: 287mm !important;
       margin: 0 !important;
       padding: 0 !important;
       background: #fff !important;
