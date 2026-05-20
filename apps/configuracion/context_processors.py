@@ -4,7 +4,7 @@ Context processors que exponen configuración a todos los templates.
 import logging
 from django.core.cache import cache
 from .models import ConfiguracionGeneral
-from .pwa import apple_touch_icon_url
+from .pwa import apple_touch_icon_url, _emergencia_url
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +39,7 @@ def config_general(request):
     return {
         'config_general': cfg,
         'pwa_apple_icon': apple_touch_icon_url(request, cfg),
+        'pwa_emergencia_url': _emergencia_url(),
         'session_inactivity_seconds': getattr(settings, 'SESSION_INACTIVITY_SECONDS', 1800),
     }
 
