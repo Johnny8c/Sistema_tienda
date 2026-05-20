@@ -722,7 +722,7 @@
   }
 
   /* === PRINT MEDIA === */
-  /* @page se inyecta dinámicamente desde JS según el tamaño elegido (ver JS) */
+  /* @page se inyecta dinámicamente desde JS (A4 horizontal por defecto) */
   /* Por defecto el clon-de-impresión está oculto en pantalla */
   #print-clone { display: none; }
 
@@ -730,9 +730,12 @@
     /* Ocultar TODO lo que vive en body normalmente */
     body > * { display: none !important; }
 
-    /* Solo mostrar el clon-de-impresión */
+    /* Mostrar el clon-de-impresión como grilla que tile etiquetas en la hoja A4 */
     #print-clone {
-      display: block !important;
+      display: flex !important;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      gap: 2mm;
       margin: 0 !important;
       padding: 0 !important;
       background: #fff !important;
@@ -744,22 +747,16 @@
       background: #fff !important;
     }
 
-    /* Cada etiqueta = una página propia */
+    /* Cada etiqueta conserva su tamaño en mm y se acomoda en la hoja A4 */
     #print-clone .label {
-      border: none !important;
+      border: 0.2mm dashed #9CA3AF !important; /* línea de corte */
       box-shadow: none !important;
       margin: 0 !important;
       padding: 1.6mm 2mm !important;
-      page-break-after: always;
       page-break-inside: avoid;
-      break-after: page;
       break-inside: avoid;
       display: flex !important;
       flex-direction: column !important;
-    }
-    #print-clone .label:last-child {
-      page-break-after: auto;
-      break-after: auto;
     }
     .label-barcode { display: block !important; }
   }
@@ -1403,15 +1400,15 @@ function renderSeleccionados() {
 
 // === TAMAÑO ===
 function actualizarPaginaImpresion() {
-  // Inyecta @page con el tamaño exacto de la etiqueta para que
-  // la impresora térmica avance una etiqueta por página.
+  // Hoja A4 horizontal (297×210mm) con margen pequeño:
+  // las etiquetas conservan su tamaño en mm y se tilean dentro de la hoja.
   let style = document.getElementById('print-page-style');
   if (!style) {
     style = document.createElement('style');
     style.id = 'print-page-style';
     document.head.appendChild(style);
   }
-  style.textContent = `@page { size: ${labelW}mm ${labelH}mm; margin: 0; }`;
+  style.textContent = `@page { size: A4 landscape; margin: 8mm; }`;
 }
 
 // === CLON DE IMPRESIÓN ===
