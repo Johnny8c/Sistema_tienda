@@ -695,14 +695,14 @@
   .label-variant .color-info {
     display: inline-flex; align-items: center; gap: 0.6mm;
   }
+  /* Dot de color: ahora es <svg>, no <span>. SVG fill se imprime siempre
+     sin depender de print-color-adjust. Mantenemos las mismas dimensiones
+     visuales (1.8mm) para que la fila compacta de la etiqueta no cambie. */
   .label-variant .color-dot-print {
     width: 1.8mm; height: 1.8mm;
-    border-radius: 50%;
-    border: 0.2mm solid #aaa;
     display: inline-block;
-    /* Forzar que el color de relleno se imprima (sino sale circulo vacio) */
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    flex-shrink: 0;
+    vertical-align: middle;
   }
   .label-precio {
     font-weight: 900;
@@ -736,11 +736,19 @@
   /* Por defecto el clon-de-impresión está oculto en pantalla */
   #print-clone { display: none; }
 
+  /* Forzar que TODO se imprima con sus colores reales en cualquier media.
+     Sin esto Chrome descarta background-color al exportar PDF/imprimir
+     para "ahorrar tinta". Lo aplicamos en html para que herede toda la
+     pagina (selector universal con * no siempre funciona). */
+  html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   @media print {
-    /* Forzar que TODO se imprima con sus colores reales (sin esto Chrome
-       descarta background-color por ahorrar tinta y los puntos de color
-       y la talla negra salen sin fondo). */
-    * {
+    /* Refuerzo: misma regla con !important durante print por si algun
+       padre o reset de bootstrap la pisa. */
+    html, body, * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
@@ -1147,10 +1155,26 @@ function colorEspanolACss(nombre) {
     'celeste':'#7DD3FC','marino':'#172554',
     'morado':'#9333EA','violeta':'#8B5CF6','lila':'#C4B5FD',
     'café':'#92400E','cafe':'#92400E','marrón':'#78350F','marron':'#78350F',
-    'beige':'#E7DCC0','crema':'#FFFDD0','coral':'#FB7185'
+    'beige':'#E7DCC0','crema':'#FFFDD0','coral':'#FB7185',
+    'vino':'#7F1D1D','tinto':'#7F1D1D','bordo':'#7F1D1D',
+    'tomate':'#EF4444','salmon':'#FB7185','salmón':'#FB7185',
+    'mostaza':'#CA8A04','oro':'#D4AF37','dorado':'#D4AF37',
+    'turquesa':'#14B8A6','aqua':'#06B6D4','menta':'#6EE7B7',
+    'fucsia':'#D946EF','magenta':'#D946EF','durazno':'#FED7AA',
+    'miel':'#D4A017','perla':'#F5F5F5'
   };
   if (!nombre) return '#94A3B8';
-  return map[nombre.toLowerCase().trim()] || nombre.toLowerCase();
+  const limpio = nombre.toLowerCase().trim();
+  // 1) Match exacto en el mapa
+  if (map[limpio]) return map[limpio];
+  // 2) Match por palabra: para nombres compuestos como "Azul animal prin",
+  //    "Café animal prin", "Beige claro", etc., buscamos cualquier palabra
+  //    del nombre que coincida con una entrada del mapa.
+  for (const palabra of limpio.split(/\s+/)) {
+    if (map[palabra]) return map[palabra];
+  }
+  // 3) Fallback gris para que el dot al menos sea visible (mejor que invisible)
+  return '#94A3B8';
 }
 
 function escapeHtml(s) {
@@ -1535,9 +1559,14 @@ function renderPreview() {
     const tieneVariante = optVariante && (p.talla || p.color);
     const tallaPart = (tieneVariante && p.talla)
       ? `<span class="talla-tag">${escapeHtml(p.talla)}</span>` : '';
+    // El dot se renderiza como SVG inline (no <span> con background) para
+    // garantizar que se imprima — SVG fill se respeta siempre, mientras que
+    // background-color depende de que Chrome aplique print-color-adjust.
     const colorPart = (tieneVariante && p.color)
       ? `<span class="color-info">
-           <span class="color-dot-print" style="background:${colorEspanolACss(p.color)}"></span>
+           <svg class="color-dot-print" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+             <circle cx="5" cy="5" r="4.5" fill="${colorEspanolACss(p.color)}" stroke="#888" stroke-width="0.5"/>
+           </svg>
            ${escapeHtml(p.color)}
          </span>`
       : '';
