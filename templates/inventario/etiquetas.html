@@ -917,6 +917,10 @@
                   data-bs-toggle="modal" data-bs-target="#modalPegarLista">
             <i class="bi bi-clipboard-plus"></i>Pegar lista
           </button>
+          <button type="button" class="quick-pill" id="qa-por-dia"
+                  data-bs-toggle="modal" data-bs-target="#modalPorDia">
+            <i class="bi bi-calendar-day"></i>Por día de ingreso
+          </button>
         </div>
 
         <div class="pr-search-wrap">
@@ -1110,6 +1114,36 @@
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
         <button type="button" class="btn btn-primary" id="btn-procesar-lista">
           <i class="bi bi-magic me-1"></i>Buscar y seleccionar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Etiquetas por día de ingreso -->
+<div class="modal fade" id="modalPorDia" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-calendar-day me-2"></i>Etiquetas por día de ingreso</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">
+          Elegí una fecha y se seleccionan todas las variantes con código de
+          barras que fueron <b>ingresadas ese día</b>.
+        </p>
+        <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+          <input type="date" id="por-dia-fecha" class="form-control" style="max-width:190px">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="por-dia-hoy">Hoy</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="por-dia-ayer">Ayer</button>
+        </div>
+        <div id="por-dia-resumen" style="font-size:13px;margin-top:8px"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary" id="btn-por-dia-agregar" disabled>
+          <i class="bi bi-plus-lg me-1"></i>Agregar a la selección
         </button>
       </div>
     </div>
@@ -2067,6 +2101,76 @@ document.getElementById('btn-procesar-lista').addEventListener('click', () => {
     html += `<div style="font-size:12px;color:var(--text-muted);margin-top:8px"><i class="bi bi-check-all me-1"></i>Todas las líneas se encontraron.</div>`;
   }
   cont.innerHTML = html;
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   POR DÍA DE INGRESO — selecciona todas las variantes creadas en una
+   fecha. Usa el campo `creado` (YYYY-MM-DD local) que envía la vista.
+   ═══════════════════════════════════════════════════════════════════ */
+function _fechaLocalISO(offsetDias) {
+  const d = new Date();
+  if (offsetDias) d.setDate(d.getDate() + offsetDias);
+  // YYYY-MM-DD en hora local
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+function _variantesDelDia(fecha) {
+  return PRODUCTOS.filter(p => p.codigo_barras && p.creado === fecha);
+}
+
+function _refrescarResumenPorDia() {
+  const fecha = document.getElementById('por-dia-fecha').value;
+  const resumen = document.getElementById('por-dia-resumen');
+  const btn = document.getElementById('btn-por-dia-agregar');
+  if (!fecha) {
+    resumen.innerHTML = '<span style="color:var(--text-muted)">Elegí una fecha.</span>';
+    btn.disabled = true;
+    return;
+  }
+  const variantes = _variantesDelDia(fecha);
+  const stock = variantes.reduce((s, p) => s + (p.stock_disponible || 0), 0);
+  if (!variantes.length) {
+    resumen.innerHTML = `<span style="color:#B45309"><i class="bi bi-info-circle me-1"></i>No hay productos ingresados el ${fecha}.</span>`;
+    btn.disabled = true;
+    return;
+  }
+  resumen.innerHTML = `
+    <div style="background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 12px;color:#15803D;font-weight:600">
+      <i class="bi bi-check-circle-fill me-1"></i>${variantes.length} variante${variantes.length!==1?'s':''} ingresada${variantes.length!==1?'s':''} ese día
+      · <b>${stock}</b> uds en stock
+    </div>`;
+  btn.disabled = false;
+}
+
+document.getElementById('por-dia-fecha').addEventListener('change', _refrescarResumenPorDia);
+document.getElementById('por-dia-hoy').addEventListener('click', () => {
+  document.getElementById('por-dia-fecha').value = _fechaLocalISO(0);
+  _refrescarResumenPorDia();
+});
+document.getElementById('por-dia-ayer').addEventListener('click', () => {
+  document.getElementById('por-dia-fecha').value = _fechaLocalISO(-1);
+  _refrescarResumenPorDia();
+});
+
+document.getElementById('btn-por-dia-agregar').addEventListener('click', () => {
+  const fecha = document.getElementById('por-dia-fecha').value;
+  if (!fecha) return;
+  const variantes = _variantesDelDia(fecha);
+  if (!variantes.length) return;
+  agregarMultiples(variantes.map(v => v.id));
+  const resumen = document.getElementById('por-dia-resumen');
+  resumen.innerHTML = `<div style="background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 12px;color:#15803D;font-weight:600">
+    <i class="bi bi-check-circle-fill me-1"></i>${variantes.length} variante${variantes.length!==1?'s':''} del ${fecha} agregada${variantes.length!==1?'s':''} a la selección.
+  </div>`;
+});
+
+// Por defecto, abrir el modal con la fecha de hoy
+document.getElementById('modalPorDia').addEventListener('show.bs.modal', () => {
+  const inp = document.getElementById('por-dia-fecha');
+  if (!inp.value) inp.value = _fechaLocalISO(0);
+  _refrescarResumenPorDia();
 });
 </script>
 {% endblock %}

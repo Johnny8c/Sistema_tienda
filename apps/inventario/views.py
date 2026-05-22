@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.db.models import Count, ProtectedError
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 from apps.usuarios.decorators import requiere_no_vendedor
 from .models import CatalogoProducto, Producto, Categoria
 
@@ -420,6 +421,8 @@ def imprimir_etiquetas(request):
             'stock': p.stock,
             'stock_disponible': p.stock_disponible,
             'codigo_barras': p.codigo_barras or '',
+            # Fecha de ingreso (local America/Guayaquil) para filtrar "por día"
+            'creado': timezone.localtime(p.creado_en).strftime('%Y-%m-%d') if p.creado_en else '',
         })
 
     logo_url = ''
