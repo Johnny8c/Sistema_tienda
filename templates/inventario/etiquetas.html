@@ -1918,15 +1918,16 @@ renderQuickActionCounts();
    PEGAR LISTA — selección masiva desde texto pegado
    El usuario pega una lista (1 producto por línea). Cada línea se
    parsea a {nombre, atributos, precio} y se matchea contra PRODUCTOS
-   por nombre exacto + scoring de talla/color/precio. Líneas repetidas
-   consumen variantes distintas (consume-match) para soportar el caso
-   de varias unidades del mismo nombre/talla/color con códigos distintos.
+   por nombre + scoring de talla/color/precio. Una línea repetida N
+   veces NO consume variantes distintas: matchea siempre la misma
+   variante y se acumula la cantidad (N etiquetas de esa variante).
    ═══════════════════════════════════════════════════════════════════ */
 function _normTexto(s) {
   return (s == null ? '' : String(s))
     .toLowerCase().trim()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // sin acentos
-    .replace(/\s+/g, ' ');
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')  // sin acentos
+    .replace(/[^a-z0-9\s]/g, ' ')             // apóstrofos/símbolos → espacio
+    .replace(/\s+/g, ' ').trim();
 }
 
 function _parseLineaLista(linea) {
@@ -1955,10 +1956,31 @@ function _parseLineaLista(linea) {
   return { nombre, atributos, precio, original: linea.trim() };
 }
 
+function _scoreVariante(p, atrTokens, precio) {
+  // Puntúa qué tan bien una variante (p) coincide con los atributos de la
+  // línea. Talla y color se evalúan por SEPARADO (no else-if) para que
+  // "Beige XL" puntúe en ambos.
+  const tN = _normTexto(p.talla);
+  const cN = _normTexto(p.color);
+  const palabras = atrTokens.join(' ').split(' ').filter(Boolean);
+  let score = 0;
+  if (tN) {
+    if (atrTokens.includes(tN)) score += 4;
+    else if (palabras.includes(tN)) score += 3;
+    else if (atrTokens.join(' ').includes(tN)) score += 1;
+  }
+  if (cN) {
+    if (atrTokens.includes(cN)) score += 4;
+    else if (palabras.includes(cN)) score += 3;
+    else if (atrTokens.join(' ').includes(cN)) score += 1;
+  }
+  if (precio != null && Math.abs(parseFloat(p.precio) - precio) < 0.01) score += 1;
+  return score;
+}
+
 function _matchearLista(texto) {
   const lineas = texto.split(/\r?\n/);
-  const usados = new Set();
-  const encontrados = [];        // ids
+  const conteo = new Map();      // id de variante -> cuántas líneas la mapean
   const noEncontrados = [];      // strings (línea original)
 
   lineas.forEach(linea => {
@@ -1966,43 +1988,39 @@ function _matchearLista(texto) {
     if (!parsed || !parsed.nombre) return;
     const nombreN = _normTexto(parsed.nombre);
 
-    // Candidatos: nombre exacto; si no hay, nombre que empiece igual
+    // Candidatos por nombre exacto; si no hay, por prefijo (sin consumir:
+    // una misma variante puede matchear varias líneas repetidas).
     let candidatos = PRODUCTOS.filter(p =>
-      p.codigo_barras && !usados.has(p.id) && _normTexto(p.nombre) === nombreN);
+      p.codigo_barras && _normTexto(p.nombre) === nombreN);
     if (candidatos.length === 0) {
-      candidatos = PRODUCTOS.filter(p =>
-        p.codigo_barras && !usados.has(p.id) &&
-        (_normTexto(p.nombre).startsWith(nombreN) || nombreN.startsWith(_normTexto(p.nombre))));
+      candidatos = PRODUCTOS.filter(p => {
+        if (!p.codigo_barras) return false;
+        const n = _normTexto(p.nombre);
+        return n.startsWith(nombreN) || nombreN.startsWith(n);
+      });
     }
     if (candidatos.length === 0) {
       noEncontrados.push(parsed.original);
       return;
     }
 
-    // Scoring por atributos (talla/color) + precio
-    const atrN = parsed.atributos.map(_normTexto).filter(Boolean);
-    let mejor = null, mejorScore = -1;
-    candidatos.forEach(p => {
-      const tN = _normTexto(p.talla), cN = _normTexto(p.color);
-      let score = 0;
-      atrN.forEach(a => {
-        if (a === tN || a === cN) score += 3;
-        else if (tN && (tN.includes(a) || a.includes(tN))) score += 1;
-        else if (cN && (cN.includes(a) || a.includes(cN))) score += 1;
-      });
-      if (parsed.precio != null && Math.abs(parseFloat(p.precio) - parsed.precio) < 0.01) score += 1;
-      if (score > mejorScore) { mejorScore = score; mejor = p; }
-    });
-
-    if (mejor) {
-      usados.add(mejor.id);
-      encontrados.push(mejor.id);
+    // Elegir la mejor variante por talla/color/precio (sin consumir).
+    let elegido;
+    if (candidatos.length === 1) {
+      elegido = candidatos[0];
     } else {
-      noEncontrados.push(parsed.original);
+      const atrTokens = parsed.atributos.map(_normTexto).filter(Boolean);
+      let mejor = candidatos[0], mejorScore = -1;
+      candidatos.forEach(p => {
+        const s = _scoreVariante(p, atrTokens, parsed.precio);
+        if (s > mejorScore) { mejorScore = s; mejor = p; }
+      });
+      elegido = mejor;
     }
+    conteo.set(elegido.id, (conteo.get(elegido.id) || 0) + 1);
   });
 
-  return { encontrados, noEncontrados };
+  return { conteo, noEncontrados };
 }
 
 document.getElementById('btn-procesar-lista').addEventListener('click', () => {
@@ -2013,15 +2031,29 @@ document.getElementById('btn-procesar-lista').addEventListener('click', () => {
     return;
   }
 
-  const { encontrados, noEncontrados } = _matchearLista(texto);
+  const { conteo, noEncontrados } = _matchearLista(texto);
 
-  if (encontrados.length) {
-    agregarMultiples(encontrados);
+  // Agregar cada variante con cantidad = nº de líneas que la mencionan.
+  let totalEtiquetas = 0;
+  conteo.forEach((cant, id) => {
+    const p = PRODUCTOS.find(x => x.id === id);
+    if (!p) return;
+    if (seleccionados.has(id)) {
+      seleccionados.get(id).cantidad += cant;
+    } else {
+      seleccionados.set(id, { producto: p, cantidad: cant });
+    }
+    totalEtiquetas += cant;
+  });
+  if (conteo.size) {
+    renderSeleccionados();
+    renderPreview();
+    renderResultados();
   }
 
   let html = '';
   html += `<div style="background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 12px;font-size:13px;color:#15803D;font-weight:600">
-    <i class="bi bi-check-circle-fill me-1"></i>${encontrados.length} producto${encontrados.length!==1?'s':''} agregado${encontrados.length!==1?'s':''} a la selección.
+    <i class="bi bi-check-circle-fill me-1"></i>${totalEtiquetas} etiqueta${totalEtiquetas!==1?'s':''} en ${conteo.size} variante${conteo.size!==1?'s':''} agregada${conteo.size!==1?'s':''}.
   </div>`;
 
   if (noEncontrados.length) {
