@@ -147,13 +147,21 @@ CSRF_TRUSTED_ORIGINS = config(
 )
 
 if not DEBUG:
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 días
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
+    # BEHIND_HTTPS=True (default) cuando el sitio se sirve por HTTPS detrás
+    # de un proxy/CDN (Railway, nginx+Certbot, CloudFront, etc.). Si todavía
+    # no hay SSL configurado (despliegue inicial en EC2 solo por IP HTTP),
+    # poner BEHIND_HTTPS=False en el .env para evitar redirects rotos y
+    # cookies que no se setean.
+    BEHIND_HTTPS = config('BEHIND_HTTPS', default=True, cast=bool)
+    if BEHIND_HTTPS:
+        SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+        SECURE_SSL_REDIRECT = True
+        SESSION_COOKIE_SECURE = True
+        CSRF_COOKIE_SECURE = True
+        SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30  # 30 días
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+        SECURE_HSTS_PRELOAD = True
+    # Estos no dependen de HTTPS, siempre activos en producción
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = 'same-origin'
     X_FRAME_OPTIONS = 'DENY'
