@@ -4,6 +4,46 @@
 {% block nav_inventario %}active{% endblock %}
 {% block page_title %}{{ accion }} producto{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Combobox buscable para categoría */
+  .cat-combo-results {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border, #E2E8F0);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(15,23,42,.12);
+    max-height: 260px; overflow-y: auto;
+    z-index: 200;
+    display: none;
+  }
+  .cat-combo-results.open { display: block; }
+  .cat-combo-item {
+    padding: 9px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border, #F1F5F9);
+    font-size: 14px;
+    color: var(--text-1, #111827);
+  }
+  .cat-combo-item:last-child { border-bottom: none; }
+  .cat-combo-item:hover,
+  .cat-combo-item.active {
+    background: var(--primary-light, rgba(79,70,229,.10));
+    color: var(--primary, #4F46E5);
+  }
+  .cat-combo-item.selected {
+    background: var(--primary-light, rgba(79,70,229,.10));
+    font-weight: 600;
+  }
+  .cat-combo-empty {
+    padding: 14px;
+    text-align: center;
+    color: var(--text-muted, #6B7280);
+    font-size: 13px;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div class="d-flex align-items-center gap-3">
@@ -29,16 +69,26 @@
           <div class="mb-3">
             <label class="form-label fw-semibold">Categoría</label>
             {% if categorias %}
-            <select name="categoria" class="form-select">
-              <option value="">— Sin categoría —</option>
-              {% for c in categorias %}
-              <option value="{{ c.pk }}"
-                {% if catalogo.categoria_id == c.pk %}selected
-                {% elif f.categoria|stringformat:"s" == c.pk|stringformat:"s" %}selected{% endif %}>
-                {{ c.nombre }}
-              </option>
-              {% endfor %}
-            </select>
+            <div class="cat-combo" id="cat-combo" style="position:relative">
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="cat-combo-input" class="form-control"
+                       placeholder="Buscar o elegir categoría…"
+                       autocomplete="off">
+                <button type="button" class="btn btn-outline-secondary" id="cat-combo-clear"
+                        title="Quitar categoría">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <input type="hidden" name="categoria" id="cat-combo-hidden"
+                     value="{% if catalogo.categoria_id %}{{ catalogo.categoria_id }}{% elif f.categoria %}{{ f.categoria }}{% endif %}">
+              <div id="cat-combo-results" class="cat-combo-results">
+                <div class="cat-combo-item" data-id="" data-name="— Sin categoría —">— Sin categoría —</div>
+                {% for c in categorias %}
+                <div class="cat-combo-item" data-id="{{ c.pk }}" data-name="{{ c.nombre }}">{{ c.nombre }}</div>
+                {% endfor %}
+              </div>
+            </div>
             <div class="form-text">
               ¿Falta alguna? <a href="{% url 'lista_categorias' %}">Administrar categorías</a>.
             </div>
@@ -166,5 +216,107 @@
     };
     reader.readAsDataURL(file);
   });
+
+  // ── Combobox buscable de Categoría ─────────────────────────────────
+  (function () {
+    const combo   = document.getElementById('cat-combo');
+    if (!combo) return; // si no hay categorías la sección no existe
+
+    const input   = document.getElementById('cat-combo-input');
+    const hidden  = document.getElementById('cat-combo-hidden');
+    const results = document.getElementById('cat-combo-results');
+    const clearBtn= document.getElementById('cat-combo-clear');
+    const items   = Array.from(results.querySelectorAll('.cat-combo-item'));
+
+    function normalize(s) {
+      return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+
+    function setSelection(id, name) {
+      hidden.value = id || '';
+      input.value = (id && name && id !== '') ? name : '';
+      items.forEach(el => el.classList.toggle('selected', el.dataset.id === (id || '')));
+    }
+
+    function openDropdown() {
+      results.classList.add('open');
+      filter('');
+    }
+    function closeDropdown() {
+      results.classList.remove('open');
+    }
+
+    function filter(query) {
+      const q = normalize(query);
+      let visible = 0;
+      items.forEach(el => {
+        const name = normalize(el.dataset.name);
+        const ok = !q || name.includes(q);
+        el.style.display = ok ? '' : 'none';
+        if (ok) visible++;
+      });
+      // Mensaje "sin resultados"
+      let empty = results.querySelector('.cat-combo-empty');
+      if (visible === 0) {
+        if (!empty) {
+          empty = document.createElement('div');
+          empty.className = 'cat-combo-empty';
+          empty.textContent = 'Sin resultados';
+          results.appendChild(empty);
+        }
+      } else if (empty) {
+        empty.remove();
+      }
+    }
+
+    // Pre-seleccionar en modo edición (si hay valor en el hidden)
+    const initialId = hidden.value || '';
+    if (initialId) {
+      const item = items.find(el => el.dataset.id === initialId);
+      if (item) setSelection(item.dataset.id, item.dataset.name);
+    }
+
+    // Abrir al hacer focus o click en el input
+    input.addEventListener('focus', openDropdown);
+    input.addEventListener('click', openDropdown);
+
+    // Filtrar mientras se escribe
+    input.addEventListener('input', () => {
+      filter(input.value);
+      // Si el usuario escribe, deselectionar hasta que elija algo nuevo
+      hidden.value = '';
+      results.classList.add('open');
+    });
+
+    // Click en un ítem
+    items.forEach(el => {
+      el.addEventListener('mousedown', (e) => {
+        // mousedown en vez de click para que dispare ANTES del blur del input
+        e.preventDefault();
+        setSelection(el.dataset.id, el.dataset.name);
+        closeDropdown();
+      });
+    });
+
+    // Botón "X" para limpiar
+    clearBtn.addEventListener('click', () => {
+      setSelection('', '');
+      filter('');
+      input.focus();
+    });
+
+    // Cerrar al hacer click fuera
+    document.addEventListener('click', (e) => {
+      if (!combo.contains(e.target)) closeDropdown();
+    });
+
+    // Cerrar con Escape
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeDropdown();
+        input.blur();
+      }
+    });
+  })();
 </script>
 {% endblock %}
