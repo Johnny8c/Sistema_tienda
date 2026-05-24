@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.db import transaction
 from django.utils import timezone
 
@@ -17,32 +17,91 @@ from .exceptions import (
 )
 
 
-def _calcular_total_items(items: list) -> Decimal:
-    """Calcula el total leyendo el precio actual de cada producto.
-    Debe llamarse dentro de una transacción atómica; usa select_for_update
-    para evitar que el precio cambie entre lectura y commit."""
+def _resolver_items(items: list) -> tuple[list, Decimal]:
+    """
+    Resuelve los items del carrito en una sola pasada:
+      - Bloquea cada Producto con select_for_update (race-safe).
+      - Toma `precio_unitario` del item si vino del POS; si no, cae al
+        `producto.precio` por compatibilidad (tests viejos lo omiten).
+      - Valida que cantidad > 0 y precio > 0.
+      - Si la config dice PRECIO_RANGO_BLOQUEAR, valida contra el
+        rango precio_minimo/precio_maximo del catalogo.
+
+    Devuelve `[(producto, cantidad, precio_unitario), ...]` y el total.
+    Debe llamarse dentro de una transacción atómica.
+    """
+    from apps.configuracion.models import ConfiguracionGeneral
+    cfg_gen = ConfiguracionGeneral.get_singleton()
+
+    items_resueltos = []
     total = Decimal('0.00')
+
     for item in items:
-        producto = Producto.objects.select_for_update().get(pk=item['producto_id'])
-        total += producto.precio * item['cantidad']
-    return total
+        producto = (
+            Producto.objects
+            .select_related('catalogo')
+            .select_for_update(of=('self',))
+            .get(pk=item['producto_id'])
+        )
+
+        try:
+            cantidad = int(item['cantidad'])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f'Cantidad inválida para "{producto.nombre}".') from exc
+        if cantidad <= 0:
+            raise ValueError(f'Cantidad inválida para "{producto.nombre}".')
+
+        # Precio: usar el del POS si vino, sino el precio del producto
+        raw_pu = item.get('precio_unitario')
+        if raw_pu in (None, ''):
+            pu = producto.precio
+        else:
+            try:
+                pu = Decimal(str(raw_pu).strip().replace(',', '.'))
+            except (InvalidOperation, ValueError) as exc:
+                raise ValueError(
+                    f'Precio unitario inválido para "{producto.nombre}".'
+                ) from exc
+        if pu <= 0:
+            raise ValueError(f'Precio unitario inválido para "{producto.nombre}".')
+
+        # Validar rango min/max si la config lo exige y el producto tiene catalogo
+        if (cfg_gen and producto.catalogo
+                and cfg_gen.precio_fuera_rango_modo == cfg_gen.PRECIO_RANGO_BLOQUEAR):
+            if (producto.catalogo.precio_minimo is not None
+                    and pu < producto.catalogo.precio_minimo):
+                raise ValueError(
+                    f'"{producto.nombre}" no se puede vender por debajo de '
+                    f'${producto.catalogo.precio_minimo} (precio mínimo).'
+                )
+            if (producto.catalogo.precio_maximo is not None
+                    and pu > producto.catalogo.precio_maximo):
+                raise ValueError(
+                    f'"{producto.nombre}" no se puede vender por encima de '
+                    f'${producto.catalogo.precio_maximo} (precio máximo).'
+                )
+
+        items_resueltos.append((producto, cantidad, pu))
+        total += pu * cantidad
+
+    return items_resueltos, total
 
 
 @transaction.atomic
 def crear_adelanto(cliente_id: int, items: list, monto_inicial: Decimal,
                    fecha_limite, vendedor: Usuario) -> Adelanto:
     cliente = Cliente.objects.get(pk=cliente_id)
-    total = _calcular_total_items(items)
+    items_resueltos, total = _resolver_items(items)
 
     if monto_inicial > total:
         raise SaldoInsuficienteError('El monto inicial no puede superar el total del apartado.')
 
-    for item in items:
-        producto = Producto.objects.select_for_update().get(pk=item['producto_id'])
-        if producto.stock_disponible < item['cantidad']:
+    # Validar stock con los productos ya bloqueados (evita doble lock + race).
+    for producto, cantidad, _pu in items_resueltos:
+        if producto.stock_disponible < cantidad:
             raise StockInsuficienteError(
                 f'Stock insuficiente para {producto.nombre}. '
-                f'Disponible: {producto.stock_disponible}, solicitado: {item["cantidad"]}.'
+                f'Disponible: {producto.stock_disponible}, solicitado: {cantidad}.'
             )
 
     adelanto = Adelanto.objects.create(
@@ -53,15 +112,14 @@ def crear_adelanto(cliente_id: int, items: list, monto_inicial: Decimal,
         vendedor=vendedor,
     )
 
-    for item in items:
-        producto = Producto.objects.select_for_update().get(pk=item['producto_id'])
+    for producto, cantidad, pu in items_resueltos:
         AdelantoItem.objects.create(
             adelanto=adelanto,
             producto=producto,
-            cantidad=item['cantidad'],
-            precio_unitario=producto.precio,
+            cantidad=cantidad,
+            precio_unitario=pu,  # usa el precio elegido en el POS, no el base
         )
-        producto.stock_reservado += item['cantidad']
+        producto.stock_reservado += cantidad
         producto.save(update_fields=['stock_reservado'])
 
     if monto_inicial > 0:
@@ -199,14 +257,13 @@ def cancelar_adelanto(adelanto_id: int, motivo: str, vendedor: Usuario,
 def crear_venta_credito(cliente_id: int, items: list,
                         plazo_dias: int, vendedor: Usuario) -> Deuda:
     cliente = Cliente.objects.get(pk=cliente_id)
-    total = _calcular_total_items(items)
+    items_resueltos, total = _resolver_items(items)
 
-    for item in items:
-        producto = Producto.objects.select_for_update().get(pk=item['producto_id'])
-        if producto.stock_disponible < item['cantidad']:
+    for producto, cantidad, _pu in items_resueltos:
+        if producto.stock_disponible < cantidad:
             raise StockInsuficienteError(
                 f'Stock insuficiente para {producto.nombre}. '
-                f'Disponible: {producto.stock_disponible}, solicitado: {item["cantidad"]}.'
+                f'Disponible: {producto.stock_disponible}, solicitado: {cantidad}.'
             )
 
     venta = Venta.objects.create(
@@ -216,15 +273,14 @@ def crear_venta_credito(cliente_id: int, items: list,
         vendedor=vendedor,
     )
 
-    for item in items:
-        producto = Producto.objects.select_for_update().get(pk=item['producto_id'])
+    for producto, cantidad, pu in items_resueltos:
         ItemVenta.objects.create(
             venta=venta,
             producto=producto,
-            cantidad=item['cantidad'],
-            precio_unitario=producto.precio,
+            cantidad=cantidad,
+            precio_unitario=pu,  # usa el precio elegido en el POS, no el base
         )
-        producto.stock -= item['cantidad']
+        producto.stock -= cantidad
         producto.save(update_fields=['stock'])
 
     fecha_vencimiento = None

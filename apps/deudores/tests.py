@@ -55,6 +55,29 @@ class CrearAdelantoTest(BaseTestCase):
         self.assertEqual(adelanto.total, Decimal('56.00'))
         self.assertEqual(adelanto.saldo_pendiente, Decimal('36.00'))
 
+    def test_respeta_precio_unitario_del_pos(self):
+        """Regresion: el precio que se ajusta en el POS (entre min y max)
+        debe usarse para el total del apartado y para AdelantoItem, NO el
+        precio base del producto. Bug 2026-05-24."""
+        # producto.precio = 28.00. POS manda 32.50.
+        items = [{
+            'producto_id': self.producto.id,
+            'cantidad': 2,
+            'precio_unitario': '32.50',
+        }]
+        adelanto = crear_adelanto(
+            cliente_id=self.cliente.id,
+            items=items,
+            monto_inicial=Decimal('0'),
+            fecha_limite=None,
+            vendedor=self.vendedor,
+        )
+        # Total = 32.50 * 2 = 65.00 (NO 28 * 2 = 56)
+        self.assertEqual(adelanto.total, Decimal('65.00'))
+        # El item registrado debe tener el precio del POS
+        item = adelanto.items.first()
+        self.assertEqual(item.precio_unitario, Decimal('32.50'))
+
     def test_reserva_stock_al_crear(self):
         items = [{'producto_id': self.producto.id, 'cantidad': 3}]
         crear_adelanto(
