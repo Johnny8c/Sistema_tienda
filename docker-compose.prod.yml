@@ -1,0 +1,17 @@
+# docker-compose.prod.yml — Sistema_tienda en EC2
+# Mismo patrón que systemdent: contenedor expuesto solo en 127.0.0.1.
+# nginx en el host (no en Docker) hace de reverse proxy + SSL.
+version: '3.9'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    ports:
+      - '127.0.0.1:8000:8000'
+
+volumes: {}
