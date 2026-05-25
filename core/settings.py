@@ -165,3 +165,33 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = 'same-origin'
     X_FRAME_OPTIONS = 'DENY'
+
+# ─────────────────────────────────────────────────────────────
+# EMAIL — envío de notificaciones (facturas SRI al cliente, etc.)
+# Configurable por env vars para soportar varios proveedores:
+#   - Resend:  EMAIL_HOST=smtp.resend.com, USER='resend', PASSWORD=<api_key>
+#   - Gmail:   EMAIL_HOST=smtp.gmail.com,  USER=<email>,  PASSWORD=<app_password>
+#   - Otros SMTP: ajustar host/port/TLS
+# Si no se configura EMAIL_HOST_PASSWORD, el backend cae a 'console' (los
+# emails se imprimen en consola en vez de enviarse — util en desarrollo).
+# ─────────────────────────────────────────────────────────────
+_EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_BACKEND = config(
+    'EMAIL_BACKEND',
+    default=(
+        'django.core.mail.backends.smtp.EmailBackend'
+        if _EMAIL_HOST_PASSWORD
+        else 'django.core.mail.backends.console.EmailBackend'
+    ),
+)
+EMAIL_HOST          = config('EMAIL_HOST',          default='smtp.resend.com')
+EMAIL_PORT          = config('EMAIL_PORT',          default=587, cast=int)
+EMAIL_USE_TLS       = config('EMAIL_USE_TLS',       default=True, cast=bool)
+EMAIL_USE_SSL       = config('EMAIL_USE_SSL',       default=False, cast=bool)
+EMAIL_HOST_USER     = config('EMAIL_HOST_USER',     default='resend')
+EMAIL_HOST_PASSWORD = _EMAIL_HOST_PASSWORD
+EMAIL_TIMEOUT       = config('EMAIL_TIMEOUT',       default=20, cast=int)
+DEFAULT_FROM_EMAIL  = config(
+    'DEFAULT_FROM_EMAIL',
+    default='Sistema Tienda <onboarding@resend.dev>',
+)

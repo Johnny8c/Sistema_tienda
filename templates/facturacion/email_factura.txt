@@ -1,0 +1,34 @@
+Hola {{ cliente.nombre }},
+
+Te enviamos tu factura electrónica de {{ negocio.nombre_negocio|default:"nuestra tienda" }}.
+La factura está autorizada por el SRI del Ecuador.
+
+DETALLE
+-------
+Número:             {{ factura.numero_factura }}
+Fecha de emisión:   {{ factura.fecha_emision|date:"d/m/Y" }}
+{% if factura.sri_numero_autorizacion %}Autorización SRI:   {{ factura.sri_numero_autorizacion }}
+{% endif %}Cédula/RUC:         {{ cliente.cedula_ruc }}
+
+Subtotal:           ${{ factura.subtotal_0|add:factura.subtotal_iva|floatformat:2 }}{% if factura.iva_valor %}
+IVA {{ factura.iva_porcentaje }}%:             ${{ factura.iva_valor|floatformat:2 }}{% endif %}
+TOTAL:              ${{ factura.total|floatformat:2 }}
+
+DOCUMENTOS ADJUNTOS
+-------------------
+- RIDE_{{ factura.clave_acceso|default:factura.pk }}.pdf  (representación impresa)
+- {{ factura.clave_acceso|default:factura.pk }}.xml       (comprobante legal firmado)
+
+Si tenés alguna consulta, respondé a este email{% if negocio.telefono %} o contactanos al {{ negocio.telefono }}{% endif %}.
+
+¡Gracias por tu compra!
+
+—
+{{ negocio.nombre_negocio|default:"Sistema Tienda" }}
+{% if negocio.direccion %}{{ negocio.direccion }}
+{% endif %}{% if negocio.telefono %}Tel. {{ negocio.telefono }}
+{% endif %}{% if negocio.email %}{{ negocio.email }}
+{% endif %}
+
+Este es un mensaje automático. La factura está autorizada por el SRI;
+el XML adjunto es el comprobante legal.

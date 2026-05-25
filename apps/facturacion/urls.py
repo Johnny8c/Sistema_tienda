@@ -10,4 +10,5 @@ urlpatterns = [
     path('<int:pk>/verificar/',    views.verificar_autorizacion, name='verificar_autorizacion'),
     path('<int:pk>/xml/',          views.descargar_xml,        name='descargar_xml'),
     path('<int:pk>/ride/',         views.descargar_ride,       name='descargar_ride'),
+    path('<int:pk>/email/',        views.reenviar_email_factura, name='reenviar_email_factura'),
 ]

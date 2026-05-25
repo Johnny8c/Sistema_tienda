@@ -45,6 +45,17 @@
         <i class="bi bi-file-earmark-pdf me-1"></i>RIDE PDF
       </a>
     {% endif %}
+    {% if factura.estado == 'autorizada' %}
+      <form method="post" action="{% url 'reenviar_email_factura' factura.pk %}"
+            onsubmit="return confirm('¿Enviar la factura por email a {{ factura.cliente.email|default:factura.cliente.nombre }}?');">
+        {% csrf_token %}
+        <button class="btn btn-outline-primary"
+                {% if not factura.cliente.email %}disabled title="El cliente no tiene email registrado"{% endif %}>
+          <i class="bi bi-envelope me-1"></i>
+          {% if factura.cliente.email %}Enviar por email{% else %}Sin email del cliente{% endif %}
+        </button>
+      </form>
+    {% endif %}
   </div>
 </div>
 
