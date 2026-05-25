@@ -637,7 +637,36 @@ function detenerScanner() {
   }
 }
 
-btnIni.addEventListener('click', () => {
+// === Detección de contexto seguro ===
+// Los navegadores modernos solo permiten acceder a la cámara desde HTTPS
+// o desde localhost. Si estamos en HTTP simple, getUserMedia falla con
+// "Permission denied" y no hay forma de superarlo sin SSL.
+const cameraDisponible = window.isSecureContext
+    && navigator.mediaDevices
+    && navigator.mediaDevices.getUserMedia;
+
+if (!cameraDisponible) {
+  // Ocultar el botón "Activar cámara" y mostrar un aviso amigable.
+  // Dejamos visible la búsqueda manual (que sí funciona sin HTTPS).
+  const scanCard = document.querySelector('.scan-action');
+  scanCard.innerHTML = `
+    <div class="scan-icon"><i class="bi bi-shield-lock"></i></div>
+    <div class="scan-title">Cámara solo en HTTPS</div>
+    <div class="scan-sub" style="margin-bottom:0">
+      Por seguridad, los navegadores móviles solo permiten la cámara cuando el
+      sitio usa HTTPS. Por ahora <b>ingresá el código a mano</b> abajo.
+    </div>`;
+  // Tip más prominente en el empty-state apuntando al input
+  const empty = document.getElementById('empty-state');
+  if (empty) {
+    empty.innerHTML = `
+      <i class="bi bi-arrow-up arrow"></i>
+      Ingresá el código del producto en el cuadro de arriba`;
+  }
+}
+
+if (btnIni) btnIni.addEventListener('click', () => {
+  if (!cameraDisponible) return; // safety: el botón ya no debería existir
   scanner = new Html5Qrcode('reader');
   elReader.classList.add('active');
   scanner.start(
@@ -651,10 +680,13 @@ btnIni.addEventListener('click', () => {
   ).then(() => {
     btnIni.classList.add('d-none');
     btnDet.classList.remove('d-none');
-  }).catch(() => {
+  }).catch((err) => {
     elReader.classList.remove('active');
-    if (window.toast) toast('No se pudo activar la cámara. Verifica permisos.', 'error');
-    else alert('No se pudo activar la cámara. Verifica permisos.');
+    const msg = (err && err.name === 'NotAllowedError')
+      ? 'No diste permiso para usar la cámara. Tocá el candadito de la URL → Permisos → Cámara → Permitir.'
+      : 'No se pudo activar la cámara. Verificá los permisos del navegador.';
+    if (window.toast) toast(msg, 'error');
+    else alert(msg);
     scanner = null;
   });
 });
