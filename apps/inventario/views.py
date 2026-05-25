@@ -7,7 +7,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from apps.usuarios.decorators import requiere_no_vendedor
-from .models import CatalogoProducto, Producto, Categoria
+from .models import CatalogoProducto, Producto, Categoria, EtiquetaImpresa
 
 logger = logging.getLogger(__name__)
 
@@ -433,12 +433,145 @@ def imprimir_etiquetas(request):
             logger.exception('No se pudo resolver logo.url del negocio')
             logo_url = ''
 
+    # Historial de impresión (compartido entre dispositivos). Antes vivía en
+    # localStorage del navegador, por eso la PC central y el celular mostraban
+    # porcentajes distintos. Ahora viene de la BD y todos ven lo mismo.
+    impresas_data = {}
+    for r in EtiquetaImpresa.objects.values('codigo_barras', 'total_impresas', 'ultima_impresion'):
+        impresas_data[r['codigo_barras']] = {
+            # ts en milisegundos epoch — compatible con Date.now() de JS
+            'ts': int(r['ultima_impresion'].timestamp() * 1000),
+            'total': r['total_impresas'],
+        }
+
     return render(request, 'inventario/etiquetas.html', {
         'productos_data': productos_data,
+        'impresas_data': impresas_data,
         'producto_preseleccionado': producto_id,
         'variante_preseleccionada': variante_id,
         'nombre_negocio': cfg.nombre_negocio if cfg else 'Sistema Tienda',
         'logo_url': logo_url,
+    })
+
+
+# ── API: registrar / reiniciar etiquetas impresas (servidor) ──────────
+# Se hicieron POST en vez de localStorage para que el progreso sea el
+# mismo en cualquier dispositivo conectado a la misma cuenta.
+
+@login_required
+@require_POST
+def api_etiquetas_marcar_impresas(request):
+    """Recibe {items:[{codigo_barras, cantidad}, ...]} y registra las
+    impresiones. Suma a total_impresas y actualiza ultima_impresion."""
+    import json
+    from django.db.models import F
+
+    if not request.user.puede_gestionar_inventario():
+        return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
+
+    try:
+        payload = json.loads(request.body or '{}')
+        items = payload.get('items') or []
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'mensaje': 'JSON inválido'}, status=400)
+
+    ahora = timezone.now()
+    resultados = {}
+    for it in items:
+        codigo = (it.get('codigo_barras') or '').strip()
+        try:
+            cant = int(it.get('cantidad') or 0)
+        except (TypeError, ValueError):
+            cant = 0
+        if not codigo or cant <= 0:
+            continue
+        obj, creado = EtiquetaImpresa.objects.get_or_create(
+            codigo_barras=codigo,
+            defaults={'total_impresas': cant, 'ultima_impresion': ahora},
+        )
+        if not creado:
+            # F() para sumar sin race condition entre devices simultáneos
+            EtiquetaImpresa.objects.filter(pk=obj.pk).update(
+                total_impresas=F('total_impresas') + cant,
+                ultima_impresion=ahora,
+            )
+            obj.refresh_from_db(fields=['total_impresas'])
+        resultados[codigo] = {
+            'ts': int(ahora.timestamp() * 1000),
+            'total': obj.total_impresas if creado else (obj.total_impresas),
+        }
+    return JsonResponse({'ok': True, 'impresas': resultados})
+
+
+@login_required
+@require_POST
+def api_etiquetas_reiniciar_impresas(request):
+    """Borra TODO el historial de impresión. Afecta a todos los dispositivos."""
+    if not request.user.puede_gestionar_inventario():
+        return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
+    eliminadas, _ = EtiquetaImpresa.objects.all().delete()
+    return JsonResponse({'ok': True, 'eliminadas': eliminadas})
+
+
+@login_required
+@require_POST
+def api_etiquetas_importar_localstorage(request):
+    """Importa el historial viejo que vivía en localStorage del navegador.
+    Se llama UNA sola vez por navegador (el cliente guarda un flag local).
+    Es idempotente: si una marca ya existe en BD no la pisa ni suma — así
+    abrir la página varias veces no duplica el contador. Solo crea las que
+    todavía no existían en el server."""
+    import json
+    from datetime import datetime, timezone as dt_tz
+
+    if not request.user.puede_gestionar_inventario():
+        return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
+
+    try:
+        payload = json.loads(request.body or '{}')
+        items = payload.get('items') or []
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'mensaje': 'JSON inválido'}, status=400)
+
+    importadas = 0
+    ya_existian = 0
+    impresas = {}
+    for it in items:
+        codigo = (it.get('codigo_barras') or '').strip()
+        try:
+            total = max(1, int(it.get('total') or 1))
+        except (TypeError, ValueError):
+            total = 1
+        try:
+            ts_ms = int(it.get('ts') or 0)
+        except (TypeError, ValueError):
+            ts_ms = 0
+        if not codigo:
+            continue
+        # ts del localStorage está en ms epoch. Si viene 0 o inválido, usamos
+        # "ahora" para no perder la marca.
+        if ts_ms > 0:
+            ult = datetime.fromtimestamp(ts_ms / 1000, tz=dt_tz.utc)
+        else:
+            ult = timezone.now()
+
+        obj, creado = EtiquetaImpresa.objects.get_or_create(
+            codigo_barras=codigo,
+            defaults={'total_impresas': total, 'ultima_impresion': ult},
+        )
+        if creado:
+            importadas += 1
+        else:
+            ya_existian += 1
+        impresas[codigo] = {
+            'ts': int(obj.ultima_impresion.timestamp() * 1000),
+            'total': obj.total_impresas,
+        }
+    return JsonResponse({
+        'ok': True,
+        'importadas': importadas,
+        'ya_existian': ya_existian,
+        'impresas': impresas,
     })
 
 

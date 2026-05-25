@@ -821,7 +821,7 @@
   <div class="progress-row">
     <div class="progress-text">
       <div class="pct"><span id="pg-pct">0%</span></div>
-      <div class="lbl">del catálogo etiquetado</div>
+      <div class="lbl">del catálogo etiquetado <span style="font-size:11px;color:var(--text-muted);font-weight:500;display:block;margin-top:2px"><i class="bi bi-cloud-check me-1"></i>compartido entre dispositivos</span></div>
     </div>
     <div style="flex:2;min-width:220px">
       <div class="progress-bar-wrap">
@@ -834,7 +834,7 @@
       </div>
     </div>
     <button class="btn btn-sm btn-outline-secondary" id="btn-reset-marcas" type="button"
-            title="Borrar el historial de marcado de impresión (solo este dispositivo)">
+            title="Borrar el historial de marcado de impresión (afecta a todos los dispositivos)">
       <i class="bi bi-arrow-counterclockwise me-1"></i>Reiniciar marcas
     </button>
   </div>
@@ -1154,6 +1154,7 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 {{ productos_data|json_script:"etiquetas-productos-data" }}
+{{ impresas_data|json_script:"etiquetas-impresas-data" }}
 <script>
 const PRODUCTOS = JSON.parse(document.getElementById('etiquetas-productos-data').textContent);
 const NOMBRE_NEGOCIO = "{{ nombre_negocio|escapejs }}";
@@ -1161,33 +1162,161 @@ const LOGO_URL = "{{ logo_url|escapejs }}";
 const PRESELECT_PRODUCTO = "{{ producto_preseleccionado|default:'' }}";
 const PRESELECT_VARIANTE = "{{ variante_preseleccionada|default:'' }}";
 
-// === HISTORIAL DE IMPRESIÓN (localStorage) ===
-const IMPR_KEY = 'etiquetas_impresas_v1';
+// === HISTORIAL DE IMPRESIÓN (servidor — compartido entre dispositivos) ===
+// Antes vivía en localStorage del navegador. Eso hacía que la PC central y
+// el celular mostraran porcentajes distintos aunque fuera la misma cuenta.
+// Ahora el cache vive en memoria, se inicializa con lo que mandó el server
+// al cargar la página, y cada cambio se replica al servidor por fetch().
+const URL_MARCAR    = "{% url 'api_etiquetas_marcar' %}";
+const URL_REINICIAR = "{% url 'api_etiquetas_reiniciar' %}";
+const URL_IMPORTAR  = "{% url 'api_etiquetas_importar' %}";
+let _imprCache = JSON.parse(document.getElementById('etiquetas-impresas-data').textContent || '{}');
+
+// === MIGRACIÓN ONE-SHOT: localStorage → servidor ===
+// Antes del fix, el historial vivía en localStorage de cada navegador. Al
+// pasar a servidor, lo que esté en la PC central (o donde sea) debe subirse
+// para no perder el progreso. Lo hacemos UNA sola vez por navegador y de
+// forma idempotente (si ya está en BD, no se duplica).
+const LEGACY_LS_KEY      = 'etiquetas_impresas_v1';
+const MIGRACION_FLAG_KEY = 'etiquetas_impresas_migrado_v1';
+
+function _migrarLocalStorageAlServidor() {
+  // Si ya migramos en este navegador, no hacer nada
+  if (localStorage.getItem(MIGRACION_FLAG_KEY)) return;
+  let legacy = {};
+  try {
+    legacy = JSON.parse(localStorage.getItem(LEGACY_LS_KEY) || '{}');
+  } catch (e) { legacy = {}; }
+  const entries = Object.entries(legacy || {});
+  if (!entries.length) {
+    // Nada que migrar — marcamos como hecho para no volver a chequear
+    localStorage.setItem(MIGRACION_FLAG_KEY, '1');
+    return;
+  }
+  const items = entries.map(([codigo, info]) => ({
+    codigo_barras: codigo,
+    total: (info && info.total) || 1,
+    ts:    (info && info.ts)    || Date.now(),
+  }));
+  fetch(URL_IMPORTAR, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': _getCsrfToken(),
+    },
+    body: JSON.stringify({ items }),
+  })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(resp => {
+      if (resp && resp.impresas) {
+        // Llenamos el cache con lo que YA está en BD (incluye lo que recién
+        // creamos + lo que ya existía). Así el indicador refleja la realidad.
+        Object.assign(_imprCache, resp.impresas);
+      }
+      localStorage.setItem(MIGRACION_FLAG_KEY, '1');
+      // Limpieza: ya no necesitamos la copia legacy en este navegador
+      try { localStorage.removeItem(LEGACY_LS_KEY); } catch (e) {}
+      // Refrescamos UI
+      renderProgreso();
+      renderResultados();
+      renderSeleccionados();
+      renderQuickActionCounts();
+      if ((resp.importadas || 0) > 0) {
+        console.log(
+          `[etiquetas] migradas ${resp.importadas} marcas del navegador al servidor` +
+          (resp.ya_existian ? ` (${resp.ya_existian} ya estaban)` : '')
+        );
+      }
+    })
+    .catch(err => {
+      // No marcamos como hecho — lo intentamos otra vez al recargar
+      console.warn('[etiquetas] no se pudo migrar el historial al servidor:', err);
+    });
+}
+
+function _getCsrfToken() {
+  // Django pone el token en una cookie llamada 'csrftoken'.
+  const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
 function loadImpr() {
-  try { return JSON.parse(localStorage.getItem(IMPR_KEY) || '{}'); }
-  catch (e) { return {}; }
+  // Devuelve el cache en memoria (no hace I/O). Consumido por el resto del JS
+  // exactamente igual que antes — la diferencia es que el cache se llena del
+  // servidor al cargar la página y al volver del endpoint marcar/reiniciar.
+  return _imprCache;
 }
-function saveImpr(obj) {
-  localStorage.setItem(IMPR_KEY, JSON.stringify(obj));
-}
+
 function marcarImpresas(productos) {
-  const data = loadImpr();
+  // Optimista: actualizamos el cache local YA para que la UI reaccione
+  // inmediatamente, y disparamos el POST. Si el server falla, revertimos.
   const ahora = Date.now();
+  const items = [];
+  const snapshot = {};
   productos.forEach(({ producto, cantidad }) => {
     if (!producto.codigo_barras) return;
-    const prev = data[producto.codigo_barras];
-    data[producto.codigo_barras] = {
+    const codigo = producto.codigo_barras;
+    snapshot[codigo] = _imprCache[codigo] ? { ..._imprCache[codigo] } : null;
+    const prev = _imprCache[codigo];
+    _imprCache[codigo] = {
       ts: ahora,
       total: (prev?.total || 0) + cantidad,
     };
+    items.push({ codigo_barras: codigo, cantidad });
   });
-  saveImpr(data);
+  if (!items.length) return Promise.resolve();
+  return fetch(URL_MARCAR, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': _getCsrfToken(),
+    },
+    body: JSON.stringify({ items }),
+  })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(resp => {
+      // Sincronizamos con el total real del server (puede diferir si otro
+      // dispositivo imprimió en paralelo).
+      if (resp && resp.impresas) {
+        Object.assign(_imprCache, resp.impresas);
+      }
+    })
+    .catch(() => {
+      // Revertimos el optimismo: restauramos el estado previo de cada código
+      Object.keys(snapshot).forEach(codigo => {
+        if (snapshot[codigo] === null) delete _imprCache[codigo];
+        else _imprCache[codigo] = snapshot[codigo];
+      });
+      alert('No se pudo guardar el marcado en el servidor. Revisá tu conexión.');
+      renderProgreso();
+      renderResultados();
+      renderSeleccionados();
+      renderQuickActionCounts();
+    });
 }
+
+function reiniciarImpresasServer() {
+  // Borra TODO el historial en el servidor. Confirmación visual ya fue dada.
+  return fetch(URL_REINICIAR, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'X-CSRFToken': _getCsrfToken() },
+  })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(() => { _imprCache = {}; })
+    .catch(() => {
+      alert('No se pudo reiniciar el historial en el servidor. Probá de nuevo.');
+      throw new Error('reset failed');
+    });
+}
+
 function fueImpresa(codigo) {
-  return !!loadImpr()[codigo];
+  return !!_imprCache[codigo];
 }
 function infoImpresion(codigo) {
-  return loadImpr()[codigo] || null;
+  return _imprCache[codigo] || null;
 }
 function fechaRel(ts) {
   const ahora = Date.now();
@@ -1706,11 +1835,13 @@ document.getElementById('btn-print').addEventListener('click', () => {
     const items = [...seleccionados.values()];
     const variantes = items.length;
     const totalEt = items.reduce((s,i) => s+i.cantidad, 0);
-    if (confirm(`¿Marcar las ${variantes} variante${variantes!==1?'s':''} (${totalEt} etiqueta${totalEt!==1?'s':''}) como impresas?\n\nEsto actualizará el indicador de progreso.`)) {
-      marcarImpresas(items);
-      renderSeleccionados();
-      renderProgreso();
-      renderQuickActionCounts();
+    if (confirm(`¿Marcar las ${variantes} variante${variantes!==1?'s':''} (${totalEt} etiqueta${totalEt!==1?'s':''}) como impresas?\n\nEsto actualizará el indicador de progreso (en todos los dispositivos).`)) {
+      marcarImpresas(items).then(() => {
+        renderSeleccionados();
+        renderProgreso();
+        renderQuickActionCounts();
+        renderResultados();
+      });
     }
   }, 400);
 });
@@ -1728,12 +1859,13 @@ document.getElementById('btn-reset-marcas').addEventListener('click', () => {
   const data = loadImpr();
   const cnt = Object.keys(data).length;
   if (cnt === 0) return alert('No hay marcas de impresión registradas todavía.');
-  if (confirm(`Esto borrará el historial de impresión de ${cnt} variante${cnt!==1?'s':''} (solo en este dispositivo).\n\n¿Continuar?`)) {
-    localStorage.removeItem(IMPR_KEY);
-    renderProgreso();
-    renderSeleccionados();
-    renderResultados();
-    renderQuickActionCounts();
+  if (confirm(`Esto borrará el historial de impresión de ${cnt} variante${cnt!==1?'s':''}.\n\n⚠️ Afecta a TODOS los dispositivos (PC, celular, etc).\n\n¿Continuar?`)) {
+    reiniciarImpresasServer().then(() => {
+      renderProgreso();
+      renderSeleccionados();
+      renderResultados();
+      renderQuickActionCounts();
+    }).catch(() => {});
   }
 });
 
@@ -1836,11 +1968,12 @@ function iniciarImpresion(autoMarcar) {
     const variantes = items.length;
     const totalEt = items.reduce((s, i) => s + i.cantidad, 0);
     if (confirm(`¿Marcar las ${variantes} variante${variantes!==1?'s':''} (${totalEt} etiqueta${totalEt!==1?'s':''}) como impresas?\n\nElige "Cancelar" si la impresión falló o cancelaste.`)) {
-      marcarImpresas(items);
-      renderSeleccionados();
-      renderProgreso();
-      renderQuickActionCounts();
-      renderResultados();
+      marcarImpresas(items).then(() => {
+        renderSeleccionados();
+        renderProgreso();
+        renderQuickActionCounts();
+        renderResultados();
+      });
     }
   }, 500);
 }
@@ -1947,6 +2080,10 @@ renderSeleccionados();
 renderPreview();
 renderProgreso();
 renderQuickActionCounts();
+
+// Migración del historial viejo (localStorage) al servidor. Solo se dispara
+// la primera vez en cada navegador; en el resto de cargas es un no-op.
+_migrarLocalStorageAlServidor();
 
 /* ═══════════════════════════════════════════════════════════════════
    PEGAR LISTA — selección masiva desde texto pegado
@@ -2172,5 +2309,6 @@ document.getElementById('modalPorDia').addEventListener('show.bs.modal', () => {
   if (!inp.value) inp.value = _fechaLocalISO(0);
   _refrescarResumenPorDia();
 });
+
 </script>
 {% endblock %}
