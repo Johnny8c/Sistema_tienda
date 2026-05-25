@@ -405,6 +405,7 @@ def _emitir_factura(request, factura, cfg):
         factura.es_contingencia = False
         factura.save()
         messages.success(request, 'Factura autorizada por el SRI.')
+        _enviar_factura_si_corresponde(request, factura)
         return redirect('detalle_factura', pk=factura.pk)
 
     err = ' | '.join([f'[{m["tipo"]}] {m["mensaje"]}' for m in aut['mensajes']]) or 'Rechazado por el SRI.'
@@ -474,6 +475,63 @@ def verificar_autorizacion(request, pk):
         factura.sri_respuesta = f'AUTORIZADO | Nº {aut["numero_autorizacion"]}'
         factura.save()
         messages.success(request, 'Factura autorizada.')
+        _enviar_factura_si_corresponde(request, factura)
     else:
         messages.error(request, f'Estado actual SRI: {aut["estado"]}')
+    return redirect('detalle_factura', pk=pk)
+
+
+# ── EMAIL — auto-envío al autorizar + reenvío manual ──────────
+
+
+def _enviar_factura_si_corresponde(request, factura):
+    """
+    Hook llamado justo después de que la factura quedó AUTORIZADA.
+    Intenta enviar el email al cliente. Si no hay email del cliente o
+    EMAIL no está configurado, hace nada silenciosamente (la factura
+    queda autorizada igual; el dueño puede reenviar manualmente).
+    Errores se logean pero NO interrumpen la respuesta al cajero.
+    """
+    from .email import enviar_factura_por_email
+
+    if not (factura.cliente.email or '').strip():
+        return  # sin email del cliente — no notificamos al cajero, es normal
+
+    try:
+        ok, msg_resultado = enviar_factura_por_email(factura, request=request)
+    except Exception:
+        logger.exception('Error inesperado enviando email factura %s', factura.pk)
+        return
+
+    if ok:
+        messages.info(request, f'📧 {msg_resultado}')
+    else:
+        # No mostramos error grande al cajero — solo info, la factura ya
+        # está autorizada, el envío es secundario.
+        messages.warning(request, f'No se pudo enviar email de la factura: {msg_resultado}')
+
+
+@login_required
+@requiere_no_bodeguero
+def reenviar_email_factura(request, pk):
+    """Reenvía manualmente el email de la factura al cliente."""
+    from .email import enviar_factura_por_email
+
+    factura = get_object_or_404(FacturaSRI, pk=pk)
+
+    if factura.estado != FacturaSRI.AUTORIZADA:
+        messages.error(request, 'Solo se puede enviar email de facturas autorizadas.')
+        return redirect('detalle_factura', pk=pk)
+
+    try:
+        ok, msg_resultado = enviar_factura_por_email(factura, request=request)
+    except Exception as exc:
+        logger.exception('Error inesperado reenviando email factura %s', factura.pk)
+        messages.error(request, f'Error de envío: {type(exc).__name__}: {exc}')
+        return redirect('detalle_factura', pk=pk)
+
+    if ok:
+        messages.success(request, f'📧 {msg_resultado}')
+    else:
+        messages.error(request, msg_resultado)
     return redirect('detalle_factura', pk=pk)

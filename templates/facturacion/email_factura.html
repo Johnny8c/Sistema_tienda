@@ -1,0 +1,117 @@
+{% load static %}<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factura {{ factura.numero_factura }}</title>
+</head>
+<body style="margin:0;padding:0;background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;line-height:1.5">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F4F6;padding:24px 12px">
+  <tr><td align="center">
+
+    <!-- Card principal -->
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="background:#FFFFFF;border-radius:14px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.06);max-width:600px;width:100%">
+
+      <!-- Header con color del negocio -->
+      <tr><td style="background:{{ negocio.color_primario|default:'#4F46E5' }};padding:28px 32px;color:#fff">
+        <div style="font-size:13px;font-weight:600;opacity:.85;letter-spacing:.5px;text-transform:uppercase">
+          {{ negocio.nombre_negocio|default:"Sistema Tienda" }}
+        </div>
+        <div style="font-size:22px;font-weight:800;margin-top:6px">
+          Factura electrónica Nº {{ factura.numero_factura }}
+        </div>
+        <div style="font-size:13px;opacity:.9;margin-top:4px">
+          Autorizada por el SRI · {{ factura.fecha_emision|date:"d/m/Y" }}
+        </div>
+      </td></tr>
+
+      <!-- Saludo + resumen -->
+      <tr><td style="padding:28px 32px">
+        <p style="margin:0 0 16px;font-size:15px;color:#111827">
+          Hola <strong>{{ cliente.nombre }}</strong>,
+        </p>
+        <p style="margin:0 0 18px;font-size:14px;color:#374151">
+          Te enviamos la factura electrónica de tu compra
+          {% if negocio.nombre_negocio %}en <strong>{{ negocio.nombre_negocio }}</strong>{% endif %}.
+          Está autorizada por el Servicio de Rentas Internas (SRI) del Ecuador.
+        </p>
+
+        <!-- Bloque resumen -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;margin-bottom:18px">
+          <tr><td style="padding:16px 18px">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13.5px">
+              <tr>
+                <td style="color:#6B7280;padding:4px 0">Número</td>
+                <td style="text-align:right;color:#111827;font-weight:600">{{ factura.numero_factura }}</td>
+              </tr>
+              <tr>
+                <td style="color:#6B7280;padding:4px 0">Fecha de emisión</td>
+                <td style="text-align:right;color:#111827;font-weight:600">{{ factura.fecha_emision|date:"d/m/Y" }}</td>
+              </tr>
+              {% if factura.sri_numero_autorizacion %}
+              <tr>
+                <td style="color:#6B7280;padding:4px 0">Autorización SRI</td>
+                <td style="text-align:right;color:#111827;font-weight:600;font-family:monospace;font-size:11px;word-break:break-all">{{ factura.sri_numero_autorizacion }}</td>
+              </tr>
+              {% endif %}
+              <tr>
+                <td style="color:#6B7280;padding:4px 0">Cédula/RUC</td>
+                <td style="text-align:right;color:#111827;font-weight:600">{{ cliente.cedula_ruc }}</td>
+              </tr>
+              <tr><td colspan="2" style="border-top:1px solid #E5E7EB;height:8px"></td></tr>
+              <tr>
+                <td style="color:#6B7280;padding:4px 0">Subtotal</td>
+                <td style="text-align:right;color:#374151">${{ factura.subtotal_0|add:factura.subtotal_iva|floatformat:2 }}</td>
+              </tr>
+              {% if factura.iva_valor %}
+              <tr>
+                <td style="color:#6B7280;padding:4px 0">IVA {{ factura.iva_porcentaje }}%</td>
+                <td style="text-align:right;color:#374151">${{ factura.iva_valor|floatformat:2 }}</td>
+              </tr>
+              {% endif %}
+              <tr>
+                <td style="color:#111827;padding:8px 0 0;font-weight:700;font-size:16px">Total</td>
+                <td style="text-align:right;color:{{ negocio.color_primario|default:'#4F46E5' }};font-weight:800;font-size:20px;padding-top:8px">${{ factura.total|floatformat:2 }}</td>
+              </tr>
+            </table>
+          </td></tr>
+        </table>
+
+        <!-- Bloque adjuntos -->
+        <div style="background:#EEF2FF;border:1px solid #C7D2FE;border-radius:10px;padding:14px 16px;margin-bottom:18px">
+          <div style="font-weight:700;color:#3730A3;font-size:13.5px;margin-bottom:6px">📎 Documentos adjuntos</div>
+          <div style="font-size:13px;color:#4338CA">
+            <strong>RIDE_{{ factura.clave_acceso|default:factura.pk }}.pdf</strong> — Representación impresa de la factura<br>
+            <strong>{{ factura.clave_acceso|default:factura.pk }}.xml</strong> — Comprobante firmado y autorizado por el SRI
+          </div>
+        </div>
+
+        <p style="margin:0 0 12px;font-size:13.5px;color:#4B5563">
+          Si tenés alguna consulta sobre esta factura, respondé a este email o contactanos
+          {% if negocio.telefono %}al <strong>{{ negocio.telefono }}</strong>{% endif %}.
+        </p>
+        <p style="margin:0;font-size:13.5px;color:#4B5563">
+          ¡Gracias por tu compra! 🛍️
+        </p>
+      </td></tr>
+
+      <!-- Footer -->
+      <tr><td style="background:#F9FAFB;border-top:1px solid #E5E7EB;padding:18px 32px;text-align:center;color:#6B7280;font-size:12px">
+        <strong style="color:#374151;display:block;margin-bottom:4px">{{ negocio.nombre_negocio|default:"Sistema Tienda" }}</strong>
+        {% if negocio.direccion %}{{ negocio.direccion }}<br>{% endif %}
+        {% if negocio.telefono %}Tel. {{ negocio.telefono }}{% if negocio.email %} · {% endif %}{% endif %}
+        {% if negocio.email %}{{ negocio.email }}{% endif %}
+        <br><br>
+        <span style="font-size:11px;color:#9CA3AF">
+          Este es un mensaje automático. La factura está autorizada por el SRI; el XML adjunto es el comprobante legal.
+        </span>
+      </td></tr>
+
+    </table>
+
+  </td></tr>
+</table>
+
+</body>
+</html>
