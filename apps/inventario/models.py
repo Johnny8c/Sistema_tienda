@@ -115,3 +115,23 @@ class Producto(models.Model):
         if self.catalogo_id and not self.nombre:
             self.nombre = self.catalogo.nombre
         super().save(*args, **kwargs)
+
+
+class EtiquetaImpresa(models.Model):
+    """Historial de impresión de etiquetas — compartido entre todos los
+    dispositivos. Antes vivía en localStorage del navegador, lo que hacía que
+    la PC central y el celular mostraran porcentajes distintos. Aquí
+    persistimos cuántas veces se imprimió cada código de barras y cuándo
+    fue la última, para que el indicador de progreso sea el mismo en
+    cualquier dispositivo que abra la cuenta."""
+    codigo_barras    = models.CharField(max_length=100, unique=True, db_index=True)
+    total_impresas   = models.PositiveIntegerField(default=0)
+    ultima_impresion = models.DateTimeField()
+
+    class Meta:
+        verbose_name        = 'Etiqueta impresa'
+        verbose_name_plural = 'Etiquetas impresas'
+        ordering            = ['-ultima_impresion']
+
+    def __str__(self):
+        return f'{self.codigo_barras} (×{self.total_impresas})'

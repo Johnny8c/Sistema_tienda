@@ -17,7 +17,10 @@ urlpatterns = [
     path('consultar/',    views.consultar_precio, name='consultar_precio'),
     path('api/codigo/',   views.api_buscar_codigo, name='api_buscar_codigo'),
     # Etiquetas pegables (impresión por lotes)
-    path('etiquetas/',    views.imprimir_etiquetas, name='imprimir_etiquetas'),
+    path('etiquetas/',                    views.imprimir_etiquetas,             name='imprimir_etiquetas'),
+    path('etiquetas/api/marcar/',         views.api_etiquetas_marcar_impresas,    name='api_etiquetas_marcar'),
+    path('etiquetas/api/reiniciar/',      views.api_etiquetas_reiniciar_impresas, name='api_etiquetas_reiniciar'),
+    path('etiquetas/api/importar/',       views.api_etiquetas_importar_localstorage, name='api_etiquetas_importar'),
     # Categorías
     path('categorias/',                     views.lista_categorias,    name='lista_categorias'),
     path('categorias/nueva/',               views.crear_categoria,     name='crear_categoria'),
