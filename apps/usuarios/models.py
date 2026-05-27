@@ -17,10 +17,28 @@ class Usuario(AbstractUser):
     cedula = models.CharField(max_length=20, blank=True)
     telefono = models.CharField(max_length=20, blank=True)
     direccion = models.TextField(blank=True)
+    # Código corto (2 dígitos, ej "01", "07") que aparece en las notas de venta
+    # en lugar del nombre del vendedor. Sirve para identificación rápida en
+    # tickets impresos sin exponer datos personales.
+    codigo = models.CharField(max_length=2, unique=True)
 
     class Meta:
         verbose_name = 'Usuario'
         verbose_name_plural = 'Usuarios'
+
+    @classmethod
+    def siguiente_codigo(cls):
+        """Devuelve el siguiente código de 2 dígitos disponible (01-99).
+        Busca el menor número no usado, no el siguiente al máximo, así
+        si borrás el 05 y tenés 01-04 + 06, te devuelve 05."""
+        usados = set()
+        for c in cls.objects.values_list('codigo', flat=True):
+            if c and c.isdigit():
+                usados.add(int(c))
+        for n in range(1, 100):
+            if n not in usados:
+                return f'{n:02d}'
+        return '99'  # fallback si llegaron a 99 usuarios
 
     def es_dueno(self):
         return self.rol == self.ROL_DUENO

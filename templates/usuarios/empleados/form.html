@@ -90,6 +90,22 @@
             </div>
           </div>
 
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-hash me-1 text-muted"></i>Código <span class="text-danger">*</span>
+              </label>
+              <input type="text" name="codigo" id="id_codigo" class="form-control"
+                     value="{{ f_codigo }}" required inputmode="numeric"
+                     maxlength="2" pattern="[0-9]{2}"
+                     style="font-family:monospace;font-weight:700;letter-spacing:.05em;max-width:120px"
+                     placeholder="01">
+              <div class="form-text">
+                2 dígitos. Aparece en lugar del nombre en las notas de venta (ej. <b>Vendedor: 01</b>).
+              </div>
+            </div>
+          </div>
+
           <div class="mb-4">
             <label class="form-label fw-semibold">
               <i class="bi bi-key me-1 text-muted"></i>
