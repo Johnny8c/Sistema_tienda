@@ -299,6 +299,7 @@ def crear_empleado(request):
         cedula = request.POST.get('cedula', '').strip()
         telefono = request.POST.get('telefono', '').strip()
         direccion = request.POST.get('direccion', '').strip()
+        codigo = request.POST.get('codigo', '').strip().zfill(2)  # "5" → "05"
 
         errores = []
         if not username:
@@ -307,6 +308,10 @@ def crear_empleado(request):
             errores.append('El usuario no puede contener espacios.')
         elif Usuario.objects.filter(username=username).exists():
             errores.append(f'El usuario "{username}" ya existe.')
+        if not codigo or not codigo.isdigit() or len(codigo) != 2:
+            errores.append('El código debe ser de 2 dígitos (ej. 01, 07, 15).')
+        elif Usuario.objects.filter(codigo=codigo).exists():
+            errores.append(f'El código "{codigo}" ya está en uso por otro empleado.')
         if not password:
             errores.append('La contraseña es obligatoria.')
         else:
@@ -323,6 +328,7 @@ def crear_empleado(request):
                 'f_username': username, 'f_fname': first_name,
                 'f_lname': last_name, 'f_rol': rol,
                 'f_cedula': cedula, 'f_telefono': telefono, 'f_direccion': direccion,
+                'f_codigo': codigo,
             })
 
         Usuario.objects.create_user(
@@ -334,6 +340,7 @@ def crear_empleado(request):
             cedula=cedula,
             telefono=telefono,
             direccion=direccion,
+            codigo=codigo,
         )
         messages.success(request, f'Empleado "{username}" creado correctamente.')
         return redirect('lista_empleados')
@@ -342,6 +349,8 @@ def crear_empleado(request):
         'accion': 'Crear', 'roles': Usuario.ROLES,
         'f_username': '', 'f_fname': '', 'f_lname': '', 'f_rol': '',
         'f_cedula': '', 'f_telefono': '', 'f_direccion': '',
+        # Auto-sugiere el próximo código disponible
+        'f_codigo': Usuario.siguiente_codigo(),
     })
 
 
@@ -364,6 +373,29 @@ def editar_empleado(request, pk):
         empleado.direccion = request.POST.get('direccion', '').strip()
         empleado.is_active = 'is_active' in request.POST
 
+        # Validar y aplicar el nuevo código si cambió
+        nuevo_codigo = request.POST.get('codigo', '').strip().zfill(2)
+        if nuevo_codigo != empleado.codigo:
+            if not nuevo_codigo or not nuevo_codigo.isdigit() or len(nuevo_codigo) != 2:
+                messages.error(request, 'El código debe ser de 2 dígitos (ej. 01, 07, 15).')
+                return render(request, 'usuarios/empleados/form.html', {
+                    'accion': 'Editar', 'empleado': empleado, 'roles': Usuario.ROLES,
+                    'f_username': empleado.username, 'f_fname': empleado.first_name,
+                    'f_lname': empleado.last_name, 'f_rol': empleado.rol,
+                    'f_cedula': empleado.cedula, 'f_telefono': empleado.telefono,
+                    'f_direccion': empleado.direccion, 'f_codigo': nuevo_codigo,
+                })
+            if Usuario.objects.filter(codigo=nuevo_codigo).exclude(pk=empleado.pk).exists():
+                messages.error(request, f'El código "{nuevo_codigo}" ya está en uso.')
+                return render(request, 'usuarios/empleados/form.html', {
+                    'accion': 'Editar', 'empleado': empleado, 'roles': Usuario.ROLES,
+                    'f_username': empleado.username, 'f_fname': empleado.first_name,
+                    'f_lname': empleado.last_name, 'f_rol': empleado.rol,
+                    'f_cedula': empleado.cedula, 'f_telefono': empleado.telefono,
+                    'f_direccion': empleado.direccion, 'f_codigo': nuevo_codigo,
+                })
+            empleado.codigo = nuevo_codigo
+
         nueva_password = request.POST.get('password', '').strip()
         if nueva_password:
             try:
@@ -376,7 +408,7 @@ def editar_empleado(request, pk):
                     'f_username': empleado.username, 'f_fname': empleado.first_name,
                     'f_lname': empleado.last_name, 'f_rol': empleado.rol,
                     'f_cedula': empleado.cedula, 'f_telefono': empleado.telefono,
-                    'f_direccion': empleado.direccion,
+                    'f_direccion': empleado.direccion, 'f_codigo': empleado.codigo,
                 })
             empleado.set_password(nueva_password)
 
@@ -389,7 +421,7 @@ def editar_empleado(request, pk):
         'f_username': empleado.username, 'f_fname': empleado.first_name,
         'f_lname': empleado.last_name, 'f_rol': empleado.rol,
         'f_cedula': empleado.cedula, 'f_telefono': empleado.telefono,
-        'f_direccion': empleado.direccion,
+        'f_direccion': empleado.direccion, 'f_codigo': empleado.codigo,
     })
 
 
