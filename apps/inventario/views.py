@@ -35,25 +35,32 @@ def _validar_foto(request, foto):
 
 @login_required
 def lista_inventario(request):
+    from django.core.paginator import Paginator
     q = request.GET.get('q', '')
     cat = request.GET.get('cat', '')
-    catalogos = (CatalogoProducto.objects.filter(activo=True)
-                 .select_related('categoria')
-                 .prefetch_related('variantes'))
+    catalogos_qs = (CatalogoProducto.objects.filter(activo=True)
+                    .select_related('categoria')
+                    .prefetch_related('variantes')
+                    .order_by('nombre'))
     if q:
-        catalogos = catalogos.filter(nombre__icontains=q)
+        catalogos_qs = catalogos_qs.filter(nombre__icontains=q)
     if cat:
-        catalogos = catalogos.filter(categoria_id=cat)
+        catalogos_qs = catalogos_qs.filter(categoria_id=cat)
 
-    catalogos = list(catalogos)
-    for c in catalogos:
+    # Paginar a 60 catálogos por página. Antes cargábamos los 1142+ de una,
+    # generando HTML enorme + tirando muchas fotos de Cloudinary a la vez.
+    paginator = Paginator(catalogos_qs, 60)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    for c in page_obj:
         activas = [v for v in c.variantes.all() if v.activo]
         c.tallas_unicas = list(dict.fromkeys(v.talla for v in activas if v.talla))
         c.colores_unicos = list(dict.fromkeys(v.color for v in activas if v.color))
 
     categorias = Categoria.objects.filter(activo=True)
     return render(request, 'inventario/lista.html', {
-        'catalogos': catalogos, 'q': q, 'cat': cat, 'categorias': categorias,
+        'catalogos': page_obj, 'page_obj': page_obj,
+        'q': q, 'cat': cat, 'categorias': categorias,
     })
 
 

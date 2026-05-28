@@ -40,6 +40,15 @@ class Usuario(AbstractUser):
                 return f'{n:02d}'
         return '99'  # fallback si llegaron a 99 usuarios
 
+    def save(self, *args, **kwargs):
+        # Auto-asignar el siguiente código si quien crea el usuario no se
+        # acordó (shell, admin, tests, scripts de import). El form de
+        # empleados ya valida + asigna explícitamente — esto es la red de
+        # seguridad para todos los otros caminos.
+        if not self.codigo:
+            self.codigo = self.__class__.siguiente_codigo()
+        super().save(*args, **kwargs)
+
     def es_dueno(self):
         return self.rol == self.ROL_DUENO
 

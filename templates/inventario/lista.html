@@ -248,6 +248,45 @@
   {% endwith %}
   {% endfor %}
 </div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="Paginación de catálogo" class="mt-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div style="font-size:13px;color:var(--text-muted)">
+      Mostrando <b>{{ page_obj.start_index }}-{{ page_obj.end_index }}</b>
+      de <b>{{ page_obj.paginator.count }}</b> productos
+    </div>
+    <ul class="pagination pagination-sm mb-0">
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if cat %}&cat={{ cat }}{% endif %}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
+      {% endif %}
+
+      <li class="page-item active">
+        <span class="page-link">
+          Página {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </span>
+      </li>
+
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if cat %}&cat={{ cat }}{% endif %}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
+      {% endif %}
+    </ul>
+  </div>
+</nav>
+{% endif %}
+
 {% else %}
 <div class="card">
   <div class="card-body text-center py-5" style="color:var(--text-muted)">

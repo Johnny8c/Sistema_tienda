@@ -84,6 +84,36 @@ SESSION_COOKIE_AGE = SESSION_INACTIVITY_SECONDS
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
+# ─────────────────────────────────────────────────────────────
+# CACHE — Redis si está configurado, LocMem como fallback (dev)
+# Con Redis levantado lo usamos también como backend de sesiones
+# (cached_db) para evitar que CADA request escriba en django_session en
+# RDS. Eso era un cuello de botella sobre la BD pequeña de t4g.micro,
+# especialmente porque SESSION_SAVE_EVERY_REQUEST=True. Ahora los reads
+# van a Redis y los writes son perezosos.
+# ─────────────────────────────────────────────────────────────
+_REDIS_URL = config('REDIS_URL', default='')
+if _REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND':  'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _REDIS_URL,
+            'TIMEOUT':  300,
+        }
+    }
+    # cached_db: lee de Redis (rápido) y respalda en BD (durable). Si
+    # Redis se cae, las sesiones siguen funcionando vía RDS sin perder
+    # logins existentes.
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+else:
+    # Dev local sin Redis: cache en memoria del proceso.
+    CACHES = {
+        'default': {
+            'BACKEND':  'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'sistema-tienda-dev',
+        }
+    }
+
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {

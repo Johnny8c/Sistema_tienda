@@ -509,7 +509,7 @@ function renderResultado(d) {
   const fotoEl = document.getElementById('res-foto');
   const fotoBadge = document.getElementById('res-stock-badge');
   fotoEl.innerHTML = (d.foto_url
-    ? `<img src="${d.foto_url}" alt="">`
+    ? `<img src="${d.foto_url}" alt="" loading="lazy" decoding="async">`
     : `<i class="bi bi-image res-foto-placeholder"></i>`)
     + fotoBadge.outerHTML;
 
@@ -600,7 +600,7 @@ function renderRecientes() {
   list.innerHTML = lista.map(r => `
     <div class="reciente-item" data-codigo="${r.codigo || ''}">
       <div class="reciente-foto-mini">
-        ${r.foto_url ? `<img src="${r.foto_url}" alt="">` : `<i class="bi bi-image"></i>`}
+        ${r.foto_url ? `<img src="${r.foto_url}" alt="" loading="lazy" decoding="async">` : `<i class="bi bi-image"></i>`}
       </div>
       <div class="reciente-info">
         <div class="reciente-nombre">${r.nombre}</div>

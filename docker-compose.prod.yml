@@ -4,13 +4,31 @@
 version: '3.9'
 
 services:
+  redis:
+    # Cache compartido entre workers de gunicorn + backend de sesiones.
+    # maxmemory 100mb alcanza para el tamaño de este sistema; LRU va
+    # expulsando claves viejas si llega al límite, sin afectar las
+    # sesiones activas. --save "" desactiva persistencia (cache pura, sin
+    # disk overhead). Solo escucha en localhost del host.
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 100mb --maxmemory-policy allkeys-lru --save ""
+    ports:
+      - '127.0.0.1:6379:6379'
+
   web:
     build:
       context: .
       dockerfile: Dockerfile
     restart: unless-stopped
+    depends_on:
+      - redis
     env_file:
       - ./.env
+    environment:
+      # Dentro de la red de docker-compose, el host del redis se resuelve
+      # por su nombre de servicio. settings.py lee REDIS_URL.
+      - REDIS_URL=redis://redis:6379/0
     ports:
       - '127.0.0.1:8000:8000'
 
