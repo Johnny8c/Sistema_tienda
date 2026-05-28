@@ -437,11 +437,13 @@ def imprimir_etiquetas(request):
     # localStorage del navegador, por eso la PC central y el celular mostraban
     # porcentajes distintos. Ahora viene de la BD y todos ven lo mismo.
     impresas_data = {}
-    for r in EtiquetaImpresa.objects.values('codigo_barras', 'total_impresas', 'ultima_impresion'):
+    for r in EtiquetaImpresa.objects.values('codigo_barras', 'total_impresas', 'ultima_impresion', 'stock_al_imprimir'):
         impresas_data[r['codigo_barras']] = {
             # ts en milisegundos epoch — compatible con Date.now() de JS
             'ts': int(r['ultima_impresion'].timestamp() * 1000),
             'total': r['total_impresas'],
+            # Snapshot del stock al marcar; el JS lo usa para calcular faltantes
+            'stock_al_imprimir': r['stock_al_imprimir'],
         }
 
     return render(request, 'inventario/etiquetas.html', {
@@ -477,6 +479,19 @@ def api_etiquetas_marcar_impresas(request):
 
     ahora = timezone.now()
     resultados = {}
+
+    # Lookup del stock actual de cada producto que vamos a marcar. Hacemos
+    # una sola consulta (no 1 por item) para no quemar la BD.
+    codigos = [
+        (it.get('codigo_barras') or '').strip()
+        for it in items if it.get('codigo_barras')
+    ]
+    stocks = dict(
+        Producto.objects
+        .filter(codigo_barras__in=codigos)
+        .values_list('codigo_barras', 'stock')
+    )
+
     for it in items:
         codigo = (it.get('codigo_barras') or '').strip()
         try:
@@ -485,20 +500,27 @@ def api_etiquetas_marcar_impresas(request):
             cant = 0
         if not codigo or cant <= 0:
             continue
+        stock_actual = stocks.get(codigo, 0)
         obj, creado = EtiquetaImpresa.objects.get_or_create(
             codigo_barras=codigo,
-            defaults={'total_impresas': cant, 'ultima_impresion': ahora},
+            defaults={
+                'total_impresas': cant,
+                'ultima_impresion': ahora,
+                'stock_al_imprimir': stock_actual,
+            },
         )
         if not creado:
             # F() para sumar sin race condition entre devices simultáneos
             EtiquetaImpresa.objects.filter(pk=obj.pk).update(
                 total_impresas=F('total_impresas') + cant,
                 ultima_impresion=ahora,
+                stock_al_imprimir=stock_actual,
             )
-            obj.refresh_from_db(fields=['total_impresas'])
+            obj.refresh_from_db(fields=['total_impresas', 'stock_al_imprimir'])
         resultados[codigo] = {
             'ts': int(ahora.timestamp() * 1000),
-            'total': obj.total_impresas if creado else (obj.total_impresas),
+            'total': obj.total_impresas,
+            'stock_al_imprimir': obj.stock_al_imprimir,
         }
     return JsonResponse({'ok': True, 'impresas': resultados})
 
@@ -511,6 +533,33 @@ def api_etiquetas_reiniciar_impresas(request):
         return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
     eliminadas, _ = EtiquetaImpresa.objects.all().delete()
     return JsonResponse({'ok': True, 'eliminadas': eliminadas})
+
+
+@login_required
+@require_POST
+def api_etiquetas_marcar_pendiente(request):
+    """Marca una sola variante como pendiente de imprimir (sin tocar las
+    demás). Se usa para regularizar productos a los que el dueño les ajustó
+    stock manualmente y por eso el snapshot quedó desactualizado. NO borra
+    el registro — solo pone stock_al_imprimir=0 para preservar el historial
+    (fecha de última impresión, total acumulado) y que aparezca como
+    'Falta N' donde N = stock actual."""
+    import json
+
+    if not request.user.puede_gestionar_inventario():
+        return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
+
+    try:
+        payload = json.loads(request.body or '{}')
+        codigo = (payload.get('codigo_barras') or '').strip()
+    except json.JSONDecodeError:
+        return JsonResponse({'ok': False, 'mensaje': 'JSON inválido'}, status=400)
+
+    if not codigo:
+        return JsonResponse({'ok': False, 'mensaje': 'Falta codigo_barras'}, status=400)
+
+    actualizadas = EtiquetaImpresa.objects.filter(codigo_barras=codigo).update(stock_al_imprimir=0)
+    return JsonResponse({'ok': True, 'actualizadas': actualizadas})
 
 
 @login_required
@@ -566,6 +615,7 @@ def api_etiquetas_importar_localstorage(request):
         impresas[codigo] = {
             'ts': int(obj.ultima_impresion.timestamp() * 1000),
             'total': obj.total_impresas,
+            'stock_al_imprimir': obj.stock_al_imprimir,
         }
     return JsonResponse({
         'ok': True,
