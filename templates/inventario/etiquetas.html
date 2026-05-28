@@ -88,6 +88,26 @@
   [data-theme="dark"] .impr-badge.ok { background: rgba(16,185,129,.2); color: #34D399; }
   [data-theme="dark"] .impr-badge.pend { background: rgba(245,158,11,.18); color: #FCD34D; }
 
+  /* Botón pequeño junto al badge "Impresa" para volverla a pendiente cuando
+     el dueño ajustó stock manualmente y por eso el snapshot quedó viejo. */
+  .impr-reset-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #6B7280;
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 4px;
+    transition: all .12s;
+    line-height: 1;
+  }
+  .impr-reset-btn:hover {
+    background: rgba(245,158,11,.12);
+    color: #B45309;
+    border-color: rgba(245,158,11,.3);
+  }
+
   .impr-meta {
     font-size: 11px; color: var(--text-muted);
     margin-top: 2px;
@@ -1167,9 +1187,10 @@ const PRESELECT_VARIANTE = "{{ variante_preseleccionada|default:'' }}";
 // el celular mostraran porcentajes distintos aunque fuera la misma cuenta.
 // Ahora el cache vive en memoria, se inicializa con lo que mandó el server
 // al cargar la página, y cada cambio se replica al servidor por fetch().
-const URL_MARCAR    = "{% url 'api_etiquetas_marcar' %}";
-const URL_REINICIAR = "{% url 'api_etiquetas_reiniciar' %}";
-const URL_IMPORTAR  = "{% url 'api_etiquetas_importar' %}";
+const URL_MARCAR             = "{% url 'api_etiquetas_marcar' %}";
+const URL_REINICIAR          = "{% url 'api_etiquetas_reiniciar' %}";
+const URL_IMPORTAR           = "{% url 'api_etiquetas_importar' %}";
+const URL_MARCAR_PENDIENTE   = "{% url 'api_etiquetas_marcar_pendiente' %}";
 let _imprCache = JSON.parse(document.getElementById('etiquetas-impresas-data').textContent || '{}');
 
 // === MIGRACIÓN ONE-SHOT: localStorage → servidor ===
@@ -1297,6 +1318,38 @@ function marcarImpresas(productos) {
     });
 }
 
+function marcarComoPendiente(codigo, evento) {
+  // Marca UNA variante como pendiente (sin tocar las otras). Se llama desde
+  // el botón ↺ que aparece junto al badge "Impresa". Útil para regularizar
+  // productos cuyo stock se ajustó manualmente sin pasar por la pantalla
+  // de etiquetas.
+  if (evento) { evento.preventDefault(); evento.stopPropagation(); }
+  if (!codigo) return;
+  if (!confirm('Marcar esta variante como PENDIENTE de imprimir?\n\nEl historial se mantiene, pero va a aparecer como "Falta N" para que sepas que necesita etiquetas nuevas.')) return;
+
+  fetch(URL_MARCAR_PENDIENTE, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': _getCsrfToken(),
+    },
+    body: JSON.stringify({ codigo_barras: codigo }),
+  })
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(() => {
+      // Actualizamos el cache local: stock_al_imprimir = 0 → faltantes = stock
+      if (_imprCache[codigo]) _imprCache[codigo].stock_al_imprimir = 0;
+      renderProgreso();
+      renderResultados();
+      renderSeleccionados();
+      renderQuickActionCounts();
+    })
+    .catch(err => {
+      alert('No se pudo marcar como pendiente (' + err + '). Probá de nuevo.');
+    });
+}
+
 function reiniciarImpresasServer() {
   // Borra TODO el historial en el servidor. Confirmación visual ya fue dada.
   return fetch(URL_REINICIAR, {
@@ -1312,9 +1365,32 @@ function reiniciarImpresasServer() {
     });
 }
 
-function fueImpresa(codigo) {
-  return !!_imprCache[codigo];
+function fueImpresa(producto) {
+  // Una variante está "totalmente impresa" si todas sus unidades de stock
+  // ya tienen etiqueta. Si después le agregás stock, queda parcial (no
+  // impresa, faltan etiquetas).
+  if (!producto || !producto.codigo_barras) return false;
+  const info = _imprCache[producto.codigo_barras];
+  if (!info) return false;
+  // Registros legacy (sin snapshot del stock al imprimir) los tratamos como
+  // "completos" — no tiene sentido romper el progreso del usuario.
+  if (info.stock_al_imprimir == null) return true;
+  const stockActual = producto.stock || 0;
+  return info.stock_al_imprimir >= stockActual;
 }
+
+function faltantesEtiqueta(producto) {
+  // Cuántas etiquetas le faltan a una variante. 0 = ya impresa entera;
+  // stock entero si nunca se marcó; stock-snapshot si se agregó stock
+  // después de la última impresión.
+  if (!producto || !producto.codigo_barras) return 0;
+  const stockActual = producto.stock || 0;
+  const info = _imprCache[producto.codigo_barras];
+  if (!info) return stockActual;
+  if (info.stock_al_imprimir == null) return 0;
+  return Math.max(0, stockActual - info.stock_al_imprimir);
+}
+
 function infoImpresion(codigo) {
   return _imprCache[codigo] || null;
 }
@@ -1336,7 +1412,13 @@ let ultimasMatches = []; // últimos resultados de búsqueda visibles
 
 function resolverCantidad(producto) {
   if (cantidadPorDefecto === 'auto') {
-    // 'auto' = stock disponible. Si stock <= 0, defaultear a 1 para que algo se imprima.
+    // 'auto' = solo lo que falta etiquetar (no el stock entero). Esto evita
+    // duplicar etiquetas para unidades viejas que ya las tienen. Si el
+    // producto es totalmente nuevo, faltantesEtiqueta() devuelve el stock
+    // completo, así que el comportamiento clásico se mantiene.
+    const faltan = faltantesEtiqueta(producto);
+    if (faltan > 0) return faltan;
+    // Ya está todo impreso pero igual lo seleccionaste — al menos 1.
     return Math.max(1, producto.stock_disponible || producto.stock || 1);
   }
   return parseInt(cantidadPorDefecto) || 1;
@@ -1394,7 +1476,7 @@ function renderResultados() {
   const q = search.value.trim().toLowerCase();
   const soloPend = document.getElementById('opt-solo-pendientes').checked;
   let conCodigo = PRODUCTOS.filter(p => p.codigo_barras);
-  if (soloPend) conCodigo = conCodigo.filter(p => !fueImpresa(p.codigo_barras));
+  if (soloPend) conCodigo = conCodigo.filter(p => !fueImpresa(p));
 
   const matches = q
     ? conCodigo.filter(p =>
@@ -1444,7 +1526,7 @@ function renderResultados() {
   let html = '';
   for (const grupo of grupos.values()) {
     const stockGrupo = grupo.variantes.reduce((s, v) => s + (v.stock_disponible || 0), 0);
-    const pendientesGrupo = grupo.variantes.filter(v => !fueImpresa(v.codigo_barras)).length;
+    const pendientesGrupo = grupo.variantes.filter(v => !fueImpresa(v)).length;
     const grupoStatus = pendientesGrupo === 0
       ? `<span class="impr-badge ok" style="margin-left:6px"><i class="bi bi-check-all"></i>Todas impresas</span>`
       : pendientesGrupo === grupo.variantes.length
@@ -1475,9 +1557,26 @@ function renderResultados() {
     // Variantes (filas indentadas)
     grupo.variantes.forEach(p => {
       const info = infoImpresion(p.codigo_barras);
-      const badge = info
-        ? `<span class="impr-badge ok"><i class="bi bi-check-circle-fill"></i>Impresa</span>`
-        : `<span class="impr-badge pend"><i class="bi bi-circle"></i>Pendiente</span>`;
+      const faltan = faltantesEtiqueta(p);
+      let badge;
+      if (!info) {
+        badge = `<span class="impr-badge pend"><i class="bi bi-circle"></i>Pendiente</span>`;
+      } else if (faltan > 0) {
+        // Marcada en algún momento pero después se agregó stock — necesita
+        // etiquetas para las nuevas unidades. Badge "Faltan N" para que el
+        // usuario sepa cuántas le faltan sin tener que hacer cuentas.
+        badge = `<span class="impr-badge pend"><i class="bi bi-exclamation-circle"></i>Faltan ${faltan}</span>`;
+      } else {
+        // "Impresa" + botón discreto para volver a pendiente. Útil si el
+        // dueño ajustó stock manualmente y el snapshot quedó viejo.
+        const codigoEsc = escapeHtml(p.codigo_barras);
+        badge = `<span class="impr-badge ok"><i class="bi bi-check-circle-fill"></i>Impresa</span>` +
+                `<button type="button" class="impr-reset-btn"
+                         onclick="marcarComoPendiente('${codigoEsc}', event)"
+                         title="Marcar como pendiente (si le ajustaste stock manualmente)">
+                   <i class="bi bi-arrow-counterclockwise"></i>
+                 </button>`;
+      }
       const yaSeleccionado = seleccionados.get(p.id);
       const counter = yaSeleccionado
         ? `<span class="pr-counter">×${yaSeleccionado.cantidad}</span>` : '';
@@ -1894,11 +1993,11 @@ document.getElementById('qty-custom').addEventListener('input', (e) => {
 
 // === ACCIONES RÁPIDAS MASIVAS ===
 function getPendientes() {
-  return PRODUCTOS.filter(p => p.codigo_barras && !fueImpresa(p.codigo_barras));
+  return PRODUCTOS.filter(p => p.codigo_barras && !fueImpresa(p));
 }
 
 function getImpresas() {
-  return PRODUCTOS.filter(p => p.codigo_barras && fueImpresa(p.codigo_barras));
+  return PRODUCTOS.filter(p => p.codigo_barras && fueImpresa(p));
 }
 function getTodas() {
   return PRODUCTOS.filter(p => p.codigo_barras);

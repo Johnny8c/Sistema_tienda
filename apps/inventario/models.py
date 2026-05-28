@@ -127,6 +127,11 @@ class EtiquetaImpresa(models.Model):
     codigo_barras    = models.CharField(max_length=100, unique=True, db_index=True)
     total_impresas   = models.PositiveIntegerField(default=0)
     ultima_impresion = models.DateTimeField()
+    # Snapshot del stock que tenía la variante al marcar como impresa. Sirve
+    # para detectar "faltantes": si hoy el producto tiene stock=8 pero al
+    # imprimir tenía stock=5, faltan 3 etiquetas para las nuevas unidades.
+    # NULL = registro previo a esta feature; la app lo trata como "todo impreso".
+    stock_al_imprimir = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name        = 'Etiqueta impresa'
