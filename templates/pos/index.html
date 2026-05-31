@@ -86,6 +86,19 @@
   .total-bar-label { color: #94A3B8; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
   .total-bar-value { color: #fff; font-size: 24px; font-weight: 700; }
 
+  .desglose-factura {
+    background: #1E293B; border-radius: 10px 10px 0 0;
+    padding: 12px 20px 14px; margin-top: 16px; margin-bottom: -10px;
+    border-bottom: 1px dashed #334155;
+  }
+  .desglose-factura + .total-bar { margin-top: 0; border-radius: 0 0 10px 10px; }
+  .desglose-row {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 13px; color: #CBD5E1;
+  }
+  .desglose-row + .desglose-row { margin-top: 6px; }
+  .desglose-row span:last-child { font-weight: 600; color: #fff; }
+
   .btn-cobrar {
     width: 100%; padding: 13px; border-radius: 10px;
     background: #4F46E5; border: none; color: #fff;
@@ -286,6 +299,18 @@
             <input type="number" id="monto-recibido" class="form-control" step="0.01" min="0" placeholder="0.00">
           </div>
           <div class="mt-1 text-end fw-semibold" id="cambio-display" style="font-size:13px;min-height:18px"></div>
+        </div>
+      </div>
+
+      <!-- Desglose factura SRI (solo visible al emitir factura) -->
+      <div id="desglose-factura" class="desglose-factura" style="display:none">
+        <div class="desglose-row">
+          <span>Subtotal</span>
+          <span id="subtotal-pos">$0.00</span>
+        </div>
+        <div class="desglose-row">
+          <span id="iva-label">IVA {{ iva_porcentaje }}%</span>
+          <span id="iva-pos">$0.00</span>
         </div>
       </div>
 
@@ -801,9 +826,31 @@ function setCantidad(i, val) {
 }
 function quitarItem(i) { carrito.splice(i,1); renderCarrito(); }
 
+const IVA_PCT = {{ iva_porcentaje }};
+
+/* Calcula los montos según si se emite factura.
+   Los precios del carrito son la base (sin IVA); al facturar el IVA se suma. */
+function calcularTotales() {
+  const base = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
+  const facturar = document.getElementById('emitir-factura').checked;
+  const iva = facturar ? base * (IVA_PCT/100) : 0;
+  return { base, iva, total: base + iva, facturar };
+}
+
 function actualizarTotal() {
-  const total = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
+  const { base, iva, total, facturar } = calcularTotales();
   document.getElementById('total-pos').textContent = '$' + total.toFixed(2);
+
+  const desglose = document.getElementById('desglose-factura');
+  if (facturar) {
+    document.getElementById('subtotal-pos').textContent = '$' + base.toFixed(2);
+    document.getElementById('iva-pos').textContent = '$' + iva.toFixed(2);
+    document.getElementById('iva-label').textContent = 'IVA ' + IVA_PCT + '%';
+    desglose.style.display = '';
+  } else {
+    desglose.style.display = 'none';
+  }
+
   document.getElementById('btn-cobrar').disabled = !carrito.length;
   calcularCambio();
 }
@@ -851,7 +898,7 @@ function actualizarUI() {
 /* ─── CAMBIO ──────────────────────────────────────── */
 document.getElementById('monto-recibido').addEventListener('input', calcularCambio);
 function calcularCambio() {
-  const total = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
+  const { total } = calcularTotales();
   const recibido = parseDecimalInput(document.getElementById('monto-recibido').value)||0;
   const div = document.getElementById('cambio-display');
   if (recibido > 0) {
@@ -947,7 +994,10 @@ function actualizarFacturaToggle() {
   }
 }
 
-document.getElementById('emitir-factura').addEventListener('change', actualizarFacturaToggle);
+document.getElementById('emitir-factura').addEventListener('change', () => {
+  actualizarFacturaToggle();
+  actualizarTotal();
+});
 
 function renderResultadosCli(q) {
   cliResults.innerHTML = '';

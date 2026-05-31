@@ -345,6 +345,11 @@ def pos(request):
         }
         for cliente in clientes
     ]
+
+    from apps.facturacion.models import ConfiguracionSRI
+    cfg_sri = ConfiguracionSRI.get_singleton()
+    iva_porcentaje = cfg_sri.iva_porcentaje if cfg_sri else 15
+
     return render(
         request,
         'pos/index.html',
@@ -352,6 +357,7 @@ def pos(request):
             'clientes': clientes,
             'clientes_data': clientes_data,
             'productos_data': _productos_data(),
+            'iva_porcentaje': iva_porcentaje,
         },
     )
 

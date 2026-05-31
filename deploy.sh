@@ -7,7 +7,7 @@ set -e
 echo "=== Sistema_tienda Deploy ==="
 
 # 1. Traer última versión del repo
-git pull origin main
+git pull origin aws-deploy
 
 # 2. Rebuild y reiniciar el contenedor Django
 echo ">> Restarting Django container..."
