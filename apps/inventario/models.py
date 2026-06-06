@@ -140,3 +140,20 @@ class EtiquetaImpresa(models.Model):
 
     def __str__(self):
         return f'{self.codigo_barras} (×{self.total_impresas})'
+
+    @staticmethod
+    def descontar_por_venta(codigo_barras, cantidad):
+        """Al vender unidades, la etiqueta física impresa se va con el producto.
+        Reduce el snapshot `stock_al_imprimir` para que, si más tarde se repone
+        stock, esas unidades nuevas se detecten como 'faltan etiquetas'.
+
+        Sin esto, vender la última unidad y recargar stock al mismo nivel dejaba
+        `stock_al_imprimir >= stock` y el sistema la mostraba como 'Impresa',
+        cuando en realidad la etiqueta ya no existe.
+        """
+        if not codigo_barras or cantidad <= 0:
+            return
+        ei = EtiquetaImpresa.objects.filter(codigo_barras=codigo_barras).first()
+        if ei and ei.stock_al_imprimir:
+            ei.stock_al_imprimir = max(0, ei.stock_al_imprimir - cantidad)
+            ei.save(update_fields=['stock_al_imprimir'])

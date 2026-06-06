@@ -191,6 +191,8 @@ def completar_adelanto(adelanto_id: int, vendedor: Usuario) -> Venta:
         producto.stock -= item.cantidad
         producto.stock_reservado -= item.cantidad
         producto.save(update_fields=['stock', 'stock_reservado'])
+        from apps.inventario.models import EtiquetaImpresa
+        EtiquetaImpresa.descontar_por_venta(producto.codigo_barras, item.cantidad)
 
     adelanto.estado = Adelanto.COMPLETADO
     adelanto.save(update_fields=['estado'])
@@ -282,6 +284,8 @@ def crear_venta_credito(cliente_id: int, items: list,
         )
         producto.stock -= cantidad
         producto.save(update_fields=['stock'])
+        from apps.inventario.models import EtiquetaImpresa
+        EtiquetaImpresa.descontar_por_venta(producto.codigo_barras, cantidad)
 
     fecha_vencimiento = None
     if plazo_dias:
