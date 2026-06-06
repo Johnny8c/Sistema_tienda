@@ -40,8 +40,15 @@ def lista_ventas(request):
     fecha_desde = request.GET.get('desde', '')
     fecha_hasta = request.GET.get('hasta', '')
     tipo_pago   = request.GET.get('tipo_pago', '')
+    comprobante = request.GET.get('comprobante', '')
     vendedor_id = request.GET.get('vendedor', '')
     q           = request.GET.get('q', '').strip()
+
+    from apps.facturacion.models import FacturaSRI
+    if comprobante == 'factura':
+        qs = qs.filter(factura_sri__estado=FacturaSRI.AUTORIZADA)
+    elif comprobante == 'nota_venta':
+        qs = qs.exclude(factura_sri__estado=FacturaSRI.AUTORIZADA)
 
     if fecha_desde:
         try:
@@ -74,7 +81,6 @@ def lista_ventas(request):
     # IVA cobrado: solo de ventas con factura SRI autorizada (el total base
     # NO se modifica; el IVA se muestra aparte).
     from apps.facturacion.reporting import iva_cobrado
-    from apps.facturacion.models import FacturaSRI
     iva_filtrado = iva_cobrado(qs)
 
     # Desglose del rango filtrado: cuánto se vendió con factura SRI autorizada
@@ -107,6 +113,7 @@ def lista_ventas(request):
         'fecha_desde':    fecha_desde,
         'fecha_hasta':    fecha_hasta,
         'tipo_pago':      tipo_pago,
+        'comprobante':    comprobante,
         'vendedor_id':    vendedor_id,
         'q':              q,
         'vendedores':     vendedores,

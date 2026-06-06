@@ -70,13 +70,21 @@
 <div class="card mb-3">
   <div class="card-body" style="padding:14px 16px !important">
     <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label fw-semibold" style="font-size:12px">Desde</label>
         <input type="date" name="desde" value="{{ fecha_desde }}" class="form-control">
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label fw-semibold" style="font-size:12px">Hasta</label>
         <input type="date" name="hasta" value="{{ fecha_hasta }}" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label fw-semibold" style="font-size:12px">Comprobante</label>
+        <select name="comprobante" class="form-select">
+          <option value="">Todos</option>
+          <option value="factura"     {% if comprobante == 'factura' %}selected{% endif %}>Facturas (SRI)</option>
+          <option value="nota_venta"  {% if comprobante == 'nota_venta' %}selected{% endif %}>Notas de venta</option>
+        </select>
       </div>
       <div class="col-md-2">
         <label class="form-label fw-semibold" style="font-size:12px">Tipo</label>
