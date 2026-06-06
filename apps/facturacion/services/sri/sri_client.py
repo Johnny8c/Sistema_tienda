@@ -6,6 +6,7 @@ import base64
 import re
 import time
 import requests
+import xml.etree.ElementTree as ET
 
 ENDPOINTS = {
     'pruebas': {
@@ -62,6 +63,41 @@ def _extract_all_tags(xml, tag):
     return [m.strip() for m in re.findall(pattern, xml or '', flags=re.IGNORECASE)]
 
 
+def _local(tag):
+    """Nombre local de un tag ElementTree, sin el namespace {...}."""
+    return tag.rsplit('}', 1)[-1]
+
+
+def _parse_mensajes(xml_str):
+    """Extrae los mensajes de error del SRI con un parser XML real.
+
+    La respuesta del SRI anida dos <mensaje>: el bloque de error (que tiene
+    <identificador>) contiene un <mensaje> de texto y un <informacionAdicional>.
+    Una regex no-greedy cortaba en el primer </mensaje> y perdía el
+    informacionAdicional (que dice EXACTAMENTE qué elemento falla). Acá
+    recorremos el árbol y tomamos solo los bloques que tienen <identificador>.
+    """
+    out = []
+    try:
+        root = ET.fromstring(xml_str or '')
+    except ET.ParseError:
+        return out
+    for el in root.iter():
+        if _local(el.tag) != 'mensaje':
+            continue
+        hijos = {_local(c.tag): (c.text or '').strip() for c in el}
+        if 'identificador' not in hijos:
+            continue  # es el <mensaje> de texto interno, no el bloque de error
+        texto = hijos.get('mensaje', '')
+        info  = hijos.get('informacionAdicional', '')
+        out.append({
+            'tipo':          hijos.get('tipo') or 'ERROR',
+            'mensaje':       f'{texto}: {info}' if info else texto,
+            'identificador': hijos.get('identificador', ''),
+        })
+    return out
+
+
 def enviar_comprobante(xml_firmado: str, ambiente: str, timeout=30, retry_delays=None):
     """
     Envía el XML firmado al SRI (recepción).
@@ -98,15 +134,7 @@ def enviar_comprobante(xml_firmado: str, ambiente: str, timeout=30, retry_delays
 
     data = res['data']
     estado = _extract_tag(data, 'estado') or 'ERROR'
-    mensajes = []
-    for m in _extract_all_tags(data, 'mensaje'):
-        texto = _extract_tag(m, 'mensaje') or m
-        info  = _extract_tag(m, 'informacionAdicional')
-        mensajes.append({
-            'tipo':          _extract_tag(m, 'tipo') or 'ERROR',
-            'mensaje':       f'{texto}: {info}' if info else texto,
-            'identificador': _extract_tag(m, 'identificador') or '',
-        })
+    mensajes = _parse_mensajes(data)
     return {'estado': estado, 'contingencia': False, 'mensajes': mensajes, 'raw': data}
 
 
@@ -151,13 +179,7 @@ def consultar_autorizacion(clave_acceso: str, ambiente: str, timeout=30, retry_d
     numero_autorizacion = _extract_tag(aut_xml, 'numeroAutorizacion')
     fecha_autorizacion  = _extract_tag(aut_xml, 'fechaAutorizacion')
 
-    mensajes = []
-    for m in _extract_all_tags(aut_xml, 'mensaje'):
-        mensajes.append({
-            'tipo':          _extract_tag(m, 'tipo') or 'ERROR',
-            'mensaje':       _extract_tag(m, 'mensaje') or m,
-            'identificador': _extract_tag(m, 'identificador') or '',
-        })
+    mensajes = _parse_mensajes(aut_xml)
 
     return {
         'estado':              estado,
