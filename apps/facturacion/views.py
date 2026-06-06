@@ -197,8 +197,11 @@ def _crear_factura_desde_venta(venta, usuario, cfg):
     iva_valor    = Decimal('0')
     items_factura = []
     for idx, iv in enumerate(items_venta):
-        # Precio unitario sin IVA (4 decimales = max del campo y del XML SRI)
-        precio_base_unit = (Decimal(str(iv.precio_unitario)) / factor_con_iva).quantize(Decimal('0.0001'))
+        # Precio unitario sin IVA, redondeado a 2 decimales. El SRI rechaza
+        # precioUnitario con más de 2 decimales ("ARCHIVO NO CUMPLE ESTRUCTURA
+        # XML") y exige que precioUnitario × cantidad == precioTotalSinImpuesto.
+        # Con 2 decimales el producto es exacto y el XML pasa la validación.
+        precio_base_unit = (Decimal(str(iv.precio_unitario)) / factor_con_iva).quantize(Decimal('0.01'))
         base = _round_money(precio_base_unit * Decimal(str(iv.cantidad)))
         # IVA por ítem (igual cálculo que xml_generator) — al sumar nos da el
         # iva_valor total. Así detalles y totales del XML coinciden exacto.
