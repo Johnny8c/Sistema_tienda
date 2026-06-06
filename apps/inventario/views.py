@@ -395,6 +395,20 @@ def api_buscar_codigo(request):
 
 # ── Etiquetas pegables ────────────────────────────────────────
 
+def _construir_impresas_data():
+    """Historial de impresión por código de barras (compartido entre devices)."""
+    data = {}
+    for r in EtiquetaImpresa.objects.values(
+        'codigo_barras', 'total_impresas', 'ultima_impresion', 'stock_al_imprimir'
+    ):
+        data[r['codigo_barras']] = {
+            'ts': int(r['ultima_impresion'].timestamp() * 1000),
+            'total': r['total_impresas'],
+            'stock_al_imprimir': r['stock_al_imprimir'],
+        }
+    return data
+
+
 @login_required
 def imprimir_etiquetas(request):
     """Página para configurar e imprimir lotes de etiquetas pegables.
@@ -443,15 +457,7 @@ def imprimir_etiquetas(request):
     # Historial de impresión (compartido entre dispositivos). Antes vivía en
     # localStorage del navegador, por eso la PC central y el celular mostraban
     # porcentajes distintos. Ahora viene de la BD y todos ven lo mismo.
-    impresas_data = {}
-    for r in EtiquetaImpresa.objects.values('codigo_barras', 'total_impresas', 'ultima_impresion', 'stock_al_imprimir'):
-        impresas_data[r['codigo_barras']] = {
-            # ts en milisegundos epoch — compatible con Date.now() de JS
-            'ts': int(r['ultima_impresion'].timestamp() * 1000),
-            'total': r['total_impresas'],
-            # Snapshot del stock al marcar; el JS lo usa para calcular faltantes
-            'stock_al_imprimir': r['stock_al_imprimir'],
-        }
+    impresas_data = _construir_impresas_data()
 
     return render(request, 'inventario/etiquetas.html', {
         'productos_data': productos_data,
@@ -530,6 +536,28 @@ def api_etiquetas_marcar_impresas(request):
             'stock_al_imprimir': obj.stock_al_imprimir,
         }
     return JsonResponse({'ok': True, 'impresas': resultados})
+
+
+@login_required
+def api_etiquetas_estado(request):
+    """Estado actual de impresión + stock, para refresco automático entre
+    dispositivos. Permite que la PC se actualice sola cuando en el celular se
+    marcan etiquetas (o cuando se vende/ajusta stock) sin recargar la página."""
+    if not request.user.puede_gestionar_inventario():
+        return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
+    stocks = {}
+    for p in (Producto.objects.filter(activo=True)
+              .exclude(codigo_barras__isnull=True).exclude(codigo_barras='')
+              .values('codigo_barras', 'stock', 'stock_reservado')):
+        stocks[p['codigo_barras']] = {
+            'stock': p['stock'],
+            'disp':  p['stock'] - p['stock_reservado'],
+        }
+    return JsonResponse({
+        'ok': True,
+        'impresas': _construir_impresas_data(),
+        'stocks':   stocks,
+    })
 
 
 @login_required

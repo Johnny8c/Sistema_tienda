@@ -1191,7 +1191,11 @@ const URL_MARCAR             = "{% url 'api_etiquetas_marcar' %}";
 const URL_REINICIAR          = "{% url 'api_etiquetas_reiniciar' %}";
 const URL_IMPORTAR           = "{% url 'api_etiquetas_importar' %}";
 const URL_MARCAR_PENDIENTE   = "{% url 'api_etiquetas_marcar_pendiente' %}";
+const URL_ETIQUETAS_ESTADO   = "{% url 'api_etiquetas_estado' %}";
 let _imprCache = JSON.parse(document.getElementById('etiquetas-impresas-data').textContent || '{}');
+// Contador de marcados en vuelo: el refresco automático no pisa el estado
+// optimista mientras un POST de "marcar impresas" está pendiente.
+let _marcandoImpresas = 0;
 
 // === MIGRACIÓN ONE-SHOT: localStorage → servidor ===
 // Antes del fix, el historial vivía en localStorage de cada navegador. Al
@@ -1287,6 +1291,7 @@ function marcarImpresas(productos) {
     items.push({ codigo_barras: codigo, cantidad });
   });
   if (!items.length) return Promise.resolve();
+  _marcandoImpresas++;
   return fetch(URL_MARCAR, {
     method: 'POST',
     credentials: 'same-origin',
@@ -1304,6 +1309,7 @@ function marcarImpresas(productos) {
         Object.assign(_imprCache, resp.impresas);
       }
     })
+    .finally(() => { _marcandoImpresas--; })
     .catch(() => {
       // Revertimos el optimismo: restauramos el estado previo de cada código
       Object.keys(snapshot).forEach(codigo => {
@@ -2183,6 +2189,65 @@ renderQuickActionCounts();
 // Migración del historial viejo (localStorage) al servidor. Solo se dispara
 // la primera vez en cada navegador; en el resto de cargas es un no-op.
 _migrarLocalStorageAlServidor();
+
+/* ── REFRESCO AUTOMÁTICO ENTRE DISPOSITIVOS ──────────────────────────
+   Cada 12s consultamos el estado de impresión y stock en el servidor. Si
+   otro dispositivo (ej. el celular) marcó etiquetas, o se vendió/ajustó
+   stock, lo reflejamos sin que el usuario tenga que recargar (F5). Solo
+   re-renderiza cuando detecta un cambio real, para no interrumpir el scroll
+   ni la lectura. No corre si la pestaña está oculta, si hay una impresión
+   en curso, o si hay un marcado optimista en vuelo. */
+async function refrescarEstadoEtiquetas() {
+  if (document.visibilityState !== 'visible') return;
+  if (printCountdownActive || _marcandoImpresas > 0) return;
+  let data;
+  try {
+    const r = await fetch(URL_ETIQUETAS_ESTADO, { credentials: 'same-origin' });
+    if (!r.ok) return;
+    data = await r.json();
+  } catch (e) { return; }
+  if (!data || !data.ok) return;
+
+  let cambio = false;
+
+  // 1) Historial de impresión (marcados desde otros dispositivos)
+  const nuevo = data.impresas || {};
+  for (const codigo in nuevo) {
+    const a = _imprCache[codigo], b = nuevo[codigo];
+    if (!a || a.total !== b.total || a.stock_al_imprimir !== b.stock_al_imprimir) {
+      cambio = true; break;
+    }
+  }
+  if (!cambio) {
+    // ¿Se borró algún código (reset desde otro dispositivo)?
+    for (const codigo in _imprCache) {
+      if (!(codigo in nuevo)) { cambio = true; break; }
+    }
+  }
+  if (cambio) _imprCache = nuevo;
+
+  // 2) Stock (ventas / ajustes desde otros dispositivos) → afecta faltantes
+  const stocks = data.stocks || {};
+  PRODUCTOS.forEach(p => {
+    const s = p.codigo_barras && stocks[p.codigo_barras];
+    if (s && (p.stock !== s.stock || p.stock_disponible !== s.disp)) {
+      p.stock = s.stock;
+      p.stock_disponible = s.disp;
+      cambio = true;
+    }
+  });
+
+  if (cambio) {
+    renderProgreso();
+    renderResultados();
+    renderQuickActionCounts();
+  }
+}
+
+setInterval(refrescarEstadoEtiquetas, 12000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refrescarEstadoEtiquetas();
+});
 
 /* ═══════════════════════════════════════════════════════════════════
    PEGAR LISTA — selección masiva desde texto pegado
