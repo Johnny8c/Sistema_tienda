@@ -74,7 +74,17 @@ def lista_ventas(request):
     # IVA cobrado: solo de ventas con factura SRI autorizada (el total base
     # NO se modifica; el IVA se muestra aparte).
     from apps.facturacion.reporting import iva_cobrado
+    from apps.facturacion.models import FacturaSRI
     iva_filtrado = iva_cobrado(qs)
+
+    # Desglose del rango filtrado: cuánto se vendió con factura SRI autorizada
+    # vs nota de venta (misma definición que iva_cobrado). Suman total_filtrado.
+    total_facturado   = qs.aggregate(
+        t=Sum('total', filter=Q(factura_sri__estado=FacturaSRI.AUTORIZADA))
+    )['t'] or 0
+    total_notas_venta = total_filtrado - total_facturado
+    num_facturado     = qs.filter(factura_sri__estado=FacturaSRI.AUTORIZADA).count()
+    num_notas         = cant_filtrado - num_facturado
 
     # Paginación: 50 ventas por página
     paginator = Paginator(qs, 50)
@@ -90,6 +100,10 @@ def lista_ventas(request):
         'total_filtrado': total_filtrado,
         'cant_filtrado':  cant_filtrado,
         'iva_filtrado':   iva_filtrado,
+        'total_facturado':   total_facturado,
+        'total_notas_venta': total_notas_venta,
+        'num_facturado':     num_facturado,
+        'num_notas':         num_notas,
         'fecha_desde':    fecha_desde,
         'fecha_hasta':    fecha_hasta,
         'tipo_pago':      tipo_pago,

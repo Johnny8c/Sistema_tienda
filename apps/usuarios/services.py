@@ -64,9 +64,16 @@ def datos_dashboard_dueno():
 
     # IVA cobrado (solo ventas con factura SRI autorizada). Informativo:
     # NO se suma a las ventas, que siguen en precio base.
-    from apps.facturacion.reporting import iva_cobrado
+    from apps.facturacion.reporting import iva_cobrado, total_facturado
     iva_cobrado_hoy = iva_cobrado(ventas_hoy_qs)
     iva_cobrado_mes = iva_cobrado(ventas_mes_qs)
+
+    # Desglose facturas vs notas de venta (misma regla que iva_cobrado).
+    # Cada par suma su total respectivo (mes -> total_ventas_mes, hoy -> hoy).
+    facturado_mes   = total_facturado(ventas_mes_qs)
+    notas_venta_mes = total_ventas_mes - facturado_mes
+    facturado_hoy   = total_facturado(ventas_hoy_qs)
+    notas_venta_hoy = total_ventas_hoy - facturado_hoy
 
     # Por cobrar / adelantos
     total_por_cobrar = (Deuda.objects.filter(estado=Deuda.PENDIENTE)
@@ -131,6 +138,10 @@ def datos_dashboard_dueno():
         'total_ventas_mes':   total_ventas_mes,
         'iva_cobrado_hoy':    iva_cobrado_hoy,
         'iva_cobrado_mes':    iva_cobrado_mes,
+        'facturado_mes':      facturado_mes,
+        'notas_venta_mes':    notas_venta_mes,
+        'facturado_hoy':      facturado_hoy,
+        'notas_venta_hoy':    notas_venta_hoy,
         'total_por_cobrar':   total_por_cobrar,
         'adelantos_activos':  adelantos_activos,
         'total_en_adelantos': total_en_adelantos,

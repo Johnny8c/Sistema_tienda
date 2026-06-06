@@ -829,12 +829,14 @@ function quitarItem(i) { carrito.splice(i,1); renderCarrito(); }
 const IVA_PCT = {{ iva_porcentaje }};
 
 /* Calcula los montos según si se emite factura.
-   Los precios del carrito son la base (sin IVA); al facturar el IVA se suma. */
+   Los precios del carrito YA INCLUYEN el IVA: el total nunca cambia.
+   Al facturar se desglosa hacia adentro -> base = total / (1+IVA), iva = total - base. */
 function calcularTotales() {
-  const base = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
+  const total = carrito.reduce((s,i) => s + i.precio*i.cantidad, 0);
   const facturar = document.getElementById('emitir-factura').checked;
-  const iva = facturar ? base * (IVA_PCT/100) : 0;
-  return { base, iva, total: base + iva, facturar };
+  const base = facturar ? total / (1 + IVA_PCT/100) : total;
+  const iva = facturar ? total - base : 0;
+  return { base, iva, total, facturar };
 }
 
 function actualizarTotal() {

@@ -63,6 +63,26 @@
   </div>
 </div>
 
+<!-- Desglose del contado: facturas SRI vs notas de venta -->
+<div class="row g-3 mb-4">
+  <div class="col-6">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(79,70,229,.12);color:#4F46E5"><i class="bi bi-receipt-cutoff"></i></div>
+      <div class="kpi-label">Vendido por facturas (SRI)</div>
+      <div class="kpi-value text-money">${{ total_facturado|floatformat:2 }}</div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:4px">{{ num_facturado }} factura{{ num_facturado|pluralize }} autorizada{{ num_facturado|pluralize }}</div>
+    </div>
+  </div>
+  <div class="col-6">
+    <div class="kpi-card">
+      <div class="kpi-icon" style="background:rgba(2,132,199,.12);color:#0284C7"><i class="bi bi-card-text"></i></div>
+      <div class="kpi-label">Vendido por notas de venta</div>
+      <div class="kpi-value text-money">${{ total_notas_venta|floatformat:2 }}</div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:4px">{{ num_notas }} nota{{ num_notas|pluralize }} de venta</div>
+    </div>
+  </div>
+</div>
+
 {% if reembolsos %}
 <!-- Reembolsos (salidas de dinero) -->
 <div class="card mb-3" style="border-left:4px solid #E11D48">

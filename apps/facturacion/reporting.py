@@ -28,3 +28,15 @@ def iva_cobrado(ventas_qs):
             filter=Q(factura_sri__estado=FacturaSRI.AUTORIZADA),
         )
     )['v'] or Decimal('0')
+
+
+def total_facturado(ventas_qs):
+    """Suma del total de ventas con factura SRI AUTORIZADA (lo 'facturado').
+
+    Misma regla de negocio que `iva_cobrado`: solo cuentan las facturas
+    autorizadas. El resto del total de `ventas_qs` son notas de venta.
+    Devuelve siempre un Decimal.
+    """
+    return ventas_qs.aggregate(
+        v=Sum('total', filter=Q(factura_sri__estado=FacturaSRI.AUTORIZADA))
+    )['v'] or Decimal('0')

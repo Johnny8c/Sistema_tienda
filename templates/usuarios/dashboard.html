@@ -146,6 +146,30 @@
   </div>
 </div>
 
+<!-- ── DESGLOSE DEL MES: facturas vs notas de venta ───────────── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-6">
+    <div class="mini-kpi mini-kpi-row">
+      <div class="mini-kpi-icon" style="background:rgba(79,70,229,.12);color:#4F46E5"><i class="bi bi-receipt-cutoff"></i></div>
+      <div>
+        <div class="mini-kpi-label">Facturas del mes (SRI)</div>
+        <div class="mini-kpi-value text-money">${{ facturado_mes|floatformat:2 }}</div>
+        <div class="mini-kpi-sub">Hoy: ${{ facturado_hoy|floatformat:2 }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-6">
+    <div class="mini-kpi mini-kpi-row">
+      <div class="mini-kpi-icon" style="background:rgba(2,132,199,.12);color:#0284C7"><i class="bi bi-card-text"></i></div>
+      <div>
+        <div class="mini-kpi-label">Notas de venta del mes</div>
+        <div class="mini-kpi-value text-money">${{ notas_venta_mes|floatformat:2 }}</div>
+        <div class="mini-kpi-sub">Hoy: ${{ notas_venta_hoy|floatformat:2 }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ── MINI KPIs (4 secundarios) ──────────────────────────────── -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">

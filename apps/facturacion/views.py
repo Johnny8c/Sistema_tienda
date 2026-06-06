@@ -188,14 +188,18 @@ def _crear_factura_desde_venta(venta, usuario, cfg):
     items_venta = list(venta.items.select_related('producto').all())
     iva_pct = cfg.iva_porcentaje
     iva_factor = Decimal(iva_pct) / Decimal(100)
+    factor_con_iva = Decimal(1) + iva_factor
 
-    # Suponemos que todos aplican IVA por defecto (configurable después)
+    # Los precios de venta YA INCLUYEN el IVA. Desglosamos hacia adentro:
+    # base = precio / (1 + IVA), de modo que base + iva == precio (el total no cambia).
     subtotal_iva = Decimal('0')
     subtotal_0   = Decimal('0')
     iva_valor    = Decimal('0')
     items_factura = []
     for idx, iv in enumerate(items_venta):
-        base = _round_money(Decimal(str(iv.precio_unitario)) * Decimal(str(iv.cantidad)))
+        # Precio unitario sin IVA (4 decimales = max del campo y del XML SRI)
+        precio_base_unit = (Decimal(str(iv.precio_unitario)) / factor_con_iva).quantize(Decimal('0.0001'))
+        base = _round_money(precio_base_unit * Decimal(str(iv.cantidad)))
         # IVA por ítem (igual cálculo que xml_generator) — al sumar nos da el
         # iva_valor total. Así detalles y totales del XML coinciden exacto.
         iva_item = _round_money(base * iva_factor)
@@ -203,7 +207,7 @@ def _crear_factura_desde_venta(venta, usuario, cfg):
             'orden':           idx + 1,
             'descripcion':     str(iv.producto)[:300],
             'cantidad':        Decimal(str(iv.cantidad)),
-            'precio_unitario': Decimal(str(iv.precio_unitario)),
+            'precio_unitario': precio_base_unit,
             'descuento':       Decimal('0'),
             'aplica_iva':      True,
             'subtotal':        base,
@@ -356,7 +360,13 @@ def _emitir_factura(request, factura, cfg):
         factura.es_contingencia = True
         factura.sri_respuesta = f'CONTINGENCIA: {rec["mensajes"][0]["mensaje"] if rec["mensajes"] else "SRI no disponible"}'
         factura.save(update_fields=['es_contingencia', 'sri_respuesta', 'sri_intentos_recepcion'])
-        messages.warning(request, 'SRI no disponible. Factura en modo contingencia — se reintentará.')
+        messages.warning(
+            request,
+            f'⚠️ El SRI está caído en este momento y no respondió. '
+            f'La factura {factura.numero_factura} quedó GUARDADA en modo contingencia '
+            f'y se autorizará automáticamente cuando el SRI vuelva. '
+            f'No la reemitas: ya quedó registrada.'
+        )
         return redirect('detalle_factura', pk=factura.pk)
 
     if rec['estado'] == 'DEVUELTA':
@@ -389,7 +399,12 @@ def _emitir_factura(request, factura, cfg):
     if aut['contingencia']:
         factura.sri_respuesta = 'Recibido por SRI — autorización pendiente'
         factura.save(update_fields=['sri_respuesta'])
-        messages.info(request, 'Comprobante enviado. La autorización está pendiente.')
+        messages.warning(
+            request,
+            f'⚠️ El SRI recibió la factura {factura.numero_factura} pero está caído '
+            f'para confirmar la autorización. Quedó PENDIENTE y se autorizará '
+            f'automáticamente cuando el SRI vuelva. No la reemitas.'
+        )
         return redirect('detalle_factura', pk=factura.pk)
 
     if aut['estado'] == 'AUTORIZADO':

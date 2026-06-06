@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -150,11 +150,24 @@ def cierre_caja(request):
     ).select_related('vendedor')
 
     from apps.facturacion.reporting import iva_cobrado
+    from apps.facturacion.models import FacturaSRI
     total_contado = ventas_contado.aggregate(t=Sum('total'))['t'] or Decimal('0')
     # IVA cobrado del día (solo ventas contado con factura SRI autorizada).
     # No entra en total_dia: el efectivo en caja es el base; el IVA se
     # informa aparte para conciliación tributaria.
     total_iva_cobrado = iva_cobrado(ventas_contado)
+
+    # Desglose del contado: cuánto se vendió con factura SRI autorizada vs
+    # nota de venta (misma definición de "facturado" que iva_cobrado). Las
+    # facturas pendientes/contingencia aún cuentan como nota hasta autorizarse.
+    total_facturado = ventas_contado.aggregate(
+        t=Sum('total', filter=Q(factura_sri__estado=FacturaSRI.AUTORIZADA))
+    )['t'] or Decimal('0')
+    total_notas_venta = total_contado - total_facturado
+    num_facturado = ventas_contado.filter(
+        factura_sri__estado=FacturaSRI.AUTORIZADA
+    ).count()
+    num_notas = ventas_contado.count() - num_facturado
     total_abonos_adelanto = abonos_adelanto.aggregate(t=Sum('monto'))['t'] or Decimal('0')
     total_abonos_deuda = abonos_deuda.aggregate(t=Sum('monto'))['t'] or Decimal('0')
     total_reembolsos = reembolsos.aggregate(t=Sum('monto'))['t'] or Decimal('0')   # negativo
@@ -181,6 +194,10 @@ def cierre_caja(request):
         'total_reembolsos': total_reembolsos,
         'total_dia': total_dia,
         'total_iva_cobrado': total_iva_cobrado,
+        'total_facturado': total_facturado,
+        'total_notas_venta': total_notas_venta,
+        'num_facturado': num_facturado,
+        'num_notas': num_notas,
         'ventas_por_vendedor': por_vendedor(ventas_contado, 'total'),
         'abonos_por_vendedor': {
             k: v for k, v in {
