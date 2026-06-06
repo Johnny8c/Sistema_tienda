@@ -2009,21 +2009,29 @@ function getTodas() {
   return PRODUCTOS.filter(p => p.codigo_barras);
 }
 
+// Suma las ETIQUETAS que realmente se imprimirían (unidades por variante),
+// no la cantidad de variantes. Es lo que termina saliendo en el PDF.
+function contarEtiquetas(productos) {
+  return productos.reduce((s, p) => s + resolverCantidad(p), 0);
+}
+
 function renderQuickActionCounts() {
   const pendientes = getPendientes();
   const impresas = getImpresas();
   const todas = getTodas();
 
+  // Botones "Agregar al carrito" → cuentan VARIANTES (lo que se agrega).
   document.getElementById('qa-pendientes-count').textContent = pendientes.length;
   document.getElementById('qa-pendientes').disabled = pendientes.length === 0;
   document.getElementById('qa-busqueda-count').textContent = ultimasMatches.length;
   document.getElementById('qa-busqueda').disabled = ultimasMatches.length === 0;
 
-  document.getElementById('qp-pendientes-count').textContent = pendientes.length;
+  // Botones "Imprimir X" → cuentan ETIQUETAS (coincide con el PDF que sale).
+  document.getElementById('qp-pendientes-count').textContent = contarEtiquetas(pendientes);
   document.getElementById('qp-pendientes').disabled = pendientes.length === 0;
-  document.getElementById('qp-todo-count').textContent = todas.length;
+  document.getElementById('qp-todo-count').textContent = contarEtiquetas(todas);
   document.getElementById('qp-todo').disabled = todas.length === 0;
-  document.getElementById('qp-reimprimir-count').textContent = impresas.length;
+  document.getElementById('qp-reimprimir-count').textContent = contarEtiquetas(impresas);
   document.getElementById('qp-reimprimir').disabled = impresas.length === 0;
 }
 
