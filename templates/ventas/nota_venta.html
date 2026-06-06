@@ -114,7 +114,19 @@
         </tbody>
       </table>
 
-      <div style="border-top:2px solid #0F172A;margin-top:8px;padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <!-- Desglose IVA incluido (el precio ya contiene el IVA) -->
+      <div style="border-top:1px dashed #E2E8F0;margin-top:8px;padding-top:10px">
+        <div class="d-flex justify-content-between" style="font-size:13px;color:#64748B;margin-bottom:4px">
+          <span>Subtotal</span>
+          <span>${{ nota_subtotal|floatformat:2 }}</span>
+        </div>
+        <div class="d-flex justify-content-between" style="font-size:13px;color:#64748B">
+          <span>IVA {{ nota_iva_pct }}% (incluido)</span>
+          <span>${{ nota_iva|floatformat:2 }}</span>
+        </div>
+      </div>
+
+      <div style="border-top:2px solid #0F172A;margin-top:10px;padding-top:12px;display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700;font-size:15px;text-transform:uppercase;letter-spacing:.03em">TOTAL</span>
         <span style="font-weight:700;font-size:20px">${{ venta.total|floatformat:2 }}</span>
       </div>

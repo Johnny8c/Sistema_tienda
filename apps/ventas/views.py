@@ -17,7 +17,23 @@ def nota_venta(request, pk):
     if not request.user.es_dueno() and venta.vendedor_id != request.user.pk:
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden('No tienes permiso para ver esta venta.')
-    return render(request, 'ventas/nota_venta.html', {'venta': venta})
+
+    # Desglose del IVA INCLUIDO en el total (el precio ya lo contiene):
+    # subtotal = total / (1 + IVA), iva = total - subtotal. El total no cambia.
+    from decimal import Decimal
+    from apps.facturacion.models import ConfiguracionSRI
+    cfg_sri = ConfiguracionSRI.get_singleton()
+    iva_pct = cfg_sri.iva_porcentaje if cfg_sri else 15
+    factor  = Decimal(1) + Decimal(iva_pct) / Decimal(100)
+    subtotal = (Decimal(str(venta.total)) / factor).quantize(Decimal('0.01'))
+    iva      = Decimal(str(venta.total)) - subtotal
+
+    return render(request, 'ventas/nota_venta.html', {
+        'venta':         venta,
+        'nota_subtotal': subtotal,
+        'nota_iva':      iva,
+        'nota_iva_pct':  iva_pct,
+    })
 
 
 @login_required
