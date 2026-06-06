@@ -157,3 +157,17 @@ class EtiquetaImpresa(models.Model):
         if ei and ei.stock_al_imprimir:
             ei.stock_al_imprimir = max(0, ei.stock_al_imprimir - cantidad)
             ei.save(update_fields=['stock_al_imprimir'])
+
+    @staticmethod
+    def sincronizar_con_stock(codigo_barras, stock):
+        """Al ajustar el stock manualmente no pueden quedar más unidades
+        'etiquetadas' que unidades en existencia. Si `stock_al_imprimir` supera
+        el nuevo stock, lo bajamos. Así, si después se repone stock, las
+        etiquetas faltantes se cuentan bien (no quedan unidades viejas
+        'fantasma' que ya no existen pero seguían contando como impresas)."""
+        if not codigo_barras:
+            return
+        ei = EtiquetaImpresa.objects.filter(codigo_barras=codigo_barras).first()
+        if ei and ei.stock_al_imprimir is not None and ei.stock_al_imprimir > stock:
+            ei.stock_al_imprimir = stock
+            ei.save(update_fields=['stock_al_imprimir'])

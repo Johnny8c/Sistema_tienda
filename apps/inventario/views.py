@@ -302,6 +302,10 @@ def ajustar_stock(request, pk):
         else:
             producto.stock = int(nuevo_stock)
             producto.save()
+            # Mantener coherente el contador de etiquetas: no pueden quedar más
+            # unidades "ya etiquetadas" que el stock real, o un reabastecimiento
+            # posterior imprimiría de menos.
+            EtiquetaImpresa.sincronizar_con_stock(producto.codigo_barras, producto.stock)
             messages.success(request, f'Stock actualizado a {nuevo_stock}.')
         if producto.catalogo:
             return redirect('detalle_producto', pk=producto.catalogo.pk)
