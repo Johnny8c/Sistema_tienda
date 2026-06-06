@@ -1425,7 +1425,7 @@ function resolverCantidad(producto) {
     const faltan = faltantesEtiqueta(producto);
     if (faltan > 0) return faltan;
     // Ya está todo impreso pero igual lo seleccionaste — al menos 1.
-    return Math.max(1, producto.stock_disponible || producto.stock || 1);
+    return Math.max(1, producto.stock || 1);
   }
   return parseInt(cantidadPorDefecto) || 1;
 }
@@ -1511,7 +1511,7 @@ function renderResultados() {
   });
 
   // Resumen del header: catálogos · variantes · stock
-  const stockTotal = matches.reduce((s, p) => s + (p.stock_disponible || 0), 0);
+  const stockTotal = matches.reduce((s, p) => s + (p.stock || 0), 0);
   document.getElementById('inv-count').innerHTML =
     `<b>${grupos.size}</b> producto${grupos.size!==1?'s':''} · <b>${matches.length}</b> variante${matches.length!==1?'s':''}`;
   document.getElementById('inv-stock-total').innerHTML = stockTotal > 0
@@ -1531,7 +1531,7 @@ function renderResultados() {
   // Render con grupos
   let html = '';
   for (const grupo of grupos.values()) {
-    const stockGrupo = grupo.variantes.reduce((s, v) => s + (v.stock_disponible || 0), 0);
+    const stockGrupo = grupo.variantes.reduce((s, v) => s + (v.stock || 0), 0);
     const pendientesGrupo = grupo.variantes.filter(v => !fueImpresa(v)).length;
     const grupoStatus = pendientesGrupo === 0
       ? `<span class="impr-badge ok" style="margin-left:6px"><i class="bi bi-check-all"></i>Todas impresas</span>`
@@ -1586,9 +1586,11 @@ function renderResultados() {
       const yaSeleccionado = seleccionados.get(p.id);
       const counter = yaSeleccionado
         ? `<span class="pr-counter">×${yaSeleccionado.cantidad}</span>` : '';
-      const stockDisp = p.stock_disponible || 0;
-      const stockBtn = stockDisp > 0
-        ? `<button type="button" class="pr-add-stock" onclick="agregarConStock(${p.id}, event)" title="Agregar ${stockDisp} etiquetas (= stock disponible)">+${stockDisp} stock</button>`
+      // Etiquetas = unidades FÍSICAS (stock total). Las reservadas en apartados
+      // siguen en la tienda y también necesitan etiqueta, igual que faltantes.
+      const stockTot = p.stock || 0;
+      const stockBtn = stockTot > 0
+        ? `<button type="button" class="pr-add-stock" onclick="agregarConStock(${p.id}, event)" title="Agregar ${stockTot} etiquetas (1 por unidad en stock)">+${stockTot} stock</button>`
         : `<button type="button" class="pr-add-stock" disabled title="Sin stock">Sin stock</button>`;
 
       html += `
@@ -1670,7 +1672,7 @@ function agregarConStock(id, evento) {
   if (evento) { evento.preventDefault(); evento.stopPropagation(); }
   const p = PRODUCTOS.find(x => x.id === id);
   if (!p) return;
-  const stock = Math.max(1, p.stock_disponible || p.stock || 1);
+  const stock = Math.max(1, p.stock || 1);
   agregarSeleccionado(id, stock);
 }
 
@@ -2439,7 +2441,7 @@ function _refrescarResumenPorDia() {
     return;
   }
   const variantes = _variantesDelDia(fecha);
-  const stock = variantes.reduce((s, p) => s + (p.stock_disponible || 0), 0);
+  const stock = variantes.reduce((s, p) => s + (p.stock || 0), 0);
   if (!variantes.length) {
     resumen.innerHTML = `<span style="color:#B45309"><i class="bi bi-info-circle me-1"></i>No hay productos ingresados el ${fecha}.</span>`;
     btn.disabled = true;
