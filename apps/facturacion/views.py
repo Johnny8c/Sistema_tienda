@@ -294,6 +294,32 @@ def _emitir_factura(request, factura, cfg):
     cliente = factura.cliente
     items   = list(factura.items.all())
 
+    # Defensa SRI (error 35, cvc-fractionDigits): precioUnitario debe ir a 2
+    # decimales y cumplir precioUnitario × cantidad == precioTotalSinImpuesto.
+    # Facturas creadas antes del fix de 2 decimales tenían precio_unitario con
+    # 4 decimales (ej. 30.434800) y eran rechazadas al reemitir. Acá
+    # renormalizamos ítems y totales (no-op si ya están a 2 decimales).
+    _iva_factor = Decimal(factura.iva_porcentaje or 15) / Decimal(100)
+    _sub_iva = Decimal('0')
+    _iva_val = Decimal('0')
+    for _it in items:
+        _pu2  = _round_money(_it.precio_unitario)
+        _sub2 = _round_money(_pu2 * Decimal(str(_it.cantidad)))
+        if _pu2 != _it.precio_unitario or _sub2 != _it.subtotal:
+            _it.precio_unitario = _pu2
+            _it.subtotal = _sub2
+            _it.save(update_fields=['precio_unitario', 'subtotal'])
+        if _it.aplica_iva:
+            _sub_iva += _sub2
+            _iva_val += _round_money(_sub2 * _iva_factor)
+    _total = _round_money(Decimal(str(factura.subtotal_0 or 0)) + _sub_iva + _iva_val)
+    if (_sub_iva != factura.subtotal_iva or _iva_val != factura.iva_valor
+            or _total != factura.total):
+        factura.subtotal_iva = _sub_iva
+        factura.iva_valor = _iva_val
+        factura.total = _total
+        factura.save(update_fields=['subtotal_iva', 'iva_valor', 'total'])
+
     # Descifrar .p12
     try:
         p12_b64     = descifrar_dato(cfg.certificado_p12)
