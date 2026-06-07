@@ -413,6 +413,31 @@ def _construir_impresas_data():
     return data
 
 
+def _construir_productos_data():
+    """Lista de variantes activas con código de barras para la pantalla de
+    etiquetas. Reutilizado por la carga inicial y por el refresco automático."""
+    productos = (Producto.objects.filter(activo=True)
+                 .select_related('catalogo')
+                 .order_by('catalogo__nombre', 'talla', 'color'))
+    data = []
+    for p in productos:
+        data.append({
+            'id': p.pk,
+            'catalogo_id': p.catalogo_id,
+            'nombre': p.catalogo.nombre if p.catalogo else p.nombre,
+            'categoria': (p.catalogo.categoria.nombre if p.catalogo and p.catalogo.categoria else ''),
+            'talla': p.talla,
+            'color': p.color,
+            'precio': str(p.precio),
+            'stock': p.stock,
+            'stock_disponible': p.stock_disponible,
+            'codigo_barras': p.codigo_barras or '',
+            # Fecha de ingreso (local America/Guayaquil) para filtrar "por día"
+            'creado': timezone.localtime(p.creado_en).strftime('%Y-%m-%d') if p.creado_en else '',
+        })
+    return data
+
+
 @login_required
 def imprimir_etiquetas(request):
     """Página para configurar e imprimir lotes de etiquetas pegables.
@@ -429,26 +454,7 @@ def imprimir_etiquetas(request):
     producto_id = request.GET.get('producto')
     variante_id = request.GET.get('variante')
 
-    productos = (Producto.objects.filter(activo=True)
-                 .select_related('catalogo')
-                 .order_by('catalogo__nombre', 'talla', 'color'))
-
-    productos_data = []
-    for p in productos:
-        productos_data.append({
-            'id': p.pk,
-            'catalogo_id': p.catalogo_id,
-            'nombre': p.catalogo.nombre if p.catalogo else p.nombre,
-            'categoria': (p.catalogo.categoria.nombre if p.catalogo and p.catalogo.categoria else ''),
-            'talla': p.talla,
-            'color': p.color,
-            'precio': str(p.precio),
-            'stock': p.stock,
-            'stock_disponible': p.stock_disponible,
-            'codigo_barras': p.codigo_barras or '',
-            # Fecha de ingreso (local America/Guayaquil) para filtrar "por día"
-            'creado': timezone.localtime(p.creado_en).strftime('%Y-%m-%d') if p.creado_en else '',
-        })
+    productos_data = _construir_productos_data()
 
     logo_url = ''
     if cfg and cfg.logo:
@@ -544,23 +550,17 @@ def api_etiquetas_marcar_impresas(request):
 
 @login_required
 def api_etiquetas_estado(request):
-    """Estado actual de impresión + stock, para refresco automático entre
-    dispositivos. Permite que la PC se actualice sola cuando en el celular se
-    marcan etiquetas (o cuando se vende/ajusta stock) sin recargar la página."""
+    """Estado actual para el refresco automático entre dispositivos: lista
+    completa de variantes (incluye las NUEVAS y refleja stock) + progreso de
+    impresión. Permite que la PC se actualice sola cuando en el celular se
+    marcan etiquetas, se vende/ajusta stock o se agregan variantes/categorías,
+    sin recargar la página."""
     if not request.user.puede_gestionar_inventario():
         return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
-    stocks = {}
-    for p in (Producto.objects.filter(activo=True)
-              .exclude(codigo_barras__isnull=True).exclude(codigo_barras='')
-              .values('codigo_barras', 'stock', 'stock_reservado')):
-        stocks[p['codigo_barras']] = {
-            'stock': p['stock'],
-            'disp':  p['stock'] - p['stock_reservado'],
-        }
     return JsonResponse({
         'ok': True,
-        'impresas': _construir_impresas_data(),
-        'stocks':   stocks,
+        'productos': _construir_productos_data(),
+        'impresas':  _construir_impresas_data(),
     })
 
 

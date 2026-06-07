@@ -2236,16 +2236,36 @@ async function refrescarEstadoEtiquetas() {
   }
   if (cambio) _imprCache = nuevo;
 
-  // 2) Stock (ventas / ajustes desde otros dispositivos) → afecta faltantes
-  const stocks = data.stocks || {};
-  PRODUCTOS.forEach(p => {
-    const s = p.codigo_barras && stocks[p.codigo_barras];
-    if (s && (p.stock !== s.stock || p.stock_disponible !== s.disp)) {
-      p.stock = s.stock;
-      p.stock_disponible = s.disp;
-      cambio = true;
+  // 2) Productos: variantes NUEVAS (agregadas desde otro dispositivo),
+  //    cambios de stock (ventas/ajustes/compras) y variantes desactivadas.
+  const prods = Array.isArray(data.productos) ? data.productos : null;
+  if (prods) {
+    const porId = {};
+    PRODUCTOS.forEach(p => { porId[p.id] = p; });
+    const idsServidor = new Set(prods.map(p => p.id));
+
+    // Agregar nuevas y actualizar stock de las existentes
+    prods.forEach(np => {
+      const ex = porId[np.id];
+      if (!ex) {
+        PRODUCTOS.push(np);          // variante nueva → aparece en vivo
+        cambio = true;
+      } else if (ex.stock !== np.stock || ex.stock_disponible !== np.stock_disponible) {
+        ex.stock = np.stock;
+        ex.stock_disponible = np.stock_disponible;
+        cambio = true;
+      }
+    });
+
+    // Quitar las que ya no están activas (desactivadas en otro dispositivo)
+    for (let i = PRODUCTOS.length - 1; i >= 0; i--) {
+      if (!idsServidor.has(PRODUCTOS[i].id)) {
+        seleccionados.delete(PRODUCTOS[i].id);
+        PRODUCTOS.splice(i, 1);
+        cambio = true;
+      }
     }
-  });
+  }
 
   if (cambio) {
     renderProgreso();
