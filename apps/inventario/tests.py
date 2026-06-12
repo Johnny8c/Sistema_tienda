@@ -276,6 +276,59 @@ class EtiquetasIngresoMercaderiaTest(TestCase):
             f'etiquetas faltantes (la pantalla daría {_faltantes(p, impresas)})',
         )
 
+    def test_por_dia_de_ingreso_incluye_reposiciones_de_stock(self):
+        """El filtro "Por día de ingreso" debe encontrar también las variantes
+        que recibieron stock ese día (ajuste al alza o compra), no solo las
+        creadas ese día."""
+        from datetime import timedelta
+        from apps.proveedores.models import Proveedor
+
+        hoy = timezone.localdate().strftime('%Y-%m-%d')
+
+        # Variante creada hace 10 días (la retro-fechamos)
+        prod = self._crear_producto(f'{MARCA} Reposición Día', None, stock=5)
+        v = prod.variantes.first()
+        Producto.objects.filter(pk=v.pk).update(
+            creado_en=timezone.now() - timedelta(days=10))
+
+        def dato(codigo):
+            productos, _ = self._estado_etiquetas()
+            return next(x for x in productos if x['codigo_barras'] == codigo)
+
+        # Bajar stock NO es un ingreso
+        self._ajustar_stock(v, 3)
+        p = dato(v.codigo_barras)
+        self.assertEqual(p['ingreso'], '', 'Bajar stock no debe contar como ingreso')
+        self.assertNotEqual(p['creado'], hoy)
+
+        # Subir stock SÍ: la variante debe aparecer bajo el día de hoy
+        self._ajustar_stock(v, 12)
+        p = dato(v.codigo_barras)
+        self.assertEqual(
+            p['ingreso'], hoy,
+            'La reposición por ajuste manual no quedó registrada como ingreso del día',
+        )
+
+        # También al recibir mercadería por compra a proveedor
+        prod2 = self._crear_producto(f'{MARCA} Compra Día', None, stock=2)
+        v2 = prod2.variantes.first()
+        Producto.objects.filter(pk=v2.pk).update(
+            creado_en=timezone.now() - timedelta(days=5), ultimo_ingreso_stock=None)
+        proveedor = Proveedor.objects.create(nombre=f'{MARCA} Proveedor Día')
+        r = self.client.post(reverse('crear_compra'), {
+            'proveedor_id': str(proveedor.pk),
+            'fecha': hoy,
+            'items_json': json.dumps([
+                {'producto_id': v2.pk, 'cantidad': 4, 'precio_unitario': '3.00'},
+            ]),
+        })
+        self.assertEqual(r.status_code, 302)
+        p2 = dato(v2.codigo_barras)
+        self.assertEqual(
+            p2['ingreso'], hoy,
+            'La compra a proveedor no quedó registrada como ingreso del día',
+        )
+
     def _buscar_inventario(self, q):
         """Nombres de catálogo que devuelve la búsqueda del inventario."""
         r = self.client.get(reverse('lista_inventario'), {'q': q})

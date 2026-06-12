@@ -1151,7 +1151,8 @@
       <div class="modal-body">
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">
           Elegí una fecha y se seleccionan todas las variantes con código de
-          barras que fueron <b>ingresadas ese día</b>.
+          barras que fueron <b>ingresadas ese día</b>: tanto las creadas como
+          las que recibieron <b>reposición de stock</b> (ajuste o compra).
         </p>
         <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
           <input type="date" id="por-dia-fecha" class="form-control" style="max-width:190px">
@@ -2444,8 +2445,9 @@ document.getElementById('btn-procesar-lista').addEventListener('click', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
-   POR DÍA DE INGRESO — selecciona todas las variantes creadas en una
-   fecha. Usa el campo `creado` (YYYY-MM-DD local) que envía la vista.
+   POR DÍA DE INGRESO — selecciona las variantes que ingresaron ese día:
+   creadas (`creado`) O con reposición de stock (`ingreso`), ambos
+   YYYY-MM-DD local enviados por la vista.
    ═══════════════════════════════════════════════════════════════════ */
 function _fechaLocalISO(offsetDias) {
   const d = new Date();
@@ -2457,7 +2459,8 @@ function _fechaLocalISO(offsetDias) {
 }
 
 function _variantesDelDia(fecha) {
-  return PRODUCTOS.filter(p => p.codigo_barras && p.creado === fecha);
+  return PRODUCTOS.filter(p =>
+    p.codigo_barras && (p.creado === fecha || p.ingreso === fecha));
 }
 
 function _refrescarResumenPorDia() {

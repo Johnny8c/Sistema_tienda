@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db import transaction
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 from apps.usuarios.decorators import requiere_dueno, requiere_no_vendedor
 from apps.inventario.models import Producto, EtiquetaImpresa
 from .models import Proveedor, Compra, ItemCompra
@@ -145,7 +146,9 @@ def crear_compra(request):
                     # unidades recibidas cuenten como etiquetas faltantes.
                     EtiquetaImpresa.materializar_legacy(prod.codigo_barras, prod.stock)
                     prod.stock += cantidad
-                    prod.save(update_fields=['stock'])
+                    # Registrar el ingreso para "Por día de ingreso" de etiquetas
+                    prod.ultimo_ingreso_stock = timezone.now()
+                    prod.save(update_fields=['stock', 'ultimo_ingreso_stock'])
                     total += precio * cantidad
 
                 compra.total = total

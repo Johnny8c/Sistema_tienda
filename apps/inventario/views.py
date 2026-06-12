@@ -363,7 +363,12 @@ def ajustar_stock(request, pk):
             # (registro legacy con NULL), fijarlo al stock previo para que
             # las unidades que entren con este ajuste cuenten como faltantes.
             EtiquetaImpresa.materializar_legacy(producto.codigo_barras, producto.stock)
-            producto.stock = int(nuevo_stock)
+            nuevo = int(nuevo_stock)
+            if nuevo > producto.stock:
+                # Reposición: registrar el ingreso para que la variante
+                # aparezca en "Por día de ingreso" de etiquetas.
+                producto.ultimo_ingreso_stock = timezone.now()
+            producto.stock = nuevo
             producto.save()
             # Mantener coherente el contador de etiquetas: no pueden quedar más
             # unidades "ya etiquetadas" que el stock real, o un reabastecimiento
@@ -495,8 +500,11 @@ def _construir_productos_data():
             'stock': p.stock,
             'stock_disponible': p.stock_disponible,
             'codigo_barras': p.codigo_barras or '',
-            # Fecha de ingreso (local America/Guayaquil) para filtrar "por día"
+            # Fechas locales (America/Guayaquil) para el filtro "por día de
+            # ingreso": creación de la variante + última reposición de stock.
             'creado': timezone.localtime(p.creado_en).strftime('%Y-%m-%d') if p.creado_en else '',
+            'ingreso': (timezone.localtime(p.ultimo_ingreso_stock).strftime('%Y-%m-%d')
+                        if p.ultimo_ingreso_stock else ''),
         })
     return data
 

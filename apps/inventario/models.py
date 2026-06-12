@@ -93,6 +93,10 @@ class Producto(models.Model):
     stock_reservado = models.PositiveIntegerField(default=0)
     activo          = models.BooleanField(default=True)
     creado_en       = models.DateTimeField(auto_now_add=True)
+    # Última vez que ENTRÓ stock después de creada (ajuste al alza o compra a
+    # proveedor). Alimenta el filtro "Por día de ingreso" de etiquetas, que
+    # antes solo veía la fecha de creación y dejaba fuera las reposiciones.
+    ultimo_ingreso_stock = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name        = 'Producto'
