@@ -143,8 +143,6 @@ def crear_producto(request):
             color=color, talla=talla,
             precio=precio_var, stock=int(stock or 0),
         )
-        variante.codigo_barras = f'TDA-{variante.id:06d}'
-        variante.save(update_fields=['codigo_barras'])
 
         messages.success(request, f'Producto "{nombre}" creado con su primera variante.')
         return redirect('detalle_producto', pk=catalogo.pk)
@@ -245,8 +243,6 @@ def agregar_variante(request, catalogo_pk):
             color=color, talla=talla,
             precio=precio, stock=int(stock),
         )
-        variante.codigo_barras = f'TDA-{variante.id:06d}'
-        variante.save(update_fields=['codigo_barras'])
 
         messages.success(request, f'Variante {color} {talla} agregada.')
         return redirect('detalle_producto', pk=catalogo.pk)
@@ -300,6 +296,10 @@ def ajustar_stock(request, pk):
                 f'Hay {producto.stock_reservado} unidades reservadas en apartados activos.'
             )
         else:
+            # Si la variante se etiquetó antes de que existiera el snapshot
+            # (registro legacy con NULL), fijarlo al stock previo para que
+            # las unidades que entren con este ajuste cuenten como faltantes.
+            EtiquetaImpresa.materializar_legacy(producto.codigo_barras, producto.stock)
             producto.stock = int(nuevo_stock)
             producto.save()
             # Mantener coherente el contador de etiquetas: no pueden quedar más
@@ -487,9 +487,16 @@ def imprimir_etiquetas(request):
 @require_POST
 def api_etiquetas_marcar_impresas(request):
     """Recibe {items:[{codigo_barras, cantidad}, ...]} y registra las
-    impresiones. Suma a total_impresas y actualiza ultima_impresion."""
+    impresiones. Suma a total_impresas y actualiza ultima_impresion.
+
+    `stock_al_imprimir` se ACUMULA (etiquetadas previas + las recién
+    impresas, tope el stock actual) en vez de pisarse con el stock completo.
+    Pisarlo hacía que imprimir 5 etiquetas de una variante con 10 unidades
+    marcara las 10 como etiquetadas y las otras 5 desaparecieran del conteo
+    de faltantes."""
     import json
-    from django.db.models import F
+    from django.db.models import F, Value
+    from django.db.models.functions import Coalesce, Least
 
     if not request.user.puede_gestionar_inventario():
         return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
@@ -529,15 +536,20 @@ def api_etiquetas_marcar_impresas(request):
             defaults={
                 'total_impresas': cant,
                 'ultima_impresion': ahora,
-                'stock_al_imprimir': stock_actual,
+                'stock_al_imprimir': min(stock_actual, cant),
             },
         )
         if not creado:
-            # F() para sumar sin race condition entre devices simultáneos
+            # F() para sumar sin race condition entre devices simultáneos.
+            # Coalesce: un registro legacy (snapshot NULL) se trata como
+            # "stock completo etiquetado", igual que hace el frontend.
             EtiquetaImpresa.objects.filter(pk=obj.pk).update(
                 total_impresas=F('total_impresas') + cant,
                 ultima_impresion=ahora,
-                stock_al_imprimir=stock_actual,
+                stock_al_imprimir=Least(
+                    Coalesce(F('stock_al_imprimir'), Value(stock_actual)) + Value(cant),
+                    Value(stock_actual),
+                ),
             )
             obj.refresh_from_db(fields=['total_impresas', 'stock_al_imprimir'])
         resultados[codigo] = {
@@ -624,6 +636,17 @@ def api_etiquetas_importar_localstorage(request):
     importadas = 0
     ya_existian = 0
     impresas = {}
+    # El historial viejo no traía snapshot de stock; lo fijamos al stock
+    # actual ("todo lo de hoy ya tiene etiqueta") en vez de dejar NULL.
+    # Un NULL haría invisible cualquier reposición futura de esa variante.
+    stocks_import = dict(
+        Producto.objects
+        .filter(codigo_barras__in=[
+            (it.get('codigo_barras') or '').strip()
+            for it in items if it.get('codigo_barras')
+        ])
+        .values_list('codigo_barras', 'stock')
+    )
     for it in items:
         codigo = (it.get('codigo_barras') or '').strip()
         try:
@@ -645,7 +668,11 @@ def api_etiquetas_importar_localstorage(request):
 
         obj, creado = EtiquetaImpresa.objects.get_or_create(
             codigo_barras=codigo,
-            defaults={'total_impresas': total, 'ultima_impresion': ult},
+            defaults={
+                'total_impresas': total,
+                'ultima_impresion': ult,
+                'stock_al_imprimir': stocks_import.get(codigo, 0),
+            },
         )
         if creado:
             importadas += 1

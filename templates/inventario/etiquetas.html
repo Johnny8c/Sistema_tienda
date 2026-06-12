@@ -1284,9 +1284,18 @@ function marcarImpresas(productos) {
     const codigo = producto.codigo_barras;
     snapshot[codigo] = _imprCache[codigo] ? { ..._imprCache[codigo] } : null;
     const prev = _imprCache[codigo];
+    const stockActual = producto.stock || 0;
+    // Misma regla que el servidor: el snapshot ACUMULA (previas + impresas,
+    // tope el stock). Antes se omitía el campo y quedaba undefined, que el
+    // resto del JS trata como "todo impreso" — imprimir una parte hacía
+    // desaparecer las faltantes del conteo hasta recargar.
+    const prevEtiquetadas = (prev && prev.stock_al_imprimir != null)
+      ? prev.stock_al_imprimir
+      : (prev ? stockActual : 0);
     _imprCache[codigo] = {
       ts: ahora,
       total: (prev?.total || 0) + cantidad,
+      stock_al_imprimir: Math.min(stockActual, prevEtiquetadas + cantidad),
     };
     items.push({ codigo_barras: codigo, cantidad });
   });

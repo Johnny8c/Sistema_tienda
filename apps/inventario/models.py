@@ -115,6 +115,13 @@ class Producto(models.Model):
         if self.catalogo_id and not self.nombre:
             self.nombre = self.catalogo.nombre
         super().save(*args, **kwargs)
+        # Garantía a nivel de modelo: toda variante queda con código de barras,
+        # sin importar desde qué flujo se cree (vistas, seeds, imports). Una
+        # variante sin código es invisible en la pantalla de etiquetas y su
+        # stock no cuenta para etiquetas pendientes.
+        if not self.codigo_barras:
+            self.codigo_barras = f'TDA-{self.pk:06d}'
+            super().save(update_fields=['codigo_barras'])
 
 
 class EtiquetaImpresa(models.Model):
@@ -157,6 +164,22 @@ class EtiquetaImpresa(models.Model):
         if ei and ei.stock_al_imprimir:
             ei.stock_al_imprimir = max(0, ei.stock_al_imprimir - cantidad)
             ei.save(update_fields=['stock_al_imprimir'])
+
+    @staticmethod
+    def materializar_legacy(codigo_barras, stock_actual):
+        """Convierte un registro legacy (stock_al_imprimir=NULL, anterior a la
+        feature de snapshot) en uno concreto, usando el stock ANTES de un
+        aumento. NULL se interpreta como 'todo el stock de ese momento ya
+        tenía etiqueta'; al fijarlo en el stock previo, las unidades que
+        entren después cuentan como 'faltan etiquetas'. Sin esto, reponer
+        stock sobre una variante etiquetada antes de la feature perdía las
+        etiquetas nuevas en silencio (el caso real de '100 prendas, 95
+        etiquetas'). Llamar ANTES de subir el stock."""
+        if not codigo_barras:
+            return
+        (EtiquetaImpresa.objects
+         .filter(codigo_barras=codigo_barras, stock_al_imprimir__isnull=True)
+         .update(stock_al_imprimir=stock_actual))
 
     @staticmethod
     def sincronizar_con_stock(codigo_barras, stock):

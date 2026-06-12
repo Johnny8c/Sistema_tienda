@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.views.decorators.http import require_POST
 from apps.usuarios.decorators import requiere_dueno, requiere_no_vendedor
-from apps.inventario.models import Producto
+from apps.inventario.models import Producto, EtiquetaImpresa
 from .models import Proveedor, Compra, ItemCompra
 
 logger = logging.getLogger(__name__)
@@ -140,6 +140,10 @@ def crear_compra(request):
                         compra=compra, producto=prod,
                         cantidad=cantidad, precio_unitario=precio,
                     )
+                    # Si la variante tiene registro de etiquetas legacy
+                    # (snapshot NULL), fijarlo al stock previo para que las
+                    # unidades recibidas cuenten como etiquetas faltantes.
+                    EtiquetaImpresa.materializar_legacy(prod.codigo_barras, prod.stock)
                     prod.stock += cantidad
                     prod.save(update_fields=['stock'])
                     total += precio * cantidad
