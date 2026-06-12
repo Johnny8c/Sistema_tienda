@@ -86,7 +86,9 @@ class Deuda(models.Model):
     @property
     def dias_transcurridos(self):
         from django.utils import timezone
-        return (timezone.now().date() - self.fecha_creacion.date()).days
+        # Ambas fechas en hora de Ecuador; con .date() sobre UTC la antigüedad
+        # cambiaba de día a las 19:00 locales.
+        return (timezone.localdate() - timezone.localdate(self.fecha_creacion)).days
 
     @property
     def bucket_antiguedad(self):

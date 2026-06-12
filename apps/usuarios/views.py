@@ -130,7 +130,7 @@ def _dashboard_vendedor(request, vendedor, viendo_como_dueno=False):
     from apps.configuracion.models import ConfiguracionGeneral
     cfg = ConfiguracionGeneral.objects.first()
 
-    hoy = timezone.now().date()
+    hoy = timezone.localdate()  # fecha de Ecuador, no UTC (difieren tras las 19:00)
     inicio_mes = hoy.replace(day=1)
 
     ventas_hoy_qs    = Venta.objects.filter(vendedor=vendedor, fecha__date=hoy)
@@ -230,7 +230,7 @@ def _dashboard_bodeguero(request, bodeguero, viendo_como_dueno=False):
     cfg = ConfiguracionGeneral.objects.first()
     stock_minimo = cfg.stock_minimo_alerta if cfg else 5
 
-    hoy = timezone.now().date()
+    hoy = timezone.localdate()  # fecha de Ecuador, no UTC (difieren tras las 19:00)
 
     variantes_activas = Producto.objects.filter(activo=True)
     total_variantes  = variantes_activas.count()

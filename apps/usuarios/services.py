@@ -51,7 +51,7 @@ def datos_dashboard_dueno():
     stock_minimo = cfg.stock_minimo_alerta if cfg else 5
     dias_alerta = cfg.dias_alerta_vencimiento if cfg else 7
 
-    hoy = timezone.now().date()
+    hoy = timezone.localdate()  # fecha de Ecuador, no UTC (difieren tras las 19:00)
     inicio_mes = hoy.replace(day=1)
 
     # Ventas hoy / mes

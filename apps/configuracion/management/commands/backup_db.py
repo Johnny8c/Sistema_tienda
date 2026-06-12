@@ -89,7 +89,7 @@ class Command(BaseCommand):
         self.stdout.write(f'  Dump generado: {len(data):,} bytes')
 
         # 2. Comprimir a un archivo temporal
-        now = timezone.now()
+        now = timezone.localtime()  # hora de Ecuador en el nombre del backup
         stamp = now.strftime('%Y-%m-%d_%H%M%S')
         public_id = f'backup_{stamp}'
 

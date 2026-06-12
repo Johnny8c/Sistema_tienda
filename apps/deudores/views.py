@@ -96,7 +96,7 @@ def lista_adelantos(request):
     return render(
         request,
         'deudores/adelantos/lista.html',
-        {'adelantos': adelantos, 'q': q, 'estado': estado, 'hoy': timezone.now().date()},
+        {'adelantos': adelantos, 'q': q, 'estado': estado, 'hoy': timezone.localdate()},
     )
 
 
@@ -239,7 +239,7 @@ def lista_deudas(request):
     pendientes = qs.filter(estado=Deuda.PENDIENTE)
 
     def bucket_sum(dias_min, dias_max=None):
-        hoy = timezone.now().date()
+        hoy = timezone.localdate()
         total = Decimal('0')
         for deuda in pendientes:
             dias = (hoy - deuda.fecha_creacion.date()).days
@@ -260,7 +260,7 @@ def lista_deudas(request):
             'deudas': deudas,
             'q': q,
             'estado': estado,
-            'hoy': timezone.now().date(),
+            'hoy': timezone.localdate(),
             'bucket_0_30': bucket_sum(0, 30),
             'bucket_31_60': bucket_sum(31, 60),
             'bucket_61_90': bucket_sum(61, 90),

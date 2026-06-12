@@ -10,7 +10,10 @@ from apps.ventas.models import Venta
 
 
 def _hoy():
-    return timezone.now().date()
+    # localdate() = fecha en America/Guayaquil. Con now().date() (UTC), después
+    # de las 19:00 de Ecuador "hoy" ya era mañana y los reportes del día
+    # salían vacíos o con las ventas de la noche en el día equivocado.
+    return timezone.localdate()
 
 
 def _buckets_antiguedad(deudas_pendientes):

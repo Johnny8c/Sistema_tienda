@@ -6,6 +6,8 @@ import io
 from datetime import datetime
 from decimal import Decimal
 
+from django.utils import timezone
+
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
@@ -226,7 +228,10 @@ def generar_ride_pdf(factura, items, configuracion, cliente) -> bytes:
     # Fecha autorización + ambiente
     _text(c, right_x + 4, Y(header_top + 88), 'FECHA Y HORA AUTORIZACIÓN',
           font='Helvetica', size=6.5, color='#888888')
-    fecha_aut = factura.sri_fecha_autorizacion.strftime('%d/%m/%Y %H:%M:%S') if factura.sri_fecha_autorizacion else '—'
+    # localtime: el SRI devuelve la fecha en UTC-aware; sin convertir, el RIDE
+    # mostraba la hora de otra región (UTC, +5h respecto a Ecuador).
+    fecha_aut = (timezone.localtime(factura.sri_fecha_autorizacion).strftime('%d/%m/%Y %H:%M:%S')
+                 if factura.sri_fecha_autorizacion else '—')
     _text(c, right_x + 4, Y(header_top + 98), fecha_aut, font='Helvetica-Bold', size=7)
 
     half_r = (right_w - 8) / 2
@@ -375,7 +380,7 @@ def generar_ride_pdf(factura, items, configuracion, cliente) -> bytes:
     footer_y = MARGIN + 16
     _draw_line(c, MARGIN, footer_y, MARGIN + COL_W, footer_y)
     _text(c, MARGIN, footer_y - 8,
-          f'Documento generado por Sistema Tienda | {datetime.now().strftime("%d/%m/%Y %H:%M:%S")}',
+          f'Documento generado por Sistema Tienda | {timezone.localtime().strftime("%d/%m/%Y %H:%M:%S")}',
           font='Helvetica', size=6.5, color='#AAAAAA', max_w=COL_W, align='center')
 
     c.showPage()

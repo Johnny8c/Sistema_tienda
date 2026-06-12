@@ -126,7 +126,7 @@ def lista_facturas(request):
     from django.db.models import Sum, Count, Q
     from django.core.paginator import Paginator
     from django.utils import timezone
-    hoy = timezone.now().date()
+    hoy = timezone.localdate()  # fecha de Ecuador, no UTC (difieren tras las 19:00)
     base = FacturaSRI.objects.all()
     if not request.user.es_dueno():
         base = base.filter(creada_por=request.user)
