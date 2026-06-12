@@ -82,13 +82,23 @@ def aviso_pago_proveedor(request):
     else:
         nivel = 'info'         # >30 días (informativo, discreto)
 
+    # DEV_PAGO_MONTO acepta un número ("10.00" → "$10.00 USD") o texto libre
+    # ("Por definir en función al uso" → se muestra tal cual, sin $ ni moneda).
+    monto = (settings.DEV_PAGO_MONTO or '').strip()
+    try:
+        float(monto)
+        monto_display = f'${monto} {settings.DEV_PAGO_MONEDA}'.strip()
+    except ValueError:
+        monto_display = monto
+
     return {
         'aviso_pago': {
             'fecha': fecha_pago,
             'dias': dias,
             'dias_abs': abs(dias),
             'nivel': nivel,
-            'monto': settings.DEV_PAGO_MONTO,
+            'monto': monto,
+            'monto_display': monto_display,
             'moneda': settings.DEV_PAGO_MONEDA,
             'concepto': settings.DEV_PAGO_CONCEPTO,
             'contacto_nombre': settings.DEV_PAGO_CONTACTO_NOMBRE,

@@ -147,7 +147,7 @@
       {% endif %}
     </div>
     <div class="aviso-pago-detalle">
-      {% if aviso_pago.monto %}<b>${{ aviso_pago.monto }} {{ aviso_pago.moneda }}</b> · {% endif %}{{ aviso_pago.concepto }}
+      {% if aviso_pago.monto %}<b>{{ aviso_pago.monto_display }}</b> · {% endif %}{{ aviso_pago.concepto }}
       {% if aviso_pago.fecha %} · vence el <b>{{ aviso_pago.fecha|date:"d/m/Y" }}</b>{% endif %}
     </div>
   </div>
@@ -173,7 +173,7 @@
       </div>
       {% if aviso_pago.monto %}
       <div class="aviso-pago-modal-row">
-        <span>Monto:</span><b>${{ aviso_pago.monto }} {{ aviso_pago.moneda }}</b>
+        <span>Monto:</span><b>{{ aviso_pago.monto_display }}</b>
       </div>
       {% endif %}
       <div class="aviso-pago-modal-row">
