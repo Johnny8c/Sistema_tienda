@@ -33,6 +33,61 @@ def _validar_foto(request, foto):
 
 # ── Inventario (catálogo) ──────────────────────────────────
 
+def _normalizar_texto(s):
+    """minúsculas y sin acentos/ñ→n, para comparar como escribe la gente."""
+    import unicodedata
+    s = unicodedata.normalize('NFD', s or '')
+    return ''.join(c for c in s if unicodedata.category(c) != 'Mn').lower().strip()
+
+
+def _ids_por_similitud(q, pares):
+    """Búsqueda tolerante para el inventario. `pares` = [(id, nombre), ...].
+    Devuelve los ids que coinciden, ordenados por relevancia.
+
+    Coincide aunque: falten/sobren acentos ("pano"→"paño"), las palabras
+    vayan en otro orden ("bombacho paño"), o haya un error de tipeo leve
+    ("camiseta galeta"→"Camiseata galleta"). Antes era icontains literal y
+    solo encontraba lo escrito tal cual.
+    """
+    from difflib import SequenceMatcher
+
+    qn = _normalizar_texto(q)
+    tokens = qn.split()
+    if not tokens:
+        return [pk for pk, _ in pares]
+
+    puntuados = []
+    for pk, nombre in pares:
+        nn = _normalizar_texto(nombre)
+        if qn in nn:
+            # La frase completa aparece tal cual: máxima relevancia
+            puntuados.append((0, nn, pk))
+            continue
+        palabras = nn.split()
+        score = 0.0
+        for t in tokens:
+            if t in nn:
+                score += 1.0
+                continue
+            # Tipeo leve: comparar contra cada palabra del nombre. Solo para
+            # tokens de 4+ letras (en cortos como "de" daría falsos positivos).
+            mejor = 0.0
+            if len(t) >= 4:
+                mejor = max((SequenceMatcher(None, t, w).ratio() for w in palabras),
+                            default=0.0)
+            if mejor >= 0.75:
+                score += mejor
+            else:
+                score = -1.0  # un token no coincidió: descartar el producto
+                break
+        if score >= 0:
+            # 1 = menos prioritario que el match de frase; luego mayor score
+            puntuados.append((1, -score, nn, pk))
+
+    puntuados.sort(key=lambda x: x[:-1])
+    return [item[-1] for item in puntuados]
+
+
 @login_required
 def lista_inventario(request):
     from django.core.paginator import Paginator
@@ -42,14 +97,22 @@ def lista_inventario(request):
                     .select_related('categoria')
                     .prefetch_related('variantes')
                     .order_by('nombre'))
-    if q:
-        catalogos_qs = catalogos_qs.filter(nombre__icontains=q)
     if cat:
         catalogos_qs = catalogos_qs.filter(categoria_id=cat)
 
-    # Paginar a 60 catálogos por página. Antes cargábamos los 1142+ de una,
-    # generando HTML enorme + tirando muchas fotos de Cloudinary a la vez.
-    paginator = Paginator(catalogos_qs, 60)
+    if q:
+        # Búsqueda por similitud (acentos, orden de palabras, tipeo leve).
+        # Se resuelve en Python sobre (id, nombre) — son ~1100 catálogos, es
+        # barato y funciona igual en SQLite (dev) y PostgreSQL (prod).
+        ids = _ids_por_similitud(q, catalogos_qs.values_list('id', 'nombre'))
+        posicion = {pk: i for i, pk in enumerate(ids)}
+        objetos = sorted(catalogos_qs.filter(id__in=ids),
+                         key=lambda c: posicion[c.pk])
+        paginator = Paginator(objetos, 60)
+    else:
+        # Paginar a 60 catálogos por página. Antes cargábamos los 1142+ de una,
+        # generando HTML enorme + tirando muchas fotos de Cloudinary a la vez.
+        paginator = Paginator(catalogos_qs, 60)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     for c in page_obj:

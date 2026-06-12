@@ -12,7 +12,7 @@ Todos los datos llevan la marca "TEST" en el nombre.
 import json
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -62,6 +62,13 @@ def _contar_etiquetas_pendientes(productos, impresas):
     return pendientes, total
 
 
+# Storage de estáticos simple para tests: el manifest de whitenoise exige
+# collectstatic actualizado y rompe cualquier render de página completa con
+# "Missing staticfiles manifest entry" en entornos sin él.
+@override_settings(STORAGES={
+    'default':     {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+})
 class EtiquetasIngresoMercaderiaTest(TestCase):
     """Simula el ingreso real del señor: ~100 prendas TEST entre categoría
     nueva, variantes nuevas y aumentos de stock. Verifica que la pantalla
@@ -268,6 +275,38 @@ class EtiquetasIngresoMercaderiaTest(TestCase):
             'Las 6 unidades recibidas en la compra no aparecen como '
             f'etiquetas faltantes (la pantalla daría {_faltantes(p, impresas)})',
         )
+
+    def _buscar_inventario(self, q):
+        """Nombres de catálogo que devuelve la búsqueda del inventario."""
+        r = self.client.get(reverse('lista_inventario'), {'q': q})
+        self.assertEqual(r.status_code, 200)
+        return [c.nombre for c in r.context['catalogos']]
+
+    def test_busqueda_inventario_por_similitud(self):
+        """La búsqueda del inventario debe encontrar aunque falten acentos,
+        las palabras vayan en otro orden o haya un error de tipeo leve —
+        no solo cuando se escribe tal cual."""
+        self._crear_producto(f'{MARCA} Paño bombacho con cierre', None, stock=1)
+        self._crear_producto(f'{MARCA} Camiseata galleta de hombre', None, stock=1)
+        self._crear_producto(f'{MARCA} Vestido corto de piedras', None, stock=1)
+
+        casos = {
+            'sin acentos':        ('pano bombacho', 'Paño bombacho con cierre'),
+            'orden invertido':    ('bombacho paño', 'Paño bombacho con cierre'),
+            'tipeo leve':         ('camiseta galeta', 'Camiseata galleta de hombre'),
+            'palabras salteadas': ('vestido piedras', 'Vestido corto de piedras'),
+            'literal':            ('Vestido corto', 'Vestido corto de piedras'),
+        }
+        for nombre_caso, (q, esperado) in casos.items():
+            with self.subTest(caso=nombre_caso, q=q):
+                nombres = self._buscar_inventario(q)
+                self.assertTrue(
+                    any(esperado in n for n in nombres),
+                    f'Buscando "{q}" no apareció "{esperado}". Resultados: {nombres}',
+                )
+
+        # Y algo que no existe no debe traer resultados de relleno
+        self.assertEqual(self._buscar_inventario('zapatilla deportiva runner'), [])
 
     def test_venta_de_prenda_nueva_descuenta_etiqueta_pendiente(self):
         """Si entran 10 prendas y se venden 2 antes de imprimir, deben quedar
