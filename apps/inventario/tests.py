@@ -502,3 +502,22 @@ class BitacoraInventarioTest(TestCase):
         r = self.client.get(reverse('historial_inventario'), {'q': v.codigo_barras})
         self.assertTrue(all(v.codigo_barras == m.codigo_barras for m in r.context['movimientos']))
         self.assertGreaterEqual(r.context['total'], 1)
+
+    def test_filtro_por_varios_tipos_a_la_vez(self):
+        from apps.inventario.services import registrar_movimiento
+        cat = CatalogoProducto.objects.create(nombre=f'{MARCA} Multi', precio_base=10)
+        v = cat.variantes.create(nombre=f'{MARCA} Multi', precio=10, stock=5)
+        registrar_movimiento(v, MovimientoInventario.AJUSTE, stock_anterior=5, stock_nuevo=8, usuario=self.user)
+        registrar_movimiento(v, MovimientoInventario.COMPRA, stock_anterior=8, stock_nuevo=12, usuario=self.user)
+        registrar_movimiento(v, MovimientoInventario.VENTA, stock_anterior=12, stock_nuevo=10, usuario=self.user)
+
+        # Marcar dos tipos a la vez (?tipo=ajuste&tipo=compra)
+        r = self.client.get(reverse('historial_inventario'),
+                            {'tipo': [MovimientoInventario.AJUSTE, MovimientoInventario.COMPRA]})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.context['total'], 2)
+        tipos_result = {m.tipo for m in r.context['movimientos']}
+        self.assertEqual(tipos_result, {MovimientoInventario.AJUSTE, MovimientoInventario.COMPRA})
+        # Y el contexto refleja ambos como seleccionados (para marcar las casillas)
+        self.assertEqual(set(r.context['f_tipos']),
+                         {MovimientoInventario.AJUSTE, MovimientoInventario.COMPRA})

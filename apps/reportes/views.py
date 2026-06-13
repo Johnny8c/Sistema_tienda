@@ -58,14 +58,15 @@ def historial_inventario(request):
           .select_related('producto', 'usuario')
           .order_by('-creado_en', '-id'))
 
-    tipo = request.GET.get('tipo', '').strip()
+    # Tipo admite varios valores a la vez (?tipo=venta&tipo=compra).
+    tipos_sel = [t for t in request.GET.getlist('tipo') if t]
     q = request.GET.get('q', '').strip()
     desde = request.GET.get('desde', '').strip()
     hasta = request.GET.get('hasta', '').strip()
     usuario_id = request.GET.get('usuario', '').strip()
 
-    if tipo:
-        qs = qs.filter(tipo=tipo)
+    if tipos_sel:
+        qs = qs.filter(tipo__in=tipos_sel)
     if q:
         qs = qs.filter(Q(codigo_barras__icontains=q) | Q(nombre_producto__icontains=q))
     if usuario_id:
@@ -87,12 +88,19 @@ def historial_inventario(request):
                 .filter(movimientos_inventario__isnull=False)
                 .distinct().order_by('username'))
 
+    # Querystring base (sin 'page') para que la paginación conserve TODOS los
+    # filtros, incluidos los múltiples tipos.
+    params = request.GET.copy()
+    params.pop('page', None)
+    base_qs = params.urlencode()
+
     ctx = {
         'movimientos': page_obj, 'page_obj': page_obj,
         'total': total,
         'tipos': MovimientoInventario.TIPOS,
         'usuarios': usuarios,
-        'f_tipo': tipo, 'f_q': q, 'f_desde': desde, 'f_hasta': hasta, 'f_usuario': usuario_id,
+        'base_qs': base_qs,
+        'f_tipos': tipos_sel, 'f_q': q, 'f_desde': desde, 'f_hasta': hasta, 'f_usuario': usuario_id,
     }
     return render(request, 'reportes/historial_inventario.html', ctx)
 
