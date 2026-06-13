@@ -503,6 +503,32 @@ class BitacoraInventarioTest(TestCase):
         self.assertTrue(all(v.codigo_barras == m.codigo_barras for m in r.context['movimientos']))
         self.assertGreaterEqual(r.context['total'], 1)
 
+    def test_api_ingreso_dia_devuelve_solo_lo_ingresado(self):
+        """El endpoint de 'por día de ingreso' debe devolver las unidades que
+        ENTRARON ese día (deltas positivos), no el stock total. Una variante
+        repuesta de 21 a 22 debe dar 1, no 22."""
+        from apps.inventario.services import registrar_movimiento
+
+        cat = CatalogoProducto.objects.create(nombre=f'{MARCA} IngresoDia', precio_base=10)
+        # Repuesta hoy +1 (de 21 a 22): debe contar 1
+        v1 = cat.variantes.create(nombre=f'{MARCA} v1', precio=10, stock=22)
+        registrar_movimiento(v1, MovimientoInventario.AJUSTE, stock_anterior=21, stock_nuevo=22, usuario=self.user)
+        # Creada hoy con 3: debe contar 3
+        v2 = cat.variantes.create(nombre=f'{MARCA} v2', precio=10, stock=3)
+        registrar_movimiento(v2, MovimientoInventario.CREACION, stock_anterior=0, stock_nuevo=3, usuario=self.user)
+        # Una venta el mismo día NO cuenta como ingreso
+        registrar_movimiento(v1, MovimientoInventario.VENTA, stock_anterior=22, stock_nuevo=20, usuario=self.user)
+
+        from django.utils import timezone
+        hoy = timezone.localdate().strftime('%Y-%m-%d')
+        r = self.client.get(reverse('api_etiquetas_ingreso_dia'), {'fecha': hoy})
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data['ok'])
+        self.assertEqual(data['por_codigo'].get(v1.codigo_barras), 1)   # +1, NO 22
+        self.assertEqual(data['por_codigo'].get(v2.codigo_barras), 3)
+        self.assertEqual(data['total_unidades'], 4)
+
     def test_filtro_por_varios_tipos_a_la_vez(self):
         from apps.inventario.services import registrar_movimiento
         cat = CatalogoProducto.objects.create(nombre=f'{MARCA} Multi', precio_base=10)

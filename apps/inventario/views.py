@@ -679,6 +679,43 @@ def api_etiquetas_estado(request):
 
 
 @login_required
+def api_etiquetas_ingreso_dia(request):
+    """Unidades que INGRESARON en una fecha (local), por código de barras,
+    según la bitácora (MovimientoInventario): suma de los deltas POSITIVOS
+    de ese día (creación de variante, compra, ajuste al alza).
+
+    Lo usa 'Por día de ingreso' para imprimir SOLO lo que entró ese día —
+    no el stock total de la variante. Antes metía todo el stock al carrito
+    (una prenda repuesta de 21 a 22 imprimía 22 etiquetas en vez de 1)."""
+    from django.db.models import F
+    from django.utils.dateparse import parse_date
+
+    if not request.user.puede_gestionar_inventario():
+        return JsonResponse({'ok': False, 'mensaje': 'Sin permiso'}, status=403)
+
+    fecha = parse_date((request.GET.get('fecha', '') or '').strip())
+    if not fecha:
+        return JsonResponse({'ok': False, 'mensaje': 'Fecha inválida'}, status=400)
+
+    por_codigo = {}
+    movs = (MovimientoInventario.objects
+            .filter(creado_en__date=fecha, stock_nuevo__gt=F('stock_anterior'))
+            .values_list('codigo_barras', 'stock_anterior', 'stock_nuevo'))
+    for codigo, ant, nuevo in movs:
+        if not codigo:
+            continue
+        por_codigo[codigo] = por_codigo.get(codigo, 0) + (nuevo - ant)
+
+    return JsonResponse({
+        'ok': True,
+        'fecha': str(fecha),
+        'por_codigo': por_codigo,
+        'total_unidades': sum(por_codigo.values()),
+        'total_variantes': len(por_codigo),
+    })
+
+
+@login_required
 @require_POST
 def api_etiquetas_reiniciar_impresas(request):
     """Borra TODO el historial de impresión. Afecta a todos los dispositivos."""

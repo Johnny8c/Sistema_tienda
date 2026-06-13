@@ -23,6 +23,7 @@ urlpatterns = [
     path('etiquetas/api/importar/',        views.api_etiquetas_importar_localstorage, name='api_etiquetas_importar'),
     path('etiquetas/api/marcar-pendiente/',views.api_etiquetas_marcar_pendiente,      name='api_etiquetas_marcar_pendiente'),
     path('etiquetas/api/estado/',          views.api_etiquetas_estado,                name='api_etiquetas_estado'),
+    path('etiquetas/api/ingreso-dia/',     views.api_etiquetas_ingreso_dia,           name='api_etiquetas_ingreso_dia'),
     # Categorías
     path('categorias/',                     views.lista_categorias,    name='lista_categorias'),
     path('categorias/nueva/',               views.crear_categoria,     name='crear_categoria'),
