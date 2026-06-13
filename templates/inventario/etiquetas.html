@@ -2462,6 +2462,29 @@ function _fechaLocalISO(offsetDias) {
 
 // {codigo_barras: unidades que ingresaron en la fecha elegida} — de la bitácora
 let _ingresoDiaCache = {};
+// Items [{producto, cantidad}] que mostró el último resumen. El botón
+// "Agregar a la selección" usa EXACTAMENTE estos, sin recalcular, para que
+// lo que se agrega coincida siempre con lo que se vio.
+let _itemsDelDiaActual = [];
+
+// Agrega varias variantes con SU cantidad cada una, en un solo paso y con un
+// único render al final. Antes se llamaba agregarSeleccionado() en bucle y
+// cada iteración renderizaba; si un render intermedio fallaba, el bucle se
+// cortaba y solo entraba la primera variante.
+function _agregarItemsConCantidad(items) {
+  items.forEach(({ producto, cantidad }) => {
+    if (!producto || cantidad <= 0) return;
+    if (seleccionados.has(producto.id)) {
+      seleccionados.get(producto.id).cantidad += cantidad;
+    } else {
+      seleccionados.set(producto.id, { producto, cantidad });
+    }
+  });
+  renderSeleccionados();
+  renderPreview();
+  renderResultados();
+  renderQuickActionCounts();
+}
 
 async function _cargarIngresoDia(fecha) {
   try {
@@ -2517,6 +2540,7 @@ async function _refrescarResumenPorDia() {
   resumen.innerHTML = '<span style="color:var(--text-muted)"><i class="bi bi-hourglass-split me-1"></i>Calculando…</span>';
   _ingresoDiaCache = await _cargarIngresoDia(fecha);
   const items = _itemsIngresoDia(fecha);
+  _itemsDelDiaActual = items;   // lo que use el botón al agregar
   const totalEt = items.reduce((s, i) => s + i.cantidad, 0);
   if (!items.length || totalEt === 0) {
     resumen.innerHTML = `<span style="color:#B45309"><i class="bi bi-info-circle me-1"></i>No se registraron ingresos de stock el ${fecha}.</span>`;
@@ -2543,11 +2567,10 @@ document.getElementById('por-dia-ayer').addEventListener('click', () => {
 
 document.getElementById('btn-por-dia-agregar').addEventListener('click', () => {
   const fecha = document.getElementById('por-dia-fecha').value;
-  if (!fecha) return;
-  const items = _itemsIngresoDia(fecha);
-  if (!items.length) return;
-  // Agrega cada variante con SU cantidad del día (no el stock total)
-  items.forEach(({ producto, cantidad }) => agregarSeleccionado(producto.id, cantidad));
+  // Usa EXACTAMENTE los items del resumen (no recalcula) y los agrega en bloque
+  const items = _itemsDelDiaActual;
+  if (!items || !items.length) return;
+  _agregarItemsConCantidad(items);
   const totalEt = items.reduce((s, i) => s + i.cantidad, 0);
   const resumen = document.getElementById('por-dia-resumen');
   resumen.innerHTML = `<div style="background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:10px 12px;color:#15803D;font-weight:600">
