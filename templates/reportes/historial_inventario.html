@@ -20,11 +20,12 @@
   [data-theme="dark"] .mov-badge { filter:brightness(1.35); }
 
   .hist-filtros {
-    display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;
-    margin-bottom:16px;
+    display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
   }
-  .hist-filtros .campo { display:flex; flex-direction:column; gap:3px; }
+  .hist-filtros .campo { display:flex; flex-direction:column; gap:4px; }
   .hist-filtros label { font-size:11.5px; font-weight:600; color:var(--text-muted); }
+  .filtro-titulo { font-size:11.5px; font-weight:700; color:var(--text-muted); margin-bottom:9px;
+    text-transform:uppercase; letter-spacing:.03em; }
   .hist-filtros input, .hist-filtros select {
     font-size:13px; padding:6px 10px; border:1px solid var(--border);
     border-radius:8px; background:var(--card-bg); color:var(--text-1); min-width:150px;
@@ -33,18 +34,26 @@
   .delta-neg { color:#B91C1C; font-weight:700; }
   .delta-cero { color:var(--text-muted); }
 
-  /* Casillas de tipo (selección múltiple) */
-  .tipos-check { display:flex; flex-wrap:wrap; gap:6px; max-width:600px; }
+  /* Casillas de tipo (selección múltiple) — chips compactos tipo filtro */
+  .tipos-check { display:flex; flex-wrap:wrap; gap:8px; }
   .tipo-chip {
-    display:inline-flex; align-items:center; gap:5px;
-    font-size:12px; font-weight:600; padding:5px 11px;
-    border:1px solid var(--border); border-radius:20px;
+    display:inline-flex; align-items:center; gap:7px;
+    font-size:12.5px; font-weight:600; padding:7px 13px;
+    border:1.5px solid var(--border); border-radius:20px;
     cursor:pointer; background:var(--card-bg); color:var(--text-2);
-    user-select:none; transition:all .12s;
+    user-select:none; transition:all .12s; white-space:nowrap; line-height:1;
   }
-  .tipo-chip:hover { border-color:rgba(124,58,237,.4); }
-  .tipo-chip input { margin:0; cursor:pointer; }
-  .tipo-chip.on { background:rgba(124,58,237,.12); border-color:rgba(124,58,237,.55); color:#6D28D9; }
+  .tipo-chip:hover { border-color:rgba(124,58,237,.45); background:rgba(124,58,237,.05); }
+  /* Checkbox nativo oculto (sigue funcionando vía el <label>) — sin esto el
+     estilo global de .hist-filtros input lo estiraba a 150px. */
+  .tipo-chip input { position:absolute; opacity:0; width:1px; height:1px; margin:0; }
+  .tipo-chip .ck {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; border-radius:50%; flex-shrink:0;
+    border:1.5px solid var(--border); font-size:10px; color:transparent; transition:all .12s;
+  }
+  .tipo-chip.on { background:rgba(124,58,237,.12); border-color:#7C3AED; color:#6D28D9; }
+  .tipo-chip.on .ck { background:#7C3AED; border-color:#7C3AED; color:#fff; }
   [data-theme="dark"] .tipo-chip.on { color:#C4B5FD; }
 </style>
 
@@ -58,48 +67,55 @@
   Registra quién lo hizo, cuándo y de cuánto a cuánto quedó el stock.
 </p>
 
-<form method="get" class="hist-filtros">
-  <div class="campo">
-    <label>Buscar (código o nombre)</label>
-    <input type="text" name="q" value="{{ f_q }}" placeholder="TDA-001401 o galleta">
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body" style="padding:18px 20px">
+    <form method="get">
+      <div style="margin-bottom:16px">
+        <div class="filtro-titulo">Tipo de movimiento <span style="font-weight:400;color:var(--text-muted)">— marca uno o varios</span></div>
+        <div class="tipos-check">
+          {% for val, txt in tipos %}
+            <label class="tipo-chip {% if val in f_tipos %}on{% endif %}">
+              <input type="checkbox" name="tipo" value="{{ val }}" {% if val in f_tipos %}checked{% endif %}>
+              <span class="ck"><i class="bi bi-check-lg"></i></span>{{ txt }}
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="hist-filtros">
+        <div class="campo" style="flex:2 1 240px">
+          <label>Buscar (código o nombre)</label>
+          <input type="text" name="q" value="{{ f_q }}" placeholder="TDA-001401 o galleta">
+        </div>
+        <div class="campo">
+          <label>Usuario</label>
+          <select name="usuario">
+            <option value="">Todos</option>
+            {% for u in usuarios %}
+              <option value="{{ u.id }}" {% if u.id|stringformat:'s' == f_usuario %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="campo">
+          <label>Desde</label>
+          <input type="date" name="desde" value="{{ f_desde }}">
+        </div>
+        <div class="campo">
+          <label>Hasta</label>
+          <input type="date" name="hasta" value="{{ f_hasta }}">
+        </div>
+        <div class="campo">
+          <label>&nbsp;</label>
+          <div style="display:flex;gap:8px">
+            <button type="submit" class="btn btn-dark btn-sm" style="padding:8px 20px">Filtrar</button>
+            {% if f_q or f_tipos or f_usuario or f_desde or f_hasta %}
+              <a href="{% url 'historial_inventario' %}" class="btn btn-outline-secondary btn-sm" style="padding:8px 16px">Limpiar</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </form>
   </div>
-  <div class="campo" style="flex:1 1 100%">
-    <label>Tipo de movimiento (marca uno o varios)</label>
-    <div class="tipos-check">
-      {% for val, txt in tipos %}
-        <label class="tipo-chip {% if val in f_tipos %}on{% endif %}">
-          <input type="checkbox" name="tipo" value="{{ val }}" {% if val in f_tipos %}checked{% endif %}>
-          {{ txt }}
-        </label>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="campo">
-    <label>Usuario</label>
-    <select name="usuario">
-      <option value="">Todos</option>
-      {% for u in usuarios %}
-        <option value="{{ u.id }}" {% if u.id|stringformat:'s' == f_usuario %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="campo">
-    <label>Desde</label>
-    <input type="date" name="desde" value="{{ f_desde }}">
-  </div>
-  <div class="campo">
-    <label>Hasta</label>
-    <input type="date" name="hasta" value="{{ f_hasta }}">
-  </div>
-  <div class="campo">
-    <button type="submit" class="btn btn-dark btn-sm" style="padding:7px 16px">Filtrar</button>
-  </div>
-  {% if f_q or f_tipos or f_usuario or f_desde or f_hasta %}
-  <div class="campo">
-    <a href="{% url 'historial_inventario' %}" class="btn btn-outline-secondary btn-sm" style="padding:7px 16px">Limpiar</a>
-  </div>
-  {% endif %}
-</form>
+</div>
 
 <div class="text-muted mb-2" style="font-size:13px">
   <strong>{{ total }}</strong> movimiento{{ total|pluralize }} encontrado{{ total|pluralize }}.
