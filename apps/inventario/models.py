@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.utils.text import slugify
 
 
@@ -97,6 +98,10 @@ class Producto(models.Model):
     # proveedor). Alimenta el filtro "Por día de ingreso" de etiquetas, que
     # antes solo veía la fecha de creación y dejaba fuera las reposiciones.
     ultimo_ingreso_stock = models.DateTimeField(null=True, blank=True)
+    # Stock que tenía la variante ANTES de su último movimiento de stock. Se
+    # muestra en la pantalla de ajuste ("Stock anterior") para dar contexto
+    # rápido. El historial completo vive en MovimientoInventario.
+    stock_anterior = models.PositiveIntegerField(default=0)
 
     class Meta:
         verbose_name        = 'Producto'
@@ -198,3 +203,81 @@ class EtiquetaImpresa(models.Model):
         if ei and ei.stock_al_imprimir is not None and ei.stock_al_imprimir > stock:
             ei.stock_al_imprimir = stock
             ei.save(update_fields=['stock_al_imprimir'])
+
+
+class MovimientoInventario(models.Model):
+    """Bitácora de auditoría del inventario: registra TODO cambio de stock o
+    de reservas de una variante — quién lo hizo, cuándo, de cuánto a cuánto y
+    por qué (ajuste, venta, compra, apartado, creación). Permite reconstruir
+    el historial completo y respaldar el inventario ante dudas ('faltan
+    unidades', 'no se imprimieron todas las etiquetas')."""
+
+    CREACION             = 'creacion'
+    AJUSTE               = 'ajuste'
+    VENTA                = 'venta'
+    VENTA_CREDITO        = 'venta_credito'
+    APARTADO             = 'apartado'
+    APARTADO_COMPLETADO  = 'apartado_completado'
+    APARTADO_CANCELADO   = 'apartado_cancelado'
+    COMPRA               = 'compra'
+
+    TIPOS = [
+        (CREACION,            'Creación de variante'),
+        (AJUSTE,              'Ajuste manual de stock'),
+        (VENTA,               'Venta al contado'),
+        (VENTA_CREDITO,       'Venta a crédito'),
+        (APARTADO,            'Apartado (reserva)'),
+        (APARTADO_COMPLETADO, 'Apartado entregado'),
+        (APARTADO_CANCELADO,  'Apartado cancelado'),
+        (COMPRA,              'Compra a proveedor'),
+    ]
+
+    # SET_NULL + snapshot de código/nombre: la bitácora sobrevive aunque la
+    # variante se borre alguna vez (hoy solo se desactivan, pero el log de
+    # auditoría no debe depender de eso).
+    producto = models.ForeignKey(
+        Producto, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='movimientos',
+    )
+    codigo_barras   = models.CharField(max_length=100, blank=True, db_index=True)
+    nombre_producto = models.CharField(max_length=250, blank=True)
+
+    tipo = models.CharField(max_length=25, choices=TIPOS, db_index=True)
+
+    stock_anterior = models.IntegerField()
+    stock_nuevo    = models.IntegerField()
+    # Solo se llenan en apartados (reserva/liberación). NULL = el movimiento no
+    # tocó el stock reservado.
+    reservado_anterior = models.IntegerField(null=True, blank=True)
+    reservado_nuevo    = models.IntegerField(null=True, blank=True)
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='movimientos_inventario',
+    )
+    referencia = models.CharField(max_length=120, blank=True,
+                                  help_text='p. ej. "Venta #123", "Compra #45"')
+    nota = models.CharField(max_length=250, blank=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name        = 'Movimiento de inventario'
+        verbose_name_plural = 'Movimientos de inventario'
+        ordering            = ['-creado_en', '-id']
+        indexes = [
+            models.Index(fields=['producto', '-creado_en']),
+        ]
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} · {self.codigo_barras} · {self.stock_anterior}→{self.stock_nuevo}'
+
+    @property
+    def delta_stock(self):
+        return self.stock_nuevo - self.stock_anterior
+
+    @property
+    def delta_reservado(self):
+        if self.reservado_anterior is None or self.reservado_nuevo is None:
+            return None
+        return self.reservado_nuevo - self.reservado_anterior

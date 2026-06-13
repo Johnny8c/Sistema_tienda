@@ -45,6 +45,60 @@ def index_reportes(request):
 
 @login_required
 @requiere_dueno
+def historial_inventario(request):
+    """Bitácora de auditoría del inventario: todos los movimientos de stock
+    (ajustes, ventas, compras, apartados, creaciones) con filtros. Sirve para
+    rastrear qué pasó con cada variante y respaldar el inventario."""
+    from django.core.paginator import Paginator
+    from django.utils.dateparse import parse_date
+    from apps.inventario.models import MovimientoInventario
+    from apps.usuarios.models import Usuario
+
+    qs = (MovimientoInventario.objects
+          .select_related('producto', 'usuario')
+          .order_by('-creado_en', '-id'))
+
+    tipo = request.GET.get('tipo', '').strip()
+    q = request.GET.get('q', '').strip()
+    desde = request.GET.get('desde', '').strip()
+    hasta = request.GET.get('hasta', '').strip()
+    usuario_id = request.GET.get('usuario', '').strip()
+
+    if tipo:
+        qs = qs.filter(tipo=tipo)
+    if q:
+        qs = qs.filter(Q(codigo_barras__icontains=q) | Q(nombre_producto__icontains=q))
+    if usuario_id:
+        qs = qs.filter(usuario_id=usuario_id)
+    if desde:
+        d = parse_date(desde)
+        if d:
+            qs = qs.filter(creado_en__date__gte=d)
+    if hasta:
+        h = parse_date(hasta)
+        if h:
+            qs = qs.filter(creado_en__date__lte=h)
+
+    total = qs.count()
+    paginator = Paginator(qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    usuarios = (Usuario.objects
+                .filter(movimientos_inventario__isnull=False)
+                .distinct().order_by('username'))
+
+    ctx = {
+        'movimientos': page_obj, 'page_obj': page_obj,
+        'total': total,
+        'tipos': MovimientoInventario.TIPOS,
+        'usuarios': usuarios,
+        'f_tipo': tipo, 'f_q': q, 'f_desde': desde, 'f_hasta': hasta, 'f_usuario': usuario_id,
+    }
+    return render(request, 'reportes/historial_inventario.html', ctx)
+
+
+@login_required
+@requiere_dueno
 def antiguedad_cartera(request):
     deudas = Deuda.objects.filter(
         estado=Deuda.PENDIENTE

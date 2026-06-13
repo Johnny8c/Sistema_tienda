@@ -119,8 +119,18 @@ def crear_adelanto(cliente_id: int, items: list, monto_inicial: Decimal,
             cantidad=cantidad,
             precio_unitario=pu,  # usa el precio elegido en el POS, no el base
         )
+        reservado_previo = producto.stock_reservado
         producto.stock_reservado += cantidad
         producto.save(update_fields=['stock_reservado'])
+        from apps.inventario.models import MovimientoInventario
+        from apps.inventario.services import registrar_movimiento
+        registrar_movimiento(
+            producto, MovimientoInventario.APARTADO,
+            stock_anterior=producto.stock, stock_nuevo=producto.stock,
+            reservado_anterior=reservado_previo, reservado_nuevo=producto.stock_reservado,
+            usuario=vendedor, referencia=f'Apartado #{adelanto.pk}',
+            nota=f'Reservó {cantidad} unidad(es)',
+        )
 
     if monto_inicial > 0:
         Pago.objects.create(
@@ -188,11 +198,20 @@ def completar_adelanto(adelanto_id: int, vendedor: Usuario) -> Venta:
             precio_unitario=item.precio_unitario,
         )
         producto = Producto.objects.select_for_update().get(pk=item.producto_id)
+        stock_previo = producto.stock
+        reservado_previo = producto.stock_reservado
         producto.stock -= item.cantidad
         producto.stock_reservado -= item.cantidad
         producto.save(update_fields=['stock', 'stock_reservado'])
-        from apps.inventario.models import EtiquetaImpresa
+        from apps.inventario.models import EtiquetaImpresa, MovimientoInventario
+        from apps.inventario.services import registrar_movimiento
         EtiquetaImpresa.descontar_por_venta(producto.codigo_barras, item.cantidad)
+        registrar_movimiento(
+            producto, MovimientoInventario.APARTADO_COMPLETADO,
+            stock_anterior=stock_previo, stock_nuevo=producto.stock,
+            reservado_anterior=reservado_previo, reservado_nuevo=producto.stock_reservado,
+            usuario=vendedor, referencia=f'Venta #{venta.pk} (apartado #{adelanto.pk})',
+        )
 
     adelanto.estado = Adelanto.COMPLETADO
     adelanto.save(update_fields=['estado'])
@@ -224,8 +243,18 @@ def cancelar_adelanto(adelanto_id: int, motivo: str, vendedor: Usuario,
     # Liberar stock reservado
     for item in adelanto.items.select_related('producto').all():
         producto = Producto.objects.select_for_update().get(pk=item.producto_id)
+        reservado_previo = producto.stock_reservado
         producto.stock_reservado -= item.cantidad
         producto.save(update_fields=['stock_reservado'])
+        from apps.inventario.models import MovimientoInventario
+        from apps.inventario.services import registrar_movimiento
+        registrar_movimiento(
+            producto, MovimientoInventario.APARTADO_CANCELADO,
+            stock_anterior=producto.stock, stock_nuevo=producto.stock,
+            reservado_anterior=reservado_previo, reservado_nuevo=producto.stock_reservado,
+            usuario=vendedor, referencia=f'Apartado #{adelanto.pk} cancelado',
+            nota=f'Liberó {item.cantidad} unidad(es) reservada(s)',
+        )
 
     # Manejar el dinero ya pagado
     nota_devolucion = ''
@@ -282,10 +311,17 @@ def crear_venta_credito(cliente_id: int, items: list,
             cantidad=cantidad,
             precio_unitario=pu,  # usa el precio elegido en el POS, no el base
         )
+        stock_previo = producto.stock
         producto.stock -= cantidad
         producto.save(update_fields=['stock'])
-        from apps.inventario.models import EtiquetaImpresa
+        from apps.inventario.models import EtiquetaImpresa, MovimientoInventario
+        from apps.inventario.services import registrar_movimiento
         EtiquetaImpresa.descontar_por_venta(producto.codigo_barras, cantidad)
+        registrar_movimiento(
+            producto, MovimientoInventario.VENTA_CREDITO,
+            stock_anterior=stock_previo, stock_nuevo=producto.stock,
+            usuario=vendedor, referencia=f'Venta #{venta.pk} (crédito)',
+        )
 
     fecha_vencimiento = None
     if plazo_dias:

@@ -7,7 +7,8 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from apps.usuarios.decorators import requiere_no_vendedor
-from .models import CatalogoProducto, Producto, Categoria, EtiquetaImpresa
+from .models import CatalogoProducto, Producto, Categoria, EtiquetaImpresa, MovimientoInventario
+from .services import registrar_movimiento
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +207,12 @@ def crear_producto(request):
             color=color, talla=talla,
             precio=precio_var, stock=int(stock or 0),
         )
+        registrar_movimiento(
+            variante, MovimientoInventario.CREACION,
+            stock_anterior=0, stock_nuevo=variante.stock,
+            usuario=request.user, referencia=f'Producto nuevo #{catalogo.pk}',
+            nota='Producto creado con su primera variante',
+        )
 
         messages.success(request, f'Producto "{nombre}" creado con su primera variante.')
         return redirect('detalle_producto', pk=catalogo.pk)
@@ -306,6 +313,12 @@ def agregar_variante(request, catalogo_pk):
             color=color, talla=talla,
             precio=precio, stock=int(stock),
         )
+        registrar_movimiento(
+            variante, MovimientoInventario.CREACION,
+            stock_anterior=0, stock_nuevo=variante.stock,
+            usuario=request.user, referencia=f'Variante nueva de #{catalogo.pk}',
+            nota=f'Variante {color} {talla} agregada'.strip(),
+        )
 
         messages.success(request, f'Variante {color} {talla} agregada.')
         return redirect('detalle_producto', pk=catalogo.pk)
@@ -364,12 +377,19 @@ def ajustar_stock(request, pk):
             # las unidades que entren con este ajuste cuenten como faltantes.
             EtiquetaImpresa.materializar_legacy(producto.codigo_barras, producto.stock)
             nuevo = int(nuevo_stock)
+            stock_previo = producto.stock
             if nuevo > producto.stock:
                 # Reposición: registrar el ingreso para que la variante
                 # aparezca en "Por día de ingreso" de etiquetas.
                 producto.ultimo_ingreso_stock = timezone.now()
             producto.stock = nuevo
             producto.save()
+            if nuevo != stock_previo:
+                registrar_movimiento(
+                    producto, MovimientoInventario.AJUSTE,
+                    stock_anterior=stock_previo, stock_nuevo=nuevo,
+                    usuario=request.user, referencia='Ajuste manual',
+                )
             # Mantener coherente el contador de etiquetas: no pueden quedar más
             # unidades "ya etiquetadas" que el stock real, o un reabastecimiento
             # posterior imprimiría de menos.
@@ -379,7 +399,18 @@ def ajustar_stock(request, pk):
             return redirect('detalle_producto', pk=producto.catalogo.pk)
         return redirect('lista_inventario')
 
-    return render(request, 'inventario/ajustar_stock.html', {'producto': producto})
+    # Historial reciente de esta variante para dar contexto en la pantalla:
+    # "stock anterior" sale del último movimiento (más fiable que el campo
+    # denormalizado para variantes sin historial previo a esta feature).
+    movimientos = list(
+        MovimientoInventario.objects
+        .filter(producto=producto).select_related('usuario')[:6]
+    )
+    return render(request, 'inventario/ajustar_stock.html', {
+        'producto': producto,
+        'movimientos': movimientos,
+        'ultimo_movimiento': movimientos[0] if movimientos else None,
+    })
 
 
 @login_required

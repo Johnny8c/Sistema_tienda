@@ -16,7 +16,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Categoria, CatalogoProducto, Producto, EtiquetaImpresa
+from .models import Categoria, CatalogoProducto, Producto, EtiquetaImpresa, MovimientoInventario
 
 Usuario = get_user_model()
 
@@ -374,3 +374,131 @@ class EtiquetasIngresoMercaderiaTest(TestCase):
         productos, impresas = self._estado_etiquetas()
         p = next(x for x in productos if x['codigo_barras'] == v.codigo_barras)
         self.assertEqual(_faltantes(p, impresas), 8)
+
+
+@override_settings(STORAGES={
+    'default':     {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+})
+class BitacoraInventarioTest(TestCase):
+    """La bitácora (MovimientoInventario) debe registrar cada cambio de stock
+    con el antes/después correcto, y el campo Producto.stock_anterior debe
+    reflejar el valor previo al último movimiento."""
+
+    def setUp(self):
+        self.user = Usuario.objects.create_user(
+            username='test_bodeguero_log', password='x', rol=Usuario.ROL_DUENO,
+        )
+        self.client.force_login(self.user)
+
+    def _movs(self, producto, tipo=None):
+        qs = MovimientoInventario.objects.filter(producto=producto)
+        if tipo:
+            qs = qs.filter(tipo=tipo)
+        return list(qs.order_by('creado_en', 'id'))
+
+    def test_creacion_de_producto_y_variante_se_registran(self):
+        r = self.client.post(reverse('crear_producto'), {
+            'nombre': f'{MARCA} Bitácora', 'categoria': '',
+            'precio_minimo': '10.00', 'precio_maximo': '15.00',
+            'color': 'Negro', 'talla': 'M', 'stock': '7',
+        })
+        self.assertEqual(r.status_code, 302)
+        catalogo = CatalogoProducto.objects.get(nombre=f'{MARCA} Bitácora')
+        v = catalogo.variantes.first()
+        movs = self._movs(v, MovimientoInventario.CREACION)
+        self.assertEqual(len(movs), 1)
+        self.assertEqual((movs[0].stock_anterior, movs[0].stock_nuevo), (0, 7))
+        self.assertEqual(movs[0].usuario, self.user)
+
+        # Agregar variante también se registra
+        r = self.client.post(reverse('agregar_variante', args=[catalogo.pk]), {
+            'color': 'Azul', 'talla': 'L', 'precio': '12.00', 'stock': '3',
+        })
+        self.assertEqual(r.status_code, 302)
+        v2 = catalogo.variantes.get(talla='L')
+        movs2 = self._movs(v2, MovimientoInventario.CREACION)
+        self.assertEqual(len(movs2), 1)
+        self.assertEqual(movs2[0].stock_nuevo, 3)
+
+    def test_ajuste_de_stock_registra_antes_y_despues(self):
+        r = self.client.post(reverse('crear_producto'), {
+            'nombre': f'{MARCA} Ajuste', 'categoria': '',
+            'precio_minimo': '10.00', 'precio_maximo': '15.00',
+            'color': 'Gris', 'talla': 'M', 'stock': '5',
+        })
+        v = CatalogoProducto.objects.get(nombre=f'{MARCA} Ajuste').variantes.first()
+
+        # Subir 5 → 12
+        self.client.post(reverse('ajustar_stock', args=[v.pk]), {'stock': '12'})
+        # Bajar 12 → 8
+        self.client.post(reverse('ajustar_stock', args=[v.pk]), {'stock': '8'})
+
+        ajustes = self._movs(v, MovimientoInventario.AJUSTE)
+        self.assertEqual(len(ajustes), 2)
+        self.assertEqual((ajustes[0].stock_anterior, ajustes[0].stock_nuevo), (5, 12))
+        self.assertEqual((ajustes[1].stock_anterior, ajustes[1].stock_nuevo), (12, 8))
+
+        # El campo de la pantalla refleja el valor previo al último cambio
+        v.refresh_from_db()
+        self.assertEqual(v.stock_anterior, 12)
+        self.assertEqual(v.stock, 8)
+
+    def test_ajuste_sin_cambio_no_genera_movimiento(self):
+        v = CatalogoProducto.objects.create(
+            nombre=f'{MARCA} SinCambio', precio_base=10).variantes.create(
+            nombre='x', precio=10, stock=5)
+        self.client.post(reverse('ajustar_stock', args=[v.pk]), {'stock': '5'})
+        self.assertEqual(self._movs(v, MovimientoInventario.AJUSTE), [])
+
+    def test_venta_contado_registra_movimiento(self):
+        from apps.ventas.services import crear_venta_contado
+        from apps.configuracion.models import ConfiguracionGeneral
+
+        cat = CatalogoProducto.objects.create(nombre=f'{MARCA} Venta', precio_base=10)
+        v = cat.variantes.create(nombre=f'{MARCA} Venta', precio=10, stock=10)
+
+        crear_venta_contado(
+            items=[{'producto_id': v.pk, 'cantidad': 3, 'precio_unitario': '10.00'}],
+            cliente_id=None, vendedor=self.user, forma_pago='efectivo',
+            cfg_gen=ConfiguracionGeneral.get_singleton(),
+        )
+        ventas = self._movs(v, MovimientoInventario.VENTA)
+        self.assertEqual(len(ventas), 1)
+        self.assertEqual((ventas[0].stock_anterior, ventas[0].stock_nuevo), (10, 7))
+        self.assertTrue(ventas[0].referencia.startswith('Venta #'))
+
+    def test_compra_a_proveedor_registra_movimiento(self):
+        from apps.proveedores.models import Proveedor
+
+        cat = CatalogoProducto.objects.create(nombre=f'{MARCA} CompraLog', precio_base=10)
+        v = cat.variantes.create(nombre=f'{MARCA} CompraLog', precio=10, stock=4)
+        proveedor = Proveedor.objects.create(nombre=f'{MARCA} Prov')
+        r = self.client.post(reverse('crear_compra'), {
+            'proveedor_id': str(proveedor.pk), 'fecha': '2026-06-12',
+            'items_json': json.dumps([
+                {'producto_id': v.pk, 'cantidad': 6, 'precio_unitario': '5.00'},
+            ]),
+        })
+        self.assertEqual(r.status_code, 302)
+        compras = self._movs(v, MovimientoInventario.COMPRA)
+        self.assertEqual(len(compras), 1)
+        self.assertEqual((compras[0].stock_anterior, compras[0].stock_nuevo), (4, 10))
+
+    def test_reporte_historial_carga_y_filtra(self):
+        cat = CatalogoProducto.objects.create(nombre=f'{MARCA} Reporte', precio_base=10)
+        v = cat.variantes.create(nombre=f'{MARCA} Reporte ABC', precio=10, stock=2)
+        self.client.post(reverse('ajustar_stock', args=[v.pk]), {'stock': '9'})
+
+        r = self.client.get(reverse('historial_inventario'))
+        self.assertEqual(r.status_code, 200)
+        self.assertGreaterEqual(r.context['total'], 1)
+
+        # Filtro por tipo
+        r = self.client.get(reverse('historial_inventario'), {'tipo': MovimientoInventario.AJUSTE})
+        self.assertTrue(all(m.tipo == MovimientoInventario.AJUSTE for m in r.context['movimientos']))
+
+        # Filtro por texto (código de barras)
+        r = self.client.get(reverse('historial_inventario'), {'q': v.codigo_barras})
+        self.assertTrue(all(v.codigo_barras == m.codigo_barras for m in r.context['movimientos']))
+        self.assertGreaterEqual(r.context['total'], 1)

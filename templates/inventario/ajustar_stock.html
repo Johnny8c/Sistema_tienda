@@ -8,11 +8,18 @@
   <h4 class="fw-bold mb-0">Ajustar stock</h4>
 </div>
 
-<div class="card border-0 shadow-sm" style="max-width:400px">
+<div class="card border-0 shadow-sm" style="max-width:460px">
   <div class="card-body">
     <h6 class="fw-semibold">{{ producto }}</h6>
-    <div class="d-flex gap-4 mb-3 text-muted small">
+    <div class="d-flex gap-4 mb-3 text-muted small flex-wrap">
       <span>Stock actual: <strong>{{ producto.stock }}</strong></span>
+      <span>Stock anterior:
+        {% if ultimo_movimiento %}
+          <strong>{{ ultimo_movimiento.stock_anterior }}</strong>
+        {% else %}
+          <strong class="text-muted">—</strong>
+        {% endif %}
+      </span>
       <span>Reservado: <strong class="text-info">{{ producto.stock_reservado }}</strong></span>
       <span>Disponible: <strong>{{ producto.stock_disponible }}</strong></span>
     </div>
@@ -31,4 +38,38 @@
     </form>
   </div>
 </div>
+
+{% if movimientos %}
+<div class="card border-0 shadow-sm mt-3" style="max-width:460px">
+  <div class="card-body">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-clock-history me-1"></i>Últimos movimientos</h6>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0" style="font-size:13px">
+        <thead>
+          <tr class="text-muted">
+            <th>Fecha</th><th>Tipo</th><th class="text-center">Stock</th><th>Quién</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in movimientos %}
+          <tr>
+            <td style="white-space:nowrap">{{ m.creado_en|date:"d/m/y H:i" }}</td>
+            <td>{{ m.get_tipo_display }}</td>
+            <td class="text-center" style="white-space:nowrap">
+              {{ m.stock_anterior }} → <strong>{{ m.stock_nuevo }}</strong>
+              {% if m.delta_stock > 0 %}<span class="text-success">(+{{ m.delta_stock }})</span>
+              {% elif m.delta_stock < 0 %}<span class="text-danger">({{ m.delta_stock }})</span>{% endif %}
+            </td>
+            <td>{{ m.usuario.get_full_name|default:m.usuario.username|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <a href="{% url 'historial_inventario' %}?q={{ producto.codigo_barras }}" class="small text-decoration-none">
+      Ver historial completo de esta variante →
+    </a>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

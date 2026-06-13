@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% block title %}Historial de inventario{% endblock %}
+{% block nav_reportes %}active{% endblock %}
+{% block page_title %}Historial de inventario{% endblock %}
+
+{% block content %}
+<style>
+  .mov-badge {
+    display:inline-block; padding:3px 9px; border-radius:20px;
+    font-size:11.5px; font-weight:700; white-space:nowrap;
+  }
+  .mov-creacion            { background:rgba(100,116,139,.15); color:#475569; }
+  .mov-ajuste              { background:rgba(59,130,246,.15);  color:#1D4ED8; }
+  .mov-venta,
+  .mov-venta_credito,
+  .mov-apartado_completado { background:rgba(220,38,38,.12);   color:#B91C1C; }
+  .mov-apartado            { background:rgba(245,158,11,.15);  color:#B45309; }
+  .mov-apartado_cancelado  { background:rgba(16,185,129,.15);  color:#047857; }
+  .mov-compra              { background:rgba(16,185,129,.18);  color:#047857; }
+  [data-theme="dark"] .mov-badge { filter:brightness(1.35); }
+
+  .hist-filtros {
+    display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;
+    margin-bottom:16px;
+  }
+  .hist-filtros .campo { display:flex; flex-direction:column; gap:3px; }
+  .hist-filtros label { font-size:11.5px; font-weight:600; color:var(--text-muted); }
+  .hist-filtros input, .hist-filtros select {
+    font-size:13px; padding:6px 10px; border:1px solid var(--border);
+    border-radius:8px; background:var(--card-bg); color:var(--text-1); min-width:150px;
+  }
+  .delta-pos { color:#047857; font-weight:700; }
+  .delta-neg { color:#B91C1C; font-weight:700; }
+  .delta-cero { color:var(--text-muted); }
+</style>
+
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a href="{% url 'reportes' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i></a>
+  <h4 class="fw-bold mb-0">Historial de inventario</h4>
+</div>
+
+<p class="text-muted" style="font-size:13.5px;margin-bottom:16px">
+  Bitácora de cada cambio de stock: ajustes, ventas, compras, apartados y creaciones.
+  Registra quién lo hizo, cuándo y de cuánto a cuánto quedó el stock.
+</p>
+
+<form method="get" class="hist-filtros">
+  <div class="campo">
+    <label>Buscar (código o nombre)</label>
+    <input type="text" name="q" value="{{ f_q }}" placeholder="TDA-001401 o galleta">
+  </div>
+  <div class="campo">
+    <label>Tipo de movimiento</label>
+    <select name="tipo">
+      <option value="">Todos</option>
+      {% for val, txt in tipos %}
+        <option value="{{ val }}" {% if val == f_tipo %}selected{% endif %}>{{ txt }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label>Usuario</label>
+    <select name="usuario">
+      <option value="">Todos</option>
+      {% for u in usuarios %}
+        <option value="{{ u.id }}" {% if u.id|stringformat:'s' == f_usuario %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="campo">
+    <label>Desde</label>
+    <input type="date" name="desde" value="{{ f_desde }}">
+  </div>
+  <div class="campo">
+    <label>Hasta</label>
+    <input type="date" name="hasta" value="{{ f_hasta }}">
+  </div>
+  <div class="campo">
+    <button type="submit" class="btn btn-dark btn-sm" style="padding:7px 16px">Filtrar</button>
+  </div>
+  {% if f_q or f_tipo or f_usuario or f_desde or f_hasta %}
+  <div class="campo">
+    <a href="{% url 'historial_inventario' %}" class="btn btn-outline-secondary btn-sm" style="padding:7px 16px">Limpiar</a>
+  </div>
+  {% endif %}
+</form>
+
+<div class="text-muted mb-2" style="font-size:13px">
+  <strong>{{ total }}</strong> movimiento{{ total|pluralize }} encontrado{{ total|pluralize }}.
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0" style="font-size:13px">
+        <thead style="background:var(--table-head-bg)">
+          <tr class="text-muted">
+            <th style="padding-left:16px">Fecha</th>
+            <th>Producto</th>
+            <th>Tipo</th>
+            <th class="text-center">Stock</th>
+            <th class="text-center">Reservado</th>
+            <th>Quién</th>
+            <th style="padding-right:16px">Referencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in movimientos %}
+          <tr>
+            <td style="padding-left:16px;white-space:nowrap">{{ m.creado_en|date:"d/m/y H:i" }}</td>
+            <td>
+              <div style="font-weight:600">{{ m.nombre_producto }}</div>
+              <div class="text-muted" style="font-size:11.5px">{{ m.codigo_barras|default:"—" }}</div>
+            </td>
+            <td><span class="mov-badge mov-{{ m.tipo }}">{{ m.get_tipo_display }}</span></td>
+            <td class="text-center" style="white-space:nowrap">
+              {{ m.stock_anterior }} → <strong>{{ m.stock_nuevo }}</strong>
+              {% if m.delta_stock > 0 %}<span class="delta-pos">+{{ m.delta_stock }}</span>
+              {% elif m.delta_stock < 0 %}<span class="delta-neg">{{ m.delta_stock }}</span>
+              {% else %}<span class="delta-cero">·</span>{% endif %}
+            </td>
+            <td class="text-center" style="white-space:nowrap">
+              {% if m.delta_reservado != None %}
+                {{ m.reservado_anterior }} → <strong>{{ m.reservado_nuevo }}</strong>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td>{{ m.usuario.get_full_name|default:m.usuario.username|default:"—" }}</td>
+            <td style="padding-right:16px">
+              <div>{{ m.referencia|default:"—" }}</div>
+              {% if m.nota %}<div class="text-muted" style="font-size:11.5px">{{ m.nota }}</div>{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-center text-muted py-4">
+            No hay movimientos con estos filtros.
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav class="mt-3">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?{% if f_q %}q={{ f_q }}&{% endif %}{% if f_tipo %}tipo={{ f_tipo }}&{% endif %}{% if f_usuario %}usuario={{ f_usuario }}&{% endif %}{% if f_desde %}desde={{ f_desde }}&{% endif %}{% if f_hasta %}hasta={{ f_hasta }}&{% endif %}page={{ page_obj.previous_page_number }}">‹ Anterior</a></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+    {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?{% if f_q %}q={{ f_q }}&{% endif %}{% if f_tipo %}tipo={{ f_tipo }}&{% endif %}{% if f_usuario %}usuario={{ f_usuario }}&{% endif %}{% if f_desde %}desde={{ f_desde }}&{% endif %}{% if f_hasta %}hasta={{ f_hasta }}&{% endif %}page={{ page_obj.next_page_number }}">Siguiente ›</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

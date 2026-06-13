@@ -8,7 +8,8 @@ from django.db import transaction
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from apps.usuarios.decorators import requiere_dueno, requiere_no_vendedor
-from apps.inventario.models import Producto, EtiquetaImpresa
+from apps.inventario.models import Producto, EtiquetaImpresa, MovimientoInventario
+from apps.inventario.services import registrar_movimiento
 from .models import Proveedor, Compra, ItemCompra
 
 logger = logging.getLogger(__name__)
@@ -145,10 +146,17 @@ def crear_compra(request):
                     # (snapshot NULL), fijarlo al stock previo para que las
                     # unidades recibidas cuenten como etiquetas faltantes.
                     EtiquetaImpresa.materializar_legacy(prod.codigo_barras, prod.stock)
+                    stock_previo = prod.stock
                     prod.stock += cantidad
                     # Registrar el ingreso para "Por día de ingreso" de etiquetas
                     prod.ultimo_ingreso_stock = timezone.now()
                     prod.save(update_fields=['stock', 'ultimo_ingreso_stock'])
+                    registrar_movimiento(
+                        prod, MovimientoInventario.COMPRA,
+                        stock_anterior=stock_previo, stock_nuevo=prod.stock,
+                        usuario=request.user, referencia=f'Compra #{compra.pk}',
+                        nota=f'Recibió {cantidad} unidad(es)',
+                    )
                     total += precio * cantidad
 
                 compra.total = total

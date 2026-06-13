@@ -128,11 +128,18 @@ def crear_venta_contado(*, items, cliente_id, vendedor, forma_pago, cfg_gen):
         )
         # max(0, ...) evita stock negativo cuando se vende sin stock
         # (permitir_vender_sin_stock); el campo es PositiveInteger y reventaría.
+        stock_previo = item['prod'].stock
         item['prod'].stock = max(0, item['prod'].stock - item['cantidad'])
         item['prod'].save(update_fields=['stock'])
         # La etiqueta impresa se va con la prenda vendida: descontar el snapshot
         # para que al reponer stock se detecte que faltan etiquetas nuevas.
-        from apps.inventario.models import EtiquetaImpresa
+        from apps.inventario.models import EtiquetaImpresa, MovimientoInventario
+        from apps.inventario.services import registrar_movimiento
         EtiquetaImpresa.descontar_por_venta(item['prod'].codigo_barras, item['cantidad'])
+        registrar_movimiento(
+            item['prod'], MovimientoInventario.VENTA,
+            stock_anterior=stock_previo, stock_nuevo=item['prod'].stock,
+            usuario=vendedor, referencia=f'Venta #{venta.pk}',
+        )
 
     return venta
