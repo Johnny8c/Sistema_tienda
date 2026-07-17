@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
 from django.db import transaction
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 logger = logging.getLogger(__name__)
@@ -233,7 +234,12 @@ def _crear_factura_desde_venta(venta, usuario, cfg):
             venta=venta,
             cliente=venta.cliente,
             numero_factura=numero,
-            fecha_emision=venta.fecha.date(),
+            # localdate: la fecha de emisión debe ser la de Ecuador. Con
+            # .date() sobre el datetime UTC, toda venta hecha después de las
+            # 19:00 locales salía con la fecha del día siguiente y el SRI la
+            # rechazaba: "FECHA EMISION EXTEMPORANEA ... mayor a la fecha del
+            # servidor".
+            fecha_emision=timezone.localdate(venta.fecha),
             ambiente=cfg_locked.ambiente,
             estado=FacturaSRI.BORRADOR,
             subtotal_0=subtotal_0,

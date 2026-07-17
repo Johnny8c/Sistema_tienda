@@ -22,7 +22,10 @@ def _buckets_antiguedad(deudas_pendientes):
     totales = {'0-30': Decimal('0'), '31-60': Decimal('0'), '61-90': Decimal('0'), '90+': Decimal('0')}
 
     for d in deudas_pendientes:
-        dias = (hoy - d.fecha_creacion.date()).days
+        # localdate: ambas fechas en hora de Ecuador. Con .date() sobre el
+        # datetime UTC, una deuda creada después de las 19:00 locales
+        # envejecía un día de más.
+        dias = (hoy - timezone.localdate(d.fecha_creacion)).days
         if dias <= 30:
             key = '0-30'
         elif dias <= 60:

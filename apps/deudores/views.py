@@ -242,7 +242,8 @@ def lista_deudas(request):
         hoy = timezone.localdate()
         total = Decimal('0')
         for deuda in pendientes:
-            dias = (hoy - deuda.fecha_creacion.date()).days
+            # Ambas fechas en hora de Ecuador (ver _buckets_antiguedad)
+            dias = (hoy - timezone.localdate(deuda.fecha_creacion)).days
             en_rango = dias >= dias_min and (dias_max is None or dias <= dias_max)
             if en_rango:
                 total += deuda.saldo_pendiente
