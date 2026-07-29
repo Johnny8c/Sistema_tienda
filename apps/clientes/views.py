@@ -1,9 +1,10 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import IntegrityError
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from apps.usuarios.decorators import requiere_no_bodeguero
+from apps.usuarios.decorators import requiere_no_bodeguero, requiere_no_bodeguero_api
 from .models import Cliente
 from .services import validar_cedula_o_ruc
 
@@ -85,11 +86,15 @@ def editar_cliente(request, pk):
     return render(request, 'clientes/form.html', {'accion': 'Editar', 'cliente': cliente})
 
 
-@login_required
-@requiere_no_bodeguero
+@requiere_no_bodeguero_api
 @require_POST
 def api_crear_cliente(request):
-    """Endpoint AJAX para crear cliente rápido desde el POS."""
+    """Endpoint AJAX para crear cliente rápido desde el POS.
+
+    Ojo: acá NO se usa @login_required / @requiere_no_bodeguero porque esos
+    redirigen al login y el POS recibiría HTML en vez de JSON. Ver
+    apps/usuarios/decorators.py.
+    """
     nombre     = request.POST.get('nombre', '').strip()
     cedula_ruc = request.POST.get('cedula_ruc', '').strip()
     telefono   = request.POST.get('telefono', '').strip()
@@ -102,10 +107,17 @@ def api_crear_cliente(request):
     if Cliente.objects.filter(cedula_ruc=cedula_ruc).exists():
         return JsonResponse({'ok': False, 'error': f'Ya existe un cliente con cédula/RUC {cedula_ruc}.'}, status=400)
 
-    cliente = Cliente.objects.create(
-        nombre=nombre, cedula_ruc=cedula_ruc,
-        telefono=telefono, email=email,
-    )
+    try:
+        cliente = Cliente.objects.create(
+            nombre=nombre, cedula_ruc=cedula_ruc,
+            telefono=telefono, email=email,
+        )
+    except IntegrityError:
+        # Dos cajas creando el mismo cliente al mismo tiempo.
+        cliente = Cliente.objects.filter(cedula_ruc=cedula_ruc).first()
+        if cliente is None:
+            raise
+
     return JsonResponse({
         'ok':         True,
         'id':         cliente.pk,

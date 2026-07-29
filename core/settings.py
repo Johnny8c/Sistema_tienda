@@ -77,9 +77,17 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/dashboard/'
 LOGOUT_REDIRECT_URL = '/login/'
 
-# Cierre de sesión por inactividad (30 min). SESSION_SAVE_EVERY_REQUEST hace
-# que el contador sea "deslizante": cada request del usuario lo reinicia.
-SESSION_INACTIVITY_SECONDS = config('SESSION_INACTIVITY_SECONDS', default=1800, cast=int)
+# Cierre de sesión por inactividad (12 h = una jornada larga de tienda).
+# SESSION_SAVE_EVERY_REQUEST hace que el contador sea "deslizante": cada
+# request del usuario lo reinicia, así que las 12 h son de INACTIVIDAD real,
+# no de tiempo total conectado.
+#
+# Antes eran 30 min y con el POS abierto en el mostrador la sesión moría a
+# cada rato: el cajero solo se enteraba cuando una acción fallaba (ver el
+# caso del alta de cliente rápido). La sesión SIGUE cerrándose sola —
+# a las 12 h de no tocar nada el JS de session_timeout.js manda a /logout/,
+# y SESSION_EXPIRE_AT_BROWSER_CLOSE la cierra al cerrar el navegador.
+SESSION_INACTIVITY_SECONDS = config('SESSION_INACTIVITY_SECONDS', default=43200, cast=int)
 SESSION_COOKIE_AGE = SESSION_INACTIVITY_SECONDS
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
@@ -175,6 +183,9 @@ CSRF_TRUSTED_ORIGINS = config(
     default='https://*.up.railway.app,https://*.railway.app',
     cast=Csv(),
 )
+
+# Los fetch() del POS reciben JSON en vez de la página HTML de error 403.
+CSRF_FAILURE_VIEW = 'core.csrf.csrf_failure'
 
 if not DEBUG:
     # BEHIND_HTTPS=True (default) cuando el sitio se sirve por HTTPS detrás
