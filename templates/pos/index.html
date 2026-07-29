@@ -1013,6 +1013,14 @@ document.getElementById('btn-nuevo-cliente').addEventListener('click', e => {
   modalNC.show();
 });
 
+function mensajeErrorHTTP(status) {
+  if (status === 401 || status === 403)
+    return 'Tu sesión expiró. Inicia sesión en OTRA pestaña y vuelve a tocar "Crear y seleccionar" — así no pierdes el carrito. (Si recargas esta página, el carrito se borra.)';
+  if (status >= 500)
+    return `El servidor tuvo un error (${status}). Intenta de nuevo; si sigue igual, avisa al soporte.`;
+  return `No se pudo crear el cliente (error ${status}).`;
+}
+
 document.getElementById('nc-guardar').addEventListener('click', async () => {
   const errBox = document.getElementById('nc-error');
   errBox.style.display = 'none';
@@ -1030,11 +1038,21 @@ document.getElementById('nc-guardar').addEventListener('click', async () => {
 
   try {
     const resp = await fetch('{% url "api_crear_cliente" %}', {
-      method: 'POST', body: data, headers: {'X-CSRFToken': csrfToken},
+      method: 'POST', body: data, headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+      },
     });
-    const json = await resp.json();
-    if (!resp.ok || !json.ok) {
-      errBox.textContent = json.error || 'Error al crear cliente.';
+
+    // El servidor puede devolver HTML (login, error 500, pagina de CSRF).
+    // Si parseamos a lo bruto, el cajero ve "Unexpected token '<'" y no
+    // sabe que hacer. Parseamos con red de seguridad.
+    let json = null;
+    try { json = await resp.json(); } catch (_) { json = null; }
+
+    if (!resp.ok || !json || !json.ok) {
+      errBox.textContent = (json && json.error) || mensajeErrorHTTP(resp.status);
       errBox.style.display = '';
       return;
     }
