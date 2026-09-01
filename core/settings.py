@@ -236,3 +236,32 @@ DEFAULT_FROM_EMAIL  = config(
     'DEFAULT_FROM_EMAIL',
     default='Sistema Tienda <onboarding@resend.dev>',
 )
+
+# ─────────────────────────────────────────────────────────────
+# SRI — DATOS DEL PROVEEDOR DEL SISTEMA DE FACTURACION
+# Resolucion NAC-DGERCGC26-00000027 (28-jul-2026): todo comprobante
+# electronico debe llevar, en infoAdicional, el RUC del proveedor del
+# software con el que fue emitido.
+#
+# OJO: esto NO es el RUC del emisor (el negocio que factura, vive en
+# ConfiguracionSRI.ruc) ni el del comprador. Es el del desarrollador del
+# sistema y es GLOBAL: un solo valor para toda la instalacion.
+#
+# Solo SRI_PROVEEDOR_RUC es obligatorio por la norma; los demas son datos
+# de contacto opcionales. Cualquiera que se deje vacio no se emite.
+# El literal del nombre del campo queda configurable por si el SRI publica
+# un nombre reservado distinto en la ficha tecnica.
+# ─────────────────────────────────────────────────────────────
+SRI_PROVEEDOR_RUC      = config('SRI_PROVEEDOR_RUC',      default='0150137917001')
+SRI_PROVEEDOR_NOMBRE   = config('SRI_PROVEEDOR_NOMBRE',   default='JOHNNY CAIVINAGUA MOROCHO')
+SRI_PROVEEDOR_EMAIL    = config('SRI_PROVEEDOR_EMAIL',    default='leocaivinagua@gmail.com')
+SRI_PROVEEDOR_TELEFONO = config('SRI_PROVEEDOR_TELEFONO', default='0997303865')
+
+# Nombres de los campoAdicional (sin tildes, igual que los ya existentes)
+SRI_PROVEEDOR_CAMPO_RUC      = config('SRI_PROVEEDOR_CAMPO_RUC',      default='RUC Proveedor')
+SRI_PROVEEDOR_CAMPO_NOMBRE   = config('SRI_PROVEEDOR_CAMPO_NOMBRE',   default='Razon Social Proveedor')
+SRI_PROVEEDOR_CAMPO_EMAIL    = config('SRI_PROVEEDOR_CAMPO_EMAIL',    default='Email Proveedor')
+SRI_PROVEEDOR_CAMPO_TELEFONO = config('SRI_PROVEEDOR_CAMPO_TELEFONO', default='Telefono Proveedor')
+
+# Limite del esquema SRI: maximo 15 campoAdicional por comprobante.
+SRI_MAX_CAMPOS_ADICIONALES = 15

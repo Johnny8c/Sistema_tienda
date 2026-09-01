@@ -6,6 +6,7 @@ import io
 from datetime import datetime
 from decimal import Decimal
 
+from django.conf import settings
 from django.utils import timezone
 
 from reportlab.lib.pagesizes import A4
@@ -124,6 +125,30 @@ def _wrap_text(c, text, max_w, font='Helvetica', size=8):
     if current:
         lines.append(current)
     return lines
+
+
+def _linea_proveedor():
+    """
+    Linea de credito del proveedor del sistema para el pie del RIDE.
+    Zona libre: va debajo de la linea separadora del pie, fuera de todos los
+    bloques que el SRI exige en la representacion impresa.
+    Devuelve '' si no hay datos configurados.
+    """
+    partes = []
+    nombre = (settings.SRI_PROVEEDOR_NOMBRE or '').strip()
+    ruc    = (settings.SRI_PROVEEDOR_RUC or '').strip()
+    email  = (settings.SRI_PROVEEDOR_EMAIL or '').strip()
+    tel    = (settings.SRI_PROVEEDOR_TELEFONO or '').strip()
+
+    if nombre:
+        partes.append(f'Sistema desarrollado por {nombre}')
+    if ruc:
+        partes.append(f'RUC {ruc}')
+    if email:
+        partes.append(email)
+    if tel:
+        partes.append(tel)
+    return '  ·  '.join(partes)
 
 
 def generar_ride_pdf(factura, items, configuracion, cliente) -> bytes:
@@ -381,7 +406,16 @@ def generar_ride_pdf(factura, items, configuracion, cliente) -> bytes:
     _draw_line(c, MARGIN, footer_y, MARGIN + COL_W, footer_y)
     _text(c, MARGIN, footer_y - 8,
           f'Documento generado por Sistema Tienda | {timezone.localtime().strftime("%d/%m/%Y %H:%M:%S")}',
-          font='Helvetica', size=6.5, color='#AAAAAA', max_w=COL_W, align='center')
+          font='Helvetica', size=6.5, color='#BBBBBB', max_w=COL_W, align='center')
+
+    # Credito del proveedor del sistema (Res. NAC-DGERCGC26-00000027).
+    # Texto libre, fuera de los bloques fiscales del RIDE. Va un punto mas
+    # grande y mas oscuro que el sello tecnico de arriba: es el dato que
+    # interesa que se lea.
+    credito = _linea_proveedor()
+    if credito:
+        _text(c, MARGIN, footer_y - 20, credito,
+              font='Helvetica', size=7.5, color='#777777', max_w=COL_W, align='center')
 
     c.showPage()
     c.save()

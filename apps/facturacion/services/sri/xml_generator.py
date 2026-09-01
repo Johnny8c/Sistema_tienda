@@ -5,11 +5,18 @@ Puerto directo de xmlGenerator.js — mantiene exactamente el mismo orden de tag
 from decimal import Decimal
 from datetime import datetime, date
 
+from django.conf import settings
+
 
 def _esc(s):
     if s is None:
         return ''
     return str(s).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+
+def _esc_attr(s):
+    """Escapado para valores de atributo: ademas de &<>, las comillas."""
+    return _esc(s).replace('"', '&quot;')
 
 
 def _fmt2(n):
@@ -39,6 +46,27 @@ def _tipo_id_comprador(cedula):
     if len(c) == 10 and c.isdigit():
         return ('05', c, None)  # Cédula
     return ('06', c, None)      # Pasaporte
+
+
+def _campos_proveedor():
+    """
+    Campos del proveedor del sistema para infoAdicional.
+
+    Resolucion NAC-DGERCGC26-00000027: el RUC del proveedor del software es
+    obligatorio en todo comprobante. El resto son datos de contacto y se
+    omiten si estan vacios en la configuracion.
+
+    Devuelve una lista de (nombre, valor) en orden de prioridad: el campo
+    obligatorio primero, para que sea el ultimo en descartarse si hubiera
+    que recortar por el limite de 15 campoAdicional.
+    """
+    pares = [
+        (settings.SRI_PROVEEDOR_CAMPO_RUC,      settings.SRI_PROVEEDOR_RUC),
+        (settings.SRI_PROVEEDOR_CAMPO_NOMBRE,   settings.SRI_PROVEEDOR_NOMBRE),
+        (settings.SRI_PROVEEDOR_CAMPO_EMAIL,    settings.SRI_PROVEEDOR_EMAIL),
+        (settings.SRI_PROVEEDOR_CAMPO_TELEFONO, settings.SRI_PROVEEDOR_TELEFONO),
+    ]
+    return [(n.strip(), str(v).strip()) for n, v in pares if n and str(v).strip()]
 
 
 def generar_xml(factura, items, configuracion, cliente, tipo_emision='1'):
@@ -120,14 +148,38 @@ def generar_xml(factura, items, configuracion, cliente, tipo_emision='1'):
     parts_det.append('</detalles>')
     detalles = ''.join(parts_det)
 
-    # Info adicional
+    # Info adicional — (nombre, valor) para poder controlar duplicados y el tope de 15
     campos = []
     if cliente.telefono:
-        campos.append(f'<campoAdicional nombre="Telefono">{_esc(cliente.telefono)}</campoAdicional>')
+        campos.append(('Telefono', str(cliente.telefono)))
     if cliente.email:
-        campos.append(f'<campoAdicional nombre="Email">{_esc(cliente.email)}</campoAdicional>')
-    campos.append(f'<campoAdicional nombre="NumeroFactura">{_esc(factura.numero_factura)}</campoAdicional>')
-    info_adicional = f'<infoAdicional>{"".join(campos)}</infoAdicional>'
+        campos.append(('Email', str(cliente.email)))
+    campos.append(('NumeroFactura', str(factura.numero_factura or '')))
+
+    # Datos del proveedor del sistema (Res. NAC-DGERCGC26-00000027).
+    # Idempotente: si el nombre ya esta presente no se agrega de nuevo.
+    ya_presentes = {n for n, _ in campos}
+    for nombre, valor in _campos_proveedor():
+        if nombre not in ya_presentes:
+            campos.append((nombre, valor))
+            ya_presentes.add(nombre)
+
+    # Blindaje del tope del XSD (max 15). En la practica nunca se alcanza, pero
+    # si pasara se recorta desde el final SIN sacrificar el campo obligatorio:
+    # el RUC del proveedor se fuerza en la ultima ranura disponible.
+    tope = settings.SRI_MAX_CAMPOS_ADICIONALES
+    if len(campos) > tope:
+        obligatorio = next(
+            (c for c in campos if c[0] == settings.SRI_PROVEEDOR_CAMPO_RUC), None
+        )
+        campos = campos[:tope]
+        if obligatorio and obligatorio not in campos:
+            campos[-1] = obligatorio
+
+    info_adicional = '<infoAdicional>{}</infoAdicional>'.format(''.join(
+        f'<campoAdicional nombre="{_esc_attr(n)}">{_esc(v)}</campoAdicional>'
+        for n, v in campos
+    ))
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>'
